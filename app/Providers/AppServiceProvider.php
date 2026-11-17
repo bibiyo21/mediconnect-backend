@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use App\Shared\Contracts\Clock;
+use App\Shared\Http\Middleware\EnsureIdempotency;
 use App\Shared\Logging\ScrubbingLogManager;
 use App\Shared\Services\SystemClock;
+use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,8 +23,9 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    public function boot(Router $router): void
     {
-        //
+        // Critical writes opt in per route: ->middleware('idempotent').
+        $router->aliasMiddleware('idempotent', EnsureIdempotency::class);
     }
 }

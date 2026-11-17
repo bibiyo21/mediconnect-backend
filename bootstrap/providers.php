@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Administration\Providers\AdministrationServiceProvider;
 use App\Modules\Audit\Providers\AuditServiceProvider;
 use App\Modules\Authentication\Providers\AuthenticationServiceProvider;
 use App\Modules\Notifications\Providers\NotificationsServiceProvider;
@@ -18,4 +19,5 @@ return [
     RbacServiceProvider::class,
     NotificationsServiceProvider::class,
     AuthenticationServiceProvider::class,
+    AdministrationServiceProvider::class,
 ];
