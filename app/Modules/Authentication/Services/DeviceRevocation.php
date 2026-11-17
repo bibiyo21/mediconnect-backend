@@ -25,6 +25,11 @@ final class DeviceRevocation
         });
     }
 
+    public function revokeRefreshTokens(UserDevice $device): void
+    {
+        RefreshToken::where('user_device_id', $device->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+    }
+
     public function revokeFamily(string $familyId): void
     {
         RefreshToken::where('family_id', $familyId)->whereNull('revoked_at')->update(['revoked_at' => now()]);

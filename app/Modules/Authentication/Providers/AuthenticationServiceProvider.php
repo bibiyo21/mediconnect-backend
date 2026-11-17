@@ -42,8 +42,16 @@ final class AuthenticationServiceProvider extends ServiceProvider
         RateLimiter::for('auth-strict', function (Request $request) {
             $identifier = (string) ($request->input('identifier') ?? $request->input('email') ?? $request->input('mobile') ?? $request->input('mfa_challenge_id') ?? '');
 
+            // Requests without an identifier (step-up, verify-my-contact) are limited per
+            // signed-in user, or per IP, never in one bucket shared by everybody.
+            $subject = match (true) {
+                trim($identifier) !== '' => 'id:'.Fingerprint::of(mb_strtolower(trim($identifier))),
+                $request->user('sanctum') !== null => 'user:'.$request->user('sanctum')->getAuthIdentifier(),
+                default => 'ip:'.Fingerprint::ip($request->ip()),
+            };
+
             return [
-                Limit::perMinute(5)->by('auth-id:'.Fingerprint::of(mb_strtolower(trim($identifier)))),
+                Limit::perMinute(5)->by('auth-'.$subject),
                 Limit::perMinute(20)->by('auth-ip:'.Fingerprint::ip($request->ip())),
             ];
         });

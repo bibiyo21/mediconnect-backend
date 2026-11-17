@@ -79,6 +79,10 @@ final class OtpController
             throw AuthFailure::invalidCredentials();
         }
 
+        if (! $user->isActive()) {
+            throw AuthFailure::accountSuspended();
+        }
+
         $destination = match ($purpose) {
             OtpPurpose::VerifyEmail => $user->email ? Destination::email($user->email) : null,
             default => $user->mobile_e164 ? Destination::mobile($user->mobile_e164) : null,

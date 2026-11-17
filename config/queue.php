@@ -70,7 +70,8 @@ return [
             'queue' => env('REDIS_QUEUE', 'default'),
             'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
             'block_for' => null,
-            'after_commit' => false,
+            // Jobs dispatched inside a transaction run only after it commits.
+            'after_commit' => true,
         ],
 
         'deferred' => [
@@ -125,5 +126,12 @@ return [
         'database' => env('DB_CONNECTION', 'sqlite'),
         'table' => 'failed_jobs',
     ],
+
+    /*
+    | Queues a worker serves, highest priority first (CLAUDE.md §24). The
+    | `queues:work` command reads this list, so a new queue cannot be forgotten
+    | by the worker. Horizon (later phase) will take its supervisors from here.
+    */
+    'priorities' => ['critical', 'payments', 'sms', 'email', 'notifications', 'scheduling', 'search', 'reports', 'default'],
 
 ];

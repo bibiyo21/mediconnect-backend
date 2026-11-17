@@ -5,6 +5,7 @@ namespace App\Modules\Authentication\Http\Controllers;
 use App\Modules\Authentication\Exceptions\AuthFailure;
 use App\Modules\Authentication\Http\Requests\MfaCodeRequest;
 use App\Modules\Authentication\Models\PersonalAccessToken;
+use App\Modules\Authentication\Services\DeviceRevocation;
 use App\Modules\Authentication\Services\MfaService;
 use App\Modules\Authentication\Services\SessionIssuer;
 use App\Modules\Authentication\Services\StepUp;
@@ -33,7 +34,7 @@ final class MfaController
      * Confirms enrollment and upgrades the current sign-in to full access.
      * Recovery codes are returned once and never again.
      */
-    public function confirm(MfaCodeRequest $request, SessionIssuer $issuer): JsonResponse
+    public function confirm(MfaCodeRequest $request, SessionIssuer $issuer, DeviceRevocation $revocation): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -43,6 +44,8 @@ final class MfaController
         $token = $user->currentAccessToken();
 
         if ($token instanceof PersonalAccessToken && $token->device) {
+            // Earlier refresh tokens of this device were issued before MFA: end them.
+            $revocation->revokeRefreshTokens($token->device);
             $data += $issuer->rotateTokens($token->device, $user, (string) Str::uuid7(), fullAccess: true)->toArray();
         } elseif ($request->hasSession()) {
             $request->session()->put('auth.mfa_satisfied', true);
