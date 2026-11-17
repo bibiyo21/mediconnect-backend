@@ -1,10 +1,10 @@
 <?php
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\RefreshDatabaseAsOwner;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
-    ->use(RefreshDatabase::class)
+    ->use(RefreshDatabaseAsOwner::class)
     ->in('Feature', '../app/Modules/*/Tests/Feature');
 
 pest()->extend(TestCase::class)
