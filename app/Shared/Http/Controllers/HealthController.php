@@ -7,6 +7,7 @@ use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Symfony\Component\HttpFoundation\IpUtils;
 use Throwable;
@@ -34,11 +35,12 @@ final class HealthController
         }
 
         $checks = [
-            'database' => $this->check(fn () => DB::select('select 1')),
-            'redis' => $this->check(fn () => Redis::connection()->ping()),
-            'migrations' => $this->check(function () use ($migrator) {
+            'database' => $this->check('database', fn () => DB::select('select 1')),
+            'redis' => $this->check('redis', fn () => Redis::connection()->ping()),
+            'migrations' => $this->check('migrations', function () use ($migrator) {
                 $ran = $migrator->getRepository()->getRan();
-                $files = array_keys($migrator->getMigrationFiles($migrator->paths() + [database_path('migrations')]));
+                // array_merge, not +: package paths are a list, and + would drop our own folder.
+                $files = array_keys($migrator->getMigrationFiles(array_merge($migrator->paths(), [database_path('migrations')])));
 
                 if (array_diff($files, $ran) !== []) {
                     throw new \RuntimeException('pending migrations');
@@ -51,14 +53,16 @@ final class HealthController
         return ApiResponse::success(['status' => $ready ? 'ready' : 'not_ready', 'checks' => $checks], status: $ready ? 200 : 503);
     }
 
-    private function check(callable $probe): string
+    private function check(string $name, callable $probe): string
     {
         try {
             $probe();
 
             return 'ok';
         } catch (Throwable $e) {
-            report($e);
+            // Warning, not report(): load balancers probe every few seconds, and
+            // the 503 itself is the alert. Reporting each failure would flood Sentry.
+            Log::warning('Readiness check failed', ['check' => $name, 'error' => $e::class]);
 
             return 'fail';
         }

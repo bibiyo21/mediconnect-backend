@@ -65,7 +65,15 @@
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/auth/verify-mobile": {
@@ -122,7 +130,15 @@
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/auth/devices": {
@@ -166,7 +182,15 @@
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/auth/devices/{deviceId}": {
@@ -227,7 +251,15 @@
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/health": {
@@ -355,7 +387,15 @@
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/auth/mfa/totp/confirm": {
@@ -422,7 +462,15 @@
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/auth/mfa/step-up": {
@@ -505,7 +553,15 @@
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/auth/otp": {
@@ -891,7 +947,7 @@
                                                 "user": {
                                                     "anyOf": [
                                                         {
-                                                            "type": "array"
+                                                            "$ref": "#/components/schemas/AccountResource"
                                                         },
                                                         {}
                                                     ]
@@ -977,8 +1033,7 @@
                                                     "type": "object",
                                                     "properties": {
                                                         "user": {
-                                                            "type": "array",
-                                                            "items": {}
+                                                            "$ref": "#/components/schemas/AccountResource"
                                                         },
                                                         "device_id": {
                                                             "type": "string"
@@ -1157,8 +1212,7 @@
                                             "type": "object",
                                             "properties": {
                                                 "user": {
-                                                    "type": "array",
-                                                    "items": {}
+                                                    "$ref": "#/components/schemas/AccountResource"
                                                 },
                                                 "device_id": {
                                                     "type": "string"
@@ -1438,7 +1492,15 @@
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/auth/me": {
@@ -1459,8 +1521,7 @@
                                             "type": "boolean"
                                         },
                                         "data": {
-                                            "type": "array",
-                                            "items": {}
+                                            "$ref": "#/components/schemas/AccountResource"
                                         },
                                         "meta": {
                                             "type": "string"
@@ -1482,7 +1543,15 @@
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         }
     },
@@ -1499,6 +1568,102 @@
             }
         },
         "schemas": {
+            "AccountResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "mobile_masked": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "email_verified": {
+                        "type": "boolean"
+                    },
+                    "mobile_verified": {
+                        "type": "boolean"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ACTIVE",
+                            "SUSPENDED",
+                            "DEACTIVATED"
+                        ]
+                    },
+                    "locale": {
+                        "type": "string"
+                    },
+                    "roles": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "relations": {
+                                    "type": "array",
+                                    "prefixItems": [
+                                        {
+                                            "type": "string",
+                                            "const": "roles"
+                                        }
+                                    ],
+                                    "minItems": 1,
+                                    "maxItems": 1
+                                }
+                            },
+                            "required": [
+                                "relations"
+                            ]
+                        }
+                    },
+                    "profile": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "first_name": {
+                                "type": "string"
+                            },
+                            "middle_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "last_name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "first_name",
+                            "middle_name",
+                            "last_name"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "email",
+                    "mobile_masked",
+                    "email_verified",
+                    "mobile_verified",
+                    "status",
+                    "locale",
+                    "roles",
+                    "profile"
+                ],
+                "title": "AccountResource"
+            },
             "ForgotPasswordRequest": {
                 "type": "object",
                 "properties": {

@@ -28,7 +28,7 @@ final class RegistrationController
         $accounts->recordLogin($user);
 
         return ApiResponse::success(
-            ['user' => (new AccountResource($user->load('profile')))->resolve($request), ...$session->toArray()],
+            ['user' => new AccountResource($user->load('profile')), ...$session->toArray()],
             status: 201,
         );
     }

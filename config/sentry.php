@@ -58,6 +58,7 @@ return [
 
     // Strict scrubbing of everything that leaves the platform (App\Shared\Logging\SentryScrubber).
     'before_send' => [SentryScrubber::class, 'beforeSend'],
+    'before_send_transaction' => [SentryScrubber::class, 'beforeSendTransaction'],
     'before_breadcrumb' => [SentryScrubber::class, 'beforeBreadcrumb'],
 
     // Configures which data is collected automatically, `null` keeps collecting data based on `send_default_pii`

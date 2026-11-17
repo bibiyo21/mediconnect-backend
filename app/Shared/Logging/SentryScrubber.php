@@ -50,6 +50,23 @@ final class SentryScrubber
         return $event;
     }
 
+    /**
+     * Performance transactions bypass before_send, so they get their own pass:
+     * the same request handling, plus span descriptions (SQL, URLs) redacted.
+     */
+    public static function beforeSendTransaction(Event $event, ?EventHint $hint = null): Event
+    {
+        $event = self::beforeSend($event, $hint);
+
+        foreach ($event->getSpans() as $span) {
+            if ($span->getDescription() !== null) {
+                $span->setDescription(RedactSensitiveData::scrubMessage($span->getDescription()));
+            }
+        }
+
+        return $event;
+    }
+
     public static function beforeBreadcrumb(Breadcrumb $breadcrumb): Breadcrumb
     {
         if ($breadcrumb->getMessage() !== null) {

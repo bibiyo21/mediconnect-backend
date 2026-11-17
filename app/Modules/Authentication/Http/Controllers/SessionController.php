@@ -85,7 +85,7 @@ final class SessionController
         /** @var User $user */
         $user = $request->user();
 
-        return ApiResponse::success((new AccountResource($user->load('profile')))->resolve($request));
+        return ApiResponse::success(new AccountResource($user->load('profile')));
     }
 
     private function signedIn(Request $request, IssuedSession $session): JsonResponse
@@ -94,7 +94,7 @@ final class SessionController
         $user = $session->device->user;
 
         return ApiResponse::success([
-            'user' => (new AccountResource($user->load('profile')))->resolve($request),
+            'user' => new AccountResource($user->load('profile')),
             ...$session->toArray(),
         ]);
     }

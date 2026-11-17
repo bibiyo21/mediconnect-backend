@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Shared\Contracts\Clock;
 use App\Shared\Http\Middleware\EnsureIdempotency;
 use App\Shared\Logging\ScrubbingLogManager;
+use App\Shared\OpenApi\MarksAuthenticatedOperations;
 use App\Shared\Services\SystemClock;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -33,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
         $router->aliasMiddleware('idempotent', EnsureIdempotency::class);
 
         // The committed OpenAPI contract must not depend on APP_URL or any .env value.
-        Scramble::configure()->withDocumentTransformers(function (OpenApi $openApi): void {
+        Scramble::configure()->withOperationTransformers(MarksAuthenticatedOperations::class)->withDocumentTransformers(function (OpenApi $openApi): void {
             $openApi->servers = [new Server('/api/v1')];
             $openApi->components->addSecurityScheme('bearer', SecurityScheme::http('bearer'));
             $openApi->components->addSecurityScheme('session', SecurityScheme::apiKey('cookie', 'mediconnect-session'));
