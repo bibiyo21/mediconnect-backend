@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * An account. Roles are not exclusive (§4.2): one user may hold a patient
@@ -24,7 +25,10 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUuids, Notifiable, SoftDeletes;
+    use HasFactory, HasRoles, HasUuids, Notifiable, SoftDeletes;
+
+    /** Roles and permissions use one guard for cookie and token clients (config/rbac.php). */
+    protected string $guard_name = 'web';
 
     protected $fillable = ['email', 'mobile_e164', 'password', 'locale'];
 

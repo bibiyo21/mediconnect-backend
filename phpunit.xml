@@ -16,6 +16,9 @@
             <directory>tests/Feature</directory>
             <directory>app/Modules/*/Tests/Feature</directory>
         </testsuite>
+        <testsuite name="Concurrency">
+            <directory>tests/Concurrency</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
