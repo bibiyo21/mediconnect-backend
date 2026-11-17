@@ -6,6 +6,9 @@
  * recorded, so a typo cannot create events nobody can read back.
  */
 return [
+    // After this many failed attempts an event is parked (failed_at) and an alert is raised.
+    'max_attempts' => (int) env('OUTBOX_MAX_ATTEMPTS', 10),
+
     'events' => [
         // 'users.account_registered' => \App\Modules\Users\Events\AccountRegistered::class,
     ],

@@ -57,3 +57,14 @@ function current_totp(string $secret, int $offsetSteps = 0): string
     // Same clock as the server (Carbon, so Laravel's travel() applies).
     return $g->oathTotp($secret, intdiv(now()->getTimestamp(), $g->getKeyRegeneration()) + $offsetSteps);
 }
+
+/** Enrolls MFA for a privileged user; returns [secret, recovery codes, full access token]. */
+function enroll_mfa(User $user): array
+{
+    $limited = native_login($user)->json('data.tokens.access_token');
+    $secret = test()->postJson('/api/v1/auth/mfa/totp/setup', [], bearer($limited))->assertOk()->json('data.secret');
+    $confirm = test()->postJson('/api/v1/auth/mfa/totp/confirm', ['code' => current_totp($secret)], bearer($limited))->assertOk()->json('data');
+    app('auth')->forgetGuards();
+
+    return [$secret, $confirm['recovery_codes'], $confirm['tokens']['access_token']];
+}

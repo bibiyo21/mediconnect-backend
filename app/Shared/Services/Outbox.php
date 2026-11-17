@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use LogicException;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -50,6 +51,20 @@ final class Outbox
         DB::afterCommit(fn () => DispatchOutbox::dispatch());
     }
 
+    /**
+     * Puts parked events back in the queue (operator action after a fix).
+     *
+     * @return int events released
+     */
+    public function retryFailed(?string $eventId = null): int
+    {
+        return DB::table('outbox_events')
+            ->whereNotNull('failed_at')
+            ->whereNull('dispatched_at')
+            ->when($eventId !== null, fn ($q) => $q->where('event_id', $eventId))
+            ->update(['failed_at' => null, 'attempts' => 0, 'available_at' => now()]);
+    }
+
     /** Relays due events; returns how many were dispatched. */
     public function relay(): int
     {
@@ -59,6 +74,7 @@ final class Outbox
             // SKIP LOCKED: several relays (job + scheduler) never pick the same row.
             $rows = DB::table('outbox_events')
                 ->whereNull('dispatched_at')
+                ->whereNull('failed_at')
                 ->where('available_at', '<=', now())
                 ->orderBy('id')
                 ->limit(self::BATCH)
@@ -72,12 +88,23 @@ final class Outbox
                     $dispatched++;
                 } catch (Throwable $e) {
                     $attempts = $row->attempts + 1;
+                    $parked = $attempts >= (int) config('outbox.max_attempts');
                     DB::table('outbox_events')->where('id', $row->id)->update([
                         'attempts' => $attempts,
                         'available_at' => now()->addMinutes(min(2 ** $attempts, self::MAX_BACKOFF_MINUTES)),
+                        'failed_at' => $parked ? now() : null,
                         'last_error' => mb_substr(RedactSensitiveData::scrubMessage($e::class.': '.$e->getMessage()), 0, 1000),
                     ]);
-                    Log::warning('Outbox event failed to dispatch', ['event_id' => $row->event_id, 'event_type' => $row->event_type, 'attempts' => $attempts]);
+
+                    $context = ['event_id' => $row->event_id, 'event_type' => $row->event_type, 'attempts' => $attempts];
+
+                    if ($parked) {
+                        // Dead-lettered: reaches Sentry / alerting through the exception reporter.
+                        Log::critical('Outbox event parked after repeated failures; run outbox:retry once fixed', $context);
+                        report(new RuntimeException("Outbox event {$row->event_id} ({$row->event_type}) parked after {$attempts} attempts.", previous: $e));
+                    } else {
+                        Log::warning('Outbox event failed to dispatch', $context);
+                    }
                 }
             }
         });

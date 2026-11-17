@@ -23,6 +23,8 @@ use Throwable;
  * - Same key, different request: 422 IDEMPOTENCY_KEY_REUSED.
  * - Same key while the first is still running: 409 IDEMPOTENCY_IN_PROGRESS.
  * - A 5xx or an exception releases the key so the client can retry.
+ * - A key left IN_PROGRESS by a crashed request is taken over by a retry after
+ *   ABANDONED_AFTER_MINUTES, instead of blocking the key for 48 hours.
  *
  * Keys are scoped to the signed-in user (or the client IP), so one user can
  * never replay another user's response. Stored bodies are encrypted. Do not
@@ -33,6 +35,8 @@ final class EnsureIdempotency
     public const HEADER = 'Idempotency-Key';
 
     private const HOURS = 48;
+
+    public const ABANDONED_AFTER_MINUTES = 5;
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -64,7 +68,13 @@ final class EnsureIdempotency
                 'status' => 'IN_PROGRESS', 'expires_at' => now()->addHours(self::HOURS), 'created_at' => now(), 'updated_at' => now(),
             ]));
         } catch (UniqueConstraintViolationException) {
-            return $this->existing($scope, $route, $key, $hash);
+            $existing = $this->existing($scope, $route, $key, $hash);
+
+            if ($existing instanceof Response) {
+                return $existing;
+            }
+
+            $id = $existing; // abandoned key taken over: run the request now
         }
 
         try {
@@ -91,7 +101,8 @@ final class EnsureIdempotency
         return $response;
     }
 
-    private function existing(string $scope, string $route, string $key, string $hash): Response
+    /** @return Response|string a response to return, or the id of an abandoned key now owned by this request */
+    private function existing(string $scope, string $route, string $key, string $hash): Response|string
     {
         $row = DB::table('idempotency_keys')->where(compact('scope', 'route', 'key'))->first();
 
@@ -104,14 +115,23 @@ final class EnsureIdempotency
         }
 
         if ($row->status !== 'COMPLETED') {
-            return ApiResponse::error(ErrorCode::IdempotencyInProgress);
+            // Conditional update: of two retries racing for an abandoned key, exactly one wins.
+            $tookOver = DB::table('idempotency_keys')
+                ->where('id', $row->id)
+                ->where('status', 'IN_PROGRESS')
+                ->where('updated_at', '<', now()->subMinutes(self::ABANDONED_AFTER_MINUTES))
+                ->update(['updated_at' => now()]);
+
+            return $tookOver === 1 ? (string) $row->id : ApiResponse::error(ErrorCode::IdempotencyInProgress);
         }
 
-        return new JsonResponse(
-            json_decode(Crypt::decryptString((string) $row->response_body_encrypted), true),
-            (int) $row->response_status,
-            ['Idempotency-Replayed' => 'true'],
-        );
+        $body = Crypt::decryptString((string) $row->response_body_encrypted);
+        $headers = ['Idempotency-Replayed' => 'true'];
+
+        // Replay the exact bytes; an empty body (e.g. 204) stays empty.
+        return $body === ''
+            ? new Response('', (int) $row->response_status, $headers)
+            : JsonResponse::fromJsonString($body, (int) $row->response_status, $headers);
     }
 
     /**

@@ -17,7 +17,8 @@ final class DatabaseSettings implements Settings
 {
     private const CACHE_SECONDS = 300;
 
-    private const FORBIDDEN_KEY_PATTERN = '/(password|secret|token|api[_-]?key|private[_-]?key)/i';
+    /** A dot-separated segment equal to, or ending in, one of these words names a secret. */
+    private const SECRET_WORDS = ['password', 'secret', 'token', 'api_key', 'apikey', 'private_key', 'credentials'];
 
     public function __construct(private readonly RecordsAudit $audit) {}
 
@@ -39,7 +40,7 @@ final class DatabaseSettings implements Settings
             throw new InvalidValue('Setting keys use lowercase letters, digits, dots and underscores.');
         }
 
-        if (preg_match(self::FORBIDDEN_KEY_PATTERN, $key) === 1) {
+        if ($this->namesASecret($key)) {
             throw new InvalidValue('Secrets must not be stored as system settings.');
         }
 
@@ -59,6 +60,20 @@ final class DatabaseSettings implements Settings
         });
 
         DB::afterCommit(fn () => Cache::forget($this->cacheKey($key)));
+    }
+
+    /** "sms.api_key" and "auth.refresh_token" name secrets; "auth.access_token_minutes" does not. */
+    private function namesASecret(string $key): bool
+    {
+        foreach (explode('.', $key) as $segment) {
+            foreach (self::SECRET_WORDS as $word) {
+                if ($segment === $word || str_ends_with($segment, '_'.$word)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function cacheKey(string $key): string

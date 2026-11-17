@@ -5,6 +5,7 @@ namespace App\Modules\Authentication\Http\Middleware;
 use App\Modules\Authentication\Exceptions\AuthFailure;
 use App\Modules\Authentication\Services\StepUp;
 use App\Modules\Users\Models\User;
+use App\Shared\Http\RequestAttributes;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,6 +26,10 @@ final class RequireStepUp
         if (! $this->stepUp->isFresh($request, $user)) {
             throw AuthFailure::stepUpRequired();
         }
+
+        // Read by the audit middleware, so admin_activity_logs records the real step-up state
+        // without the Audit module depending on Authentication.
+        $request->attributes->set(RequestAttributes::STEP_UP_VERIFIED, true);
 
         return $next($request);
     }
