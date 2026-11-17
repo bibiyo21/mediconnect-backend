@@ -1,6 +1,7 @@
 <?php
 
 use App\Shared\Logging\ScrubSensitiveLogData;
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -117,7 +118,8 @@ return [
             'handler_with' => [
                 'stream' => 'php://stderr',
             ],
-            'formatter' => env('LOG_STDERR_FORMATTER'),
+            // Structured JSON logs (one object per line) for log collectors (§29).
+            'formatter' => env('LOG_STDERR_FORMATTER', JsonFormatter::class),
             'processors' => [PsrLogMessageProcessor::class],
         ],
 
@@ -140,6 +142,18 @@ return [
             'driver' => 'monolog',
             'tap' => [ScrubSensitiveLogData::class],
             'handler' => NullHandler::class,
+        ],
+
+        // Defined here (not left to the Sentry package defaults) so they get the scrubber too.
+        'sentry' => [
+            'driver' => 'sentry',
+            'tap' => [ScrubSensitiveLogData::class],
+        ],
+
+        'sentry_logs' => [
+            'driver' => 'sentry_logs',
+            'tap' => [ScrubSensitiveLogData::class],
+            'level' => env('LOG_LEVEL', 'debug'),
         ],
 
         'emergency' => [

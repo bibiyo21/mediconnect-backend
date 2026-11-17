@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Str;
-
 return [
 
     /*
@@ -127,10 +125,8 @@ return [
     |
     */
 
-    'cookie' => env(
-        'SESSION_COOKIE',
-        Str::slug((string) env('APP_NAME', 'laravel')).'-session'
-    ),
+    // Fixed name: it is part of the published API contract (OpenAPI security scheme "session").
+    'cookie' => env('SESSION_COOKIE', 'mediconnect-session'),
 
     /*
     |--------------------------------------------------------------------------
