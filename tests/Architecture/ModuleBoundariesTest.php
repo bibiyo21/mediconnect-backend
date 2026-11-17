@@ -3,9 +3,12 @@
 /*
  * Module boundary rules (architecture.md §6.3).
  *
- * 1. A module may use another module only through that module's public surface:
- *    Contracts, Events, Enums and DTOs. Models, Actions, Services, Http, Jobs,
- *    Listeners and Policies of another module are off limits.
+ * 1. A module may use another module only through its public surface:
+ *    Contracts, Events, Enums, DTOs — and its Models for read-only
+ *    relationships (architecture.md §6.3 rule 2). Actions, Services, Http,
+ *    Jobs, Listeners, Policies and Database of another module are off limits.
+ *    Writing through another module's model is a code-review rule: a static
+ *    test cannot tell a read from a write.
  * 2. The shared kernel (App\Shared) never depends on a module.
  * 3. No debugging helpers in application code.
  */
@@ -13,7 +16,7 @@
 $modulesPath = dirname(__DIR__, 2).'/app/Modules';
 $modules = array_map('basename', glob($modulesPath.'/*', GLOB_ONLYDIR) ?: []);
 
-$internalLayers = ['Models', 'Actions', 'Services', 'Http', 'Jobs', 'Listeners', 'Policies', 'Database'];
+$internalLayers = ['Actions', 'Services', 'Http', 'Jobs', 'Listeners', 'Policies', 'Database'];
 
 foreach ($modules as $module) {
     $forbidden = [];
