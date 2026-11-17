@@ -27,6 +27,10 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing" force="true"/>
+        <!-- Tests must never send events to the real Sentry project (see docs/operations/sentry-issue-audit.md). -->
+        <env name="SENTRY_LARAVEL_DSN" value="" force="true"/>
+        <env name="SENTRY_DSN" value="" force="true"/>
+        <env name="SENTRY_TRACES_SAMPLE_RATE" value="0" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>
