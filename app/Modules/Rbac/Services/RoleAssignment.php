@@ -2,6 +2,7 @@
 
 namespace App\Modules\Rbac\Services;
 
+use App\Modules\Rbac\Contracts\AssignsRoles;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Rbac\Exceptions\RoleCombinationNotAllowed;
 use App\Modules\Users\Models\User;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Auditing of role changes is added with the audit log in increment 7.
  */
-final class RoleAssignment
+final class RoleAssignment implements AssignsRoles
 {
     public function assign(User $user, Role $role): void
     {

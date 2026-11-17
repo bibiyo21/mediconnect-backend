@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // First, so every log line and error response carries the request ID.
         $middleware->prepend(AssignRequestId::class);
+
+        // Sanctum: cookie sessions for first-party web apps on the stateful domains (D-04).
+        $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    // SMS provider (D-07 still open). "mail-preview" is LOCAL ONLY: messages appear in Mailpit.
+    'sms' => [
+        'driver' => env('SMS_DRIVER', 'disabled'),
+    ],
+
 ];

@@ -4,11 +4,23 @@ namespace App\Modules\Authentication\Models;
 
 use App\Modules\Authentication\Enums\DevicePlatform;
 use App\Modules\Users\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
+ * @property string $id
+ * @property string $user_id
+ * @property DevicePlatform $platform
+ * @property string|null $device_name
+ * @property string|null $app_version
+ * @property CarbonImmutable|null $last_seen_at
+ * @property CarbonImmutable|null $revoked_at
+ * @property Carbon|null $created_at
+ * @property-read User|null $user
+ *
  * A signed-in device or browser (D-15). Revoking it ends every token issued to it.
  */
 class UserDevice extends Model

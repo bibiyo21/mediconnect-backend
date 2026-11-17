@@ -1,7 +1,21 @@
 <?php
 
+use App\Modules\Audit\Providers\AuditServiceProvider;
+use App\Modules\Authentication\Providers\AuthenticationServiceProvider;
+use App\Modules\Notifications\Providers\NotificationsServiceProvider;
+use App\Modules\Patients\Providers\PatientsServiceProvider;
+use App\Modules\Rbac\Providers\RbacServiceProvider;
+use App\Modules\Users\Providers\UsersServiceProvider;
 use App\Providers\AppServiceProvider;
 
+// Module providers are added as each module is implemented (C-3: nothing is
+// registered for modules of later phases).
 return [
     AppServiceProvider::class,
+    AuditServiceProvider::class,
+    UsersServiceProvider::class,
+    PatientsServiceProvider::class,
+    RbacServiceProvider::class,
+    NotificationsServiceProvider::class,
+    AuthenticationServiceProvider::class,
 ];

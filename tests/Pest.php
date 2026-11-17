@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__.'/Support/auth.php';
+
 use Tests\Concerns\RefreshDatabaseAsOwner;
 use Tests\TestCase;
 
