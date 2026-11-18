@@ -36,9 +36,19 @@ final class UpdateMyPatientProfileRequest extends FormRequest
             'date_of_birth' => ['sometimes', ...BirthDate::accountHolder()],
             'sex' => ['sometimes', 'nullable', Rule::enum(Sex::class)],
             'preferred_language' => ['sometimes', 'required', Rule::in(['en', 'fil'])],
+            /**
+             * Null removes the emergency contact.
+             *
+             * @var array{name: string, phone: string}|null
+             */
             'emergency_contact' => ['sometimes', 'nullable', 'array:name,phone'],
             'emergency_contact.name' => ['required_with:emergency_contact', 'string', 'max:200'],
             'emergency_contact.phone' => ['required_with:emergency_contact', 'string', 'max:20', $phMobile],
+            /**
+             * Null removes the primary address.
+             *
+             * @var array{line1: string, line2?: string|null, barangay?: string|null, city: string, province?: string|null, postal_code?: string|null}|null
+             */
             'address' => ['sometimes', 'nullable', 'array:line1,line2,barangay,city,province,postal_code'],
             'address.line1' => ['required_with:address', 'string', 'max:255'],
             'address.line2' => ['nullable', 'string', 'max:255'],

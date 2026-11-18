@@ -2264,7 +2264,11 @@
                         ]
                     },
                     "emergency_contact": {
-                        "type": "object",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "Null removes the emergency contact.",
                         "properties": {
                             "name": {
                                 "type": "string",
@@ -2274,10 +2278,18 @@
                                 "type": "string",
                                 "maxLength": 20
                             }
-                        }
+                        },
+                        "required": [
+                            "name",
+                            "phone"
+                        ]
                     },
                     "address": {
-                        "type": "object",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "Null removes the primary address.",
                         "properties": {
                             "line1": {
                                 "type": "string",
@@ -2315,7 +2327,11 @@
                                 ],
                                 "pattern": "^\\d{4}$"
                             }
-                        }
+                        },
+                        "required": [
+                            "line1",
+                            "city"
+                        ]
                     }
                 },
                 "title": "UpdateMyPatientProfileRequest"
