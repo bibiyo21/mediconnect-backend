@@ -2,13 +2,24 @@
 
 namespace App\Modules\Users\Services;
 
+use App\Modules\Audit\Contracts\RecordsSecurityEvents;
+use App\Modules\Audit\Enums\SecurityEventType;
+use App\Modules\Notifications\Contracts\SendsOneTimeMessages;
 use App\Modules\Users\Contracts\Accounts;
+use App\Modules\Users\Enums\UserStatus;
 use App\Modules\Users\Models\User;
+use App\Shared\Enums\DeliveryChannel;
 use App\Shared\ValueObjects\PhoneNumber;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 final class AccountService implements Accounts
 {
+    public function __construct(
+        private readonly RecordsSecurityEvents $securityEvents,
+        private readonly SendsOneTimeMessages $messages,
+    ) {}
+
     public function findByEmail(string $email): ?User
     {
         return User::where('email', $email)->first();
@@ -93,6 +104,53 @@ final class AccountService implements Accounts
 
     public function recordLogin(User $user): void
     {
-        $user->forceFill(['last_login_at' => now()])->saveQuietly();
+        $cancelled = $user->deletion_requested_at !== null && $user->anonymized_at === null;
+        $user->forceFill(['last_login_at' => now(), ...($cancelled ? ['deletion_requested_at' => null] : [])])->saveQuietly();
+
+        if ($cancelled) {
+            $this->securityEvents->record(SecurityEventType::AccountDeletionCancelled, $user->id);
+            $this->notify($user, 'You signed in to MediConnect, so your request to delete your account was cancelled. If you still want to delete it, request it again in the app.');
+        }
+    }
+
+    public function requestDeletion(User $user): void
+    {
+        if ($user->deletion_requested_at === null) {
+            $user->forceFill(['deletion_requested_at' => now()])->save();
+        }
+    }
+
+    public function anonymize(User $user): void
+    {
+        DB::transaction(function () use ($user) {
+            $user->forceFill([
+                // users_contact_check needs one contact: a unique, undeliverable placeholder.
+                'email' => "deleted-{$user->id}@anonymized.invalid",
+                'mobile_e164' => null,
+                'email_verified_at' => null,
+                'mobile_verified_at' => null,
+                'password' => Str::random(64),
+                'status' => UserStatus::Deactivated,
+                'anonymized_at' => now(),
+            ])->save();
+
+            $user->profile()->update([
+                'first_name' => 'Deleted', 'middle_name' => null, 'last_name' => 'User',
+                'date_of_birth' => null, 'sex' => null, 'profile_photo_path' => null,
+            ]);
+            $user->addresses()->delete();
+            $user->delete(); // soft delete; the row stays for referential integrity
+        });
+    }
+
+    /** Tells the account's contact addresses (no personal data in the text). */
+    private function notify(User $user, string $notice): void
+    {
+        if ($user->email !== null) {
+            $this->messages->sendNotice(DeliveryChannel::Email, $user->email, $notice);
+        }
+        if ($user->mobile_e164 !== null) {
+            $this->messages->sendNotice(DeliveryChannel::Sms, $user->mobile_e164, $notice);
+        }
     }
 }

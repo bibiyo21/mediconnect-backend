@@ -11,6 +11,98 @@
         }
     ],
     "paths": {
+        "/auth/account/deletion-request": {
+            "post": {
+                "operationId": "authentication.accountDeletion",
+                "tags": [
+                    "AccountDeletion"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountDeletionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "deletion_scheduled_for": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "deletion_scheduled_for"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Your account is scheduled for deletion. Sign in before then to keep it."
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/contact/otp": {
             "post": {
                 "operationId": "contactChange.requestCode",
@@ -2191,6 +2283,20 @@
             }
         },
         "schemas": {
+            "AccountDeletionRequest": {
+                "type": "object",
+                "description": "POST /auth/account/deletion-request: the current password confirms it is the account holder.",
+                "properties": {
+                    "current_password": {
+                        "type": "string",
+                        "maxLength": 128
+                    }
+                },
+                "required": [
+                    "current_password"
+                ],
+                "title": "AccountDeletionRequest"
+            },
             "AccountResource": {
                 "type": "object",
                 "properties": {

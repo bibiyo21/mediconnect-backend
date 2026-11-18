@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Authentication\Http\Controllers\AccountDeletionController;
 use App\Modules\Authentication\Http\Controllers\ContactChangeController;
 use App\Modules\Authentication\Http\Controllers\ContactVerificationController;
 use App\Modules\Authentication\Http\Controllers\DeviceController;
@@ -44,6 +45,7 @@ Route::prefix('auth')->group(function () {
             Route::post('verify-mobile', [ContactVerificationController::class, 'mobile']);
             Route::post('contact/otp', [ContactChangeController::class, 'requestCode'])->middleware('throttle:auth-strict');
             Route::put('contact', [ContactChangeController::class, 'confirm'])->middleware('throttle:auth-strict');
+            Route::post('account/deletion-request', AccountDeletionController::class)->middleware('throttle:auth-strict');
         });
     });
 });

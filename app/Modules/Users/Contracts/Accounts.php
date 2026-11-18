@@ -49,5 +49,18 @@ interface Accounts
 
     public function markMobileVerified(User $user): void;
 
+    /**
+     * Records a successful sign-in. A pending deletion request is cancelled
+     * (D-38: signing in during the grace period keeps the account).
+     */
     public function recordLogin(User $user): void;
+
+    /** Starts the deletion grace period (idempotent: an existing request keeps its date). */
+    public function requestDeletion(User $user): void;
+
+    /**
+     * Replaces the account's personal data (contact details, password, profile,
+     * addresses) and deactivates it. IDs stay for referential integrity.
+     */
+    public function anonymize(User $user): void;
 }

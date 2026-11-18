@@ -2,6 +2,7 @@
 
 namespace App\Modules\Authentication\Providers;
 
+use App\Modules\Authentication\Console\AnonymizeDeletedAccounts;
 use App\Modules\Authentication\Http\Middleware\EnsureMfaSatisfied;
 use App\Modules\Authentication\Http\Middleware\EnsureSignInIsValid;
 use App\Modules\Authentication\Http\Middleware\RequireStepUp;
@@ -32,6 +33,10 @@ final class AuthenticationServiceProvider extends ServiceProvider
         $router->aliasMiddleware('step-up', RequireStepUp::class);
 
         $this->rateLimits();
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([AnonymizeDeletedAccounts::class]);
+        }
 
         Route::middleware('api')->prefix('api/v1')->group(__DIR__.'/../Routes/api.php');
     }

@@ -3,6 +3,7 @@
 namespace App\Modules\Users\Models;
 
 use App\Modules\Users\Enums\UserStatus;
+use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,6 +23,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $email
  * @property string|null $mobile_e164
  * @property UserStatus $status
+ * @property CarbonImmutable|null $deletion_requested_at
+ * @property CarbonImmutable|null $anonymized_at
  */
 class User extends Authenticatable
 {
@@ -43,6 +46,8 @@ class User extends Authenticatable
             'email_verified_at' => 'immutable_datetime',
             'mobile_verified_at' => 'immutable_datetime',
             'last_login_at' => 'immutable_datetime',
+            'deletion_requested_at' => 'immutable_datetime',
+            'anonymized_at' => 'immutable_datetime',
             'password' => 'hashed',
             'status' => UserStatus::class,
         ];

@@ -10,3 +10,4 @@ Schedule::command('idempotency:purge')->hourly()->withoutOverlapping();
 // Idempotent: creates the next months' audit partitions if missing, and fails loudly
 // if rows ever landed in the default partition.
 Schedule::command('audit:partitions')->dailyAt('01:15')->withoutOverlapping();
+Schedule::command('accounts:anonymize-deleted')->dailyAt('02:30')->withoutOverlapping(); // D-38
