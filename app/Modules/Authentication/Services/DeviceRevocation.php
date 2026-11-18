@@ -35,6 +35,15 @@ final class DeviceRevocation
         RefreshToken::where('family_id', $familyId)->whereNull('revoked_at')->update(['revoked_at' => now()]);
     }
 
+    /** After a change of sign-in details: every other device; the current one stays signed in. */
+    public function revokeOtherDevices(User $user, ?string $keepDeviceId): void
+    {
+        UserDevice::where('user_id', $user->id)->whereNull('revoked_at')
+            ->when($keepDeviceId !== null, fn ($q) => $q->whereKeyNot($keepDeviceId))
+            ->get()
+            ->each(fn (UserDevice $device) => $this->revokeDevice($device));
+    }
+
     /** Used after a password reset: every device, every token. */
     public function revokeEverything(User $user): void
     {

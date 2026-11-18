@@ -71,6 +71,16 @@ final class AccountService implements Accounts
         });
     }
 
+    public function changeEmail(User $user, string $email): void
+    {
+        $user->forceFill(['email' => $email, 'email_verified_at' => now()])->save();
+    }
+
+    public function changeMobile(User $user, PhoneNumber $mobile): void
+    {
+        $user->forceFill(['mobile_e164' => $mobile->e164, 'mobile_verified_at' => now()])->save();
+    }
+
     public function markEmailVerified(User $user): void
     {
         $user->forceFill(['email_verified_at' => now()])->save();

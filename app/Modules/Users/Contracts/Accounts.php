@@ -39,6 +39,12 @@ interface Accounts
      */
     public function replacePrimaryAddress(User $user, ?array $address): void;
 
+    /** Sets a new, already proven email address (verified now). */
+    public function changeEmail(User $user, string $email): void;
+
+    /** Sets a new, already proven mobile number (verified now). */
+    public function changeMobile(User $user, PhoneNumber $mobile): void;
+
     public function markEmailVerified(User $user): void;
 
     public function markMobileVerified(User $user): void;

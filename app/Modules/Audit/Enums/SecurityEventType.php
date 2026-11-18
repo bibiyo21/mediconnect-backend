@@ -14,6 +14,7 @@ enum SecurityEventType: string
     case PasswordReset = 'PASSWORD_RESET';
     case DeviceRevoked = 'DEVICE_REVOKED';
     case SuspendedAccountLogin = 'SUSPENDED_ACCOUNT_LOGIN';
+    case ContactChanged = 'CONTACT_CHANGED';
 
     public function defaultSeverity(): Severity
     {

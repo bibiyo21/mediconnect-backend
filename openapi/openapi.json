@@ -11,6 +11,198 @@
         }
     ],
     "paths": {
+        "/auth/contact/otp": {
+            "post": {
+                "operationId": "contactChange.requestCode",
+                "tags": [
+                    "ContactChange"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestContactChangeCodeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "challenge_id": {
+                                                    "type": "string"
+                                                },
+                                                "channel": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "EMAIL",
+                                                        "SMS"
+                                                    ]
+                                                },
+                                                "destination_masked": {
+                                                    "type": "string"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "challenge_id",
+                                                "channel",
+                                                "destination_masked",
+                                                "expires_at"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "If the address can receive a code, one has been sent."
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/auth/contact": {
+            "put": {
+                "operationId": "contactChange.confirm",
+                "tags": [
+                    "ContactChange"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConfirmContactChangeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Your contact details were updated."
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/verify-email": {
             "post": {
                 "operationId": "contactVerification.email",
@@ -1766,6 +1958,36 @@
                 ],
                 "title": "AccountResource"
             },
+            "ConfirmContactChangeRequest": {
+                "type": "object",
+                "description": "PUT /auth/contact: the new email or mobile and the token from POST /auth/otp/verify.",
+                "properties": {
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 254
+                    },
+                    "mobile": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 20
+                    },
+                    "verification_token": {
+                        "type": "string",
+                        "minLength": 64,
+                        "maxLength": 64
+                    }
+                },
+                "required": [
+                    "verification_token"
+                ],
+                "title": "ConfirmContactChangeRequest"
+            },
             "ForgotPasswordRequest": {
                 "type": "object",
                 "properties": {
@@ -2002,16 +2224,6 @@
                 ],
                 "title": "MyPatientProfileResource"
             },
-            "OtpPurpose": {
-                "type": "string",
-                "enum": [
-                    "REGISTER",
-                    "VERIFY_EMAIL",
-                    "VERIFY_MOBILE",
-                    "RESET_PASSWORD"
-                ],
-                "title": "OtpPurpose"
-            },
             "RefreshRequest": {
                 "type": "object",
                 "properties": {
@@ -2146,11 +2358,46 @@
                 ],
                 "title": "RegisterRequest"
             },
+            "RequestContactChangeCodeRequest": {
+                "type": "object",
+                "description": "POST /auth/contact/otp: the new email or mobile, and the current password.",
+                "properties": {
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 254
+                    },
+                    "mobile": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 20
+                    },
+                    "current_password": {
+                        "type": "string",
+                        "maxLength": 128
+                    }
+                },
+                "required": [
+                    "current_password"
+                ],
+                "title": "RequestContactChangeCodeRequest"
+            },
             "RequestOtpRequest": {
                 "type": "object",
                 "properties": {
                     "purpose": {
-                        "$ref": "#/components/schemas/OtpPurpose"
+                        "type": "string",
+                        "enum": [
+                            "REGISTER",
+                            "VERIFY_EMAIL",
+                            "VERIFY_MOBILE",
+                            "RESET_PASSWORD"
+                        ]
                     },
                     "email": {
                         "type": [
