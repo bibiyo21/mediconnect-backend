@@ -1,0 +1,112 @@
+# Lint, static analysis and the full Pest suite (feature, security, concurrency,
+# architecture, OpenAPI contract drift) against real PostgreSQL and Redis.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.1-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:8.2-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      # CI-only throwaway credentials for the service containers above.
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: mediconnect_app
+      DB_PASSWORD: ci-app-password
+      DB_OWNER_USERNAME: mediconnect_owner
+      DB_OWNER_PASSWORD: ci-owner-password
+      REDIS_HOST: 127.0.0.1
+      HAS_DOCS_TOKEN: ${{ secrets.DOCS_READ_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: backend
+
+      # The same role and database setup as local development (single source of truth).
+      - uses: actions/checkout@v5
+        with:
+          repository: bibiyo21/mediconnect-infrastructure
+          path: infrastructure
+
+      # Private docs repo: lets RbacMatrixMatchesDocsTest compare config/rbac.php with
+      # docs/rbac-permissions.md. Without the secret that one test is skipped, not passed.
+      - uses: actions/checkout@v5
+        if: env.HAS_DOCS_TOKEN == 'true'
+        with:
+          repository: bibiyo21/mediconnect-docs
+          token: ${{ secrets.DOCS_READ_TOKEN }}
+          path: docs-repo
+
+      - name: Create database roles and databases
+        env:
+          PGHOST: 127.0.0.1
+          PGPASSWORD: postgres
+          POSTGRES_USER: postgres
+          DB_DATABASE: mediconnect
+          DB_OWNER_USER: mediconnect_owner
+          DB_APP_USER: mediconnect_app
+          DB_APP_PASSWORD: ci-app-password
+        run: sh infrastructure/docker/postgres/init/01-roles.sh
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pgsql, redis, intl, bcmath, pcntl, sockets, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache/files
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Prepare environment
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Lint (Pint)
+        working-directory: backend
+        run: composer lint
+
+      - name: Static analysis (Larastan)
+        working-directory: backend
+        run: composer analyse
+
+      # Serial on purpose: the suite shares one test database and runs its own
+      # concurrency tests; `--parallel` is not supported.
+      - name: Tests (Pest)
+        working-directory: backend
+        env:
+          MEDICONNECT_DOCS_PATH: ${{ env.HAS_DOCS_TOKEN == 'true' && format('{0}/docs-repo/docs', github.workspace) || '/nonexistent' }}
+        run: composer test
