@@ -564,6 +564,124 @@
                 ]
             }
         },
+        "/patients/me": {
+            "get": {
+                "operationId": "myPatientProfile.show",
+                "tags": [
+                    "MyPatientProfile"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/MyPatientProfileResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "myPatientProfile.update",
+                "tags": [
+                    "MyPatientProfile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateMyPatientProfileRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/MyPatientProfileResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/otp": {
             "post": {
                 "operationId": "otp.request",
@@ -1758,6 +1876,132 @@
                 ],
                 "title": "MfaLoginRequest"
             },
+            "MyPatientProfileResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "first_name": {
+                        "type": "string"
+                    },
+                    "middle_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_name": {
+                        "type": "string"
+                    },
+                    "date_of_birth": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sex": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "FEMALE",
+                            "MALE",
+                            "OTHER",
+                            "UNKNOWN",
+                            null
+                        ]
+                    },
+                    "preferred_language": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "fil"
+                        ]
+                    },
+                    "emergency_contact": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "phone": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "phone"
+                        ]
+                    },
+                    "address": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "line1": {
+                                "type": "string"
+                            },
+                            "line2": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "barangay": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "city": {
+                                "type": "string"
+                            },
+                            "province": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "postal_code": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "country_code": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "line1",
+                            "line2",
+                            "barangay",
+                            "city",
+                            "province",
+                            "postal_code",
+                            "country_code"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "first_name",
+                    "middle_name",
+                    "last_name",
+                    "date_of_birth",
+                    "sex",
+                    "preferred_language",
+                    "emergency_contact",
+                    "address"
+                ],
+                "title": "MyPatientProfileResource"
+            },
             "OtpPurpose": {
                 "type": "string",
                 "enum": [
@@ -1825,11 +2069,9 @@
                         "maxLength": 100
                     },
                     "date_of_birth": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
+                        "type": "string",
+                        "format": "date",
+                        "description": "D-37: account holders must be adults (minors are dependents)."
                     },
                     "sex": {
                         "anyOf": [
@@ -1897,6 +2139,7 @@
                     "password",
                     "first_name",
                     "last_name",
+                    "date_of_birth",
                     "accept_privacy_notice_version",
                     "accept_terms_version",
                     "password_confirmation"
@@ -1980,6 +2223,103 @@
                 ],
                 "title": "Sex"
             },
+            "UpdateMyPatientProfileRequest": {
+                "type": "object",
+                "description": "PATCH /patients/me: only the fields sent are changed.",
+                "properties": {
+                    "first_name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "middle_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "date_of_birth": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "sex": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/Sex"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "preferred_language": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "fil"
+                        ]
+                    },
+                    "emergency_contact": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 200
+                            },
+                            "phone": {
+                                "type": "string",
+                                "maxLength": 20
+                            }
+                        }
+                    },
+                    "address": {
+                        "type": "object",
+                        "properties": {
+                            "line1": {
+                                "type": "string",
+                                "maxLength": 255
+                            },
+                            "line2": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 255
+                            },
+                            "barangay": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 100
+                            },
+                            "city": {
+                                "type": "string",
+                                "maxLength": 100
+                            },
+                            "province": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 100
+                            },
+                            "postal_code": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "pattern": "^\\d{4}$"
+                            }
+                        }
+                    }
+                },
+                "title": "UpdateMyPatientProfileRequest"
+            },
             "VerificationTokenRequest": {
                 "type": "object",
                 "properties": {
@@ -2013,6 +2353,44 @@
             }
         },
         "responses": {
+            "AuthorizationException": {
+                "description": "Authorization error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
+            "AuthenticationException": {
+                "description": "Unauthenticated",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
             "ValidationException": {
                 "description": "Validation error",
                 "content": {
@@ -2038,25 +2416,6 @@
                             "required": [
                                 "message",
                                 "errors"
-                            ]
-                        }
-                    }
-                }
-            },
-            "AuthenticationException": {
-                "description": "Unauthenticated",
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "message": {
-                                    "type": "string",
-                                    "description": "Error overview."
-                                }
-                            },
-                            "required": [
-                                "message"
                             ]
                         }
                     }

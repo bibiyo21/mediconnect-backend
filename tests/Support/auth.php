@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Notifications\Contracts\SendsOneTimeMessages;
+use App\Modules\Patients\Models\PatientProfile;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Rbac\Services\RoleAssignment;
 use App\Modules\Users\Models\User;
@@ -67,4 +68,22 @@ function enroll_mfa(User $user): array
     app('auth')->forgetGuards();
 
     return [$secret, $confirm['recovery_codes'], $confirm['tokens']['access_token']];
+}
+
+/** A patient account as registration creates it: user, user profile and patient profile. */
+function patient_account(): User
+{
+    $user = account(Role::Patient);
+    $user->profile()->create(['first_name' => 'Ana', 'last_name' => 'Santos', 'date_of_birth' => '1990-05-01']);
+    PatientProfile::factory()->create([
+        'user_id' => $user->id, 'first_name' => 'Ana', 'last_name' => 'Santos', 'date_of_birth' => '1990-05-01',
+    ]);
+
+    return $user->refresh();
+}
+
+/** Signs a user in natively and returns bearer headers. */
+function signed_in(User $user): array
+{
+    return bearer(native_login($user)->assertOk()->json('data.tokens.access_token'));
 }

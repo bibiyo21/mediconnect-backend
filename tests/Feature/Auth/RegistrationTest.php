@@ -2,6 +2,7 @@
 
 use App\Modules\Patients\Models\PatientProfile;
 use App\Modules\Users\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
@@ -110,7 +111,18 @@ it('refuses weak passwords, stale legal versions and future birth dates', functi
     'no digits' => [['password' => 'onlyletters-here', 'password_confirmation' => 'onlyletters-here'], 'password'],
     'old privacy notice' => [['accept_privacy_notice_version' => 'v0'], 'accept_privacy_notice_version'],
     'birth date in the future' => [['date_of_birth' => now()->addDay()->toDateString()], 'date_of_birth'],
+    'no birth date (D-37)' => [['date_of_birth' => null], 'date_of_birth'],
+    'under 18 (D-37)' => [['date_of_birth' => now('Asia/Manila')->subYears(18)->addDay()->toDateString()], 'date_of_birth'],
 ]);
+
+it('accepts someone who turns 18 today, judged on the Manila calendar (D-37)', function () {
+    // 2026-11-18 01:00 in Manila is still 2026-11-17 in UTC.
+    $this->travelTo(CarbonImmutable::parse('2026-11-18 01:00', 'Asia/Manila'));
+    $token = verified_registration(['email' => 'ana@example.com']);
+
+    $this->postJson('/api/v1/auth/register', register_payload(['email' => 'ana@example.com', 'verification_token' => $token, 'date_of_birth' => '2008-11-18']))
+        ->assertCreated();
+});
 
 it('requires exactly one of email or mobile', function () {
     $this->postJson('/api/v1/auth/otp', ['purpose' => 'REGISTER'])->assertStatus(422);

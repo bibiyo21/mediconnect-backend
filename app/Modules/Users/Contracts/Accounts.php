@@ -25,6 +25,20 @@ interface Accounts
 
     public function changePassword(User $user, string $password): void;
 
+    /**
+     * Updates the shared personal profile (user_profiles). Only the given keys change.
+     *
+     * @param  array{first_name?: string, middle_name?: string|null, last_name?: string, date_of_birth?: string, sex?: string|null, preferred_language?: string}  $fields
+     */
+    public function updateProfile(User $user, array $fields): void;
+
+    /**
+     * Replaces the user's primary address, or removes it when null.
+     *
+     * @param  array{line1: string, line2?: string|null, barangay?: string|null, city: string, province?: string|null, postal_code?: string|null}|null  $address
+     */
+    public function replacePrimaryAddress(User $user, ?array $address): void;
+
     public function markEmailVerified(User $user): void;
 
     public function markMobileVerified(User $user): void;

@@ -44,6 +44,33 @@ final class AccountService implements Accounts
         $user->forceFill(['password' => $password])->save();
     }
 
+    public function updateProfile(User $user, array $fields): void
+    {
+        if ($fields !== []) {
+            $user->profile()->firstOrFail()->update($fields);
+        }
+    }
+
+    public function replacePrimaryAddress(User $user, ?array $address): void
+    {
+        DB::transaction(function () use ($user, $address) {
+            $user->addresses()->where('is_primary', true)->delete();
+
+            if ($address !== null) {
+                $user->addresses()->create([
+                    'line1' => $address['line1'],
+                    'line2' => $address['line2'] ?? null,
+                    'barangay' => $address['barangay'] ?? null,
+                    'city' => $address['city'],
+                    'province' => $address['province'] ?? null,
+                    'postal_code' => $address['postal_code'] ?? null,
+                    'country_code' => 'PH',
+                    'is_primary' => true,
+                ]);
+            }
+        });
+    }
+
     public function markEmailVerified(User $user): void
     {
         $user->forceFill(['email_verified_at' => now()])->save();
