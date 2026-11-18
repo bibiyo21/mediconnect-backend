@@ -12,9 +12,9 @@ use Illuminate\Support\Facades\DB;
  */
 final class ConsentRecorder implements RecordsConsents
 {
-    public function record(string $userId, ConsentType $type, string $documentVersion, bool $granted, ?string $subjectPatientProfileId = null): void
+    public function record(string $userId, ConsentType $type, string $documentVersion, bool $granted, ?string $subjectPatientProfileId = null): int
     {
-        DB::table('consent_records')->insert([
+        return (int) DB::table('consent_records')->insertGetId([
             'user_id' => $userId,
             'subject_patient_profile_id' => $subjectPatientProfileId,
             'consent_type' => $type->value,

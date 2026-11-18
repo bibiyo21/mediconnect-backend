@@ -333,6 +333,317 @@
                 ]
             }
         },
+        "/patients/me/dependents": {
+            "get": {
+                "operationId": "dependents.index",
+                "tags": [
+                    "Dependents"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/DependentResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "dependents.store",
+                "tags": [
+                    "Dependents"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreDependentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DependentResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/patients/me/dependents/{dependentId}": {
+            "get": {
+                "operationId": "dependents.show",
+                "tags": [
+                    "Dependents"
+                ],
+                "parameters": [
+                    {
+                        "name": "dependentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DependentResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "dependents.update",
+                "tags": [
+                    "Dependents"
+                ],
+                "parameters": [
+                    {
+                        "name": "dependentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateDependentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DependentResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "delete": {
+                "operationId": "dependents.destroy",
+                "tags": [
+                    "Dependents"
+                ],
+                "parameters": [
+                    {
+                        "name": "dependentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "The family member was removed from your account. Their records are kept."
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/devices": {
             "get": {
                 "operationId": "device.index",
@@ -352,7 +663,9 @@
                                         },
                                         "data": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                "$ref": "#/components/schemas/DeviceResource"
+                                            }
                                         },
                                         "meta": {
                                             "type": "string"
@@ -1988,6 +2301,143 @@
                 ],
                 "title": "ConfirmContactChangeRequest"
             },
+            "DependentRelationship": {
+                "type": "string",
+                "description": "How the dependent is related to the guardian (from the guardian's side: \"my CHILD\").\n",
+                "enum": [
+                    "CHILD",
+                    "PARENT",
+                    "SPOUSE",
+                    "SIBLING",
+                    "GRANDPARENT",
+                    "GRANDCHILD",
+                    "LEGAL_WARD",
+                    "OTHER"
+                ],
+                "title": "DependentRelationship"
+            },
+            "DependentResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "first_name": {
+                        "type": "string"
+                    },
+                    "middle_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_name": {
+                        "type": "string"
+                    },
+                    "date_of_birth": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sex": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "FEMALE",
+                            "MALE",
+                            "OTHER",
+                            "UNKNOWN",
+                            null
+                        ]
+                    },
+                    "relationship": {
+                        "type": "string",
+                        "enum": [
+                            "CHILD",
+                            "PARENT",
+                            "SPOUSE",
+                            "SIBLING",
+                            "GRANDPARENT",
+                            "GRANDCHILD",
+                            "LEGAL_WARD",
+                            "OTHER"
+                        ]
+                    },
+                    "authorized_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "first_name",
+                    "middle_name",
+                    "last_name",
+                    "date_of_birth",
+                    "sex",
+                    "relationship",
+                    "authorized_at"
+                ],
+                "title": "DependentResource"
+            },
+            "DeviceResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "enum": [
+                            "IOS",
+                            "ANDROID",
+                            "WEB"
+                        ]
+                    },
+                    "device_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "app_version": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_seen_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "current": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "platform",
+                    "device_name",
+                    "app_version",
+                    "last_seen_at",
+                    "created_at",
+                    "current"
+                ],
+                "title": "DeviceResource"
+            },
             "ForgotPasswordRequest": {
                 "type": "object",
                 "properties": {
@@ -2469,6 +2919,110 @@
                     "UNKNOWN"
                 ],
                 "title": "Sex"
+            },
+            "StoreDependentRequest": {
+                "type": "object",
+                "description": "POST /patients/me/dependents.",
+                "properties": {
+                    "first_name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "middle_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "date_of_birth": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "sex": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/Sex"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "relationship": {
+                        "$ref": "#/components/schemas/DependentRelationship"
+                    },
+                    "guardian_attestation": {
+                        "description": "The guardian confirms they are authorised to manage this person's health information.",
+                        "enum": [
+                            "yes",
+                            "on",
+                            "1",
+                            1,
+                            "true",
+                            true
+                        ]
+                    },
+                    "guardian_attestation_version": {
+                        "type": "string",
+                        "description": "The attestation version the app displayed; stale apps are refused.",
+                        "enum": [
+                            "draft-2026-11"
+                        ]
+                    }
+                },
+                "required": [
+                    "first_name",
+                    "last_name",
+                    "date_of_birth",
+                    "relationship",
+                    "guardian_attestation",
+                    "guardian_attestation_version"
+                ],
+                "title": "StoreDependentRequest"
+            },
+            "UpdateDependentRequest": {
+                "type": "object",
+                "description": "PATCH /patients/me/dependents/{id}: only the fields sent change.",
+                "properties": {
+                    "first_name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "middle_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "date_of_birth": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "sex": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/Sex"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "relationship": {
+                        "$ref": "#/components/schemas/DependentRelationship"
+                    }
+                },
+                "title": "UpdateDependentRequest"
             },
             "UpdateMyPatientProfileRequest": {
                 "type": "object",

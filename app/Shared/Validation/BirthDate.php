@@ -22,6 +22,16 @@ final class BirthDate
     }
 
     /**
+     * Anyone's birth date (for example a dependent): required, real, not in the future.
+     *
+     * @return list<string>
+     */
+    public static function anyAge(): array
+    {
+        return ['required', 'date_format:Y-m-d', 'after:1900-01-01', 'before_or_equal:'.self::today()->toDateString()];
+    }
+
+    /**
      * Plain-language messages for accountHolder().
      *
      * @return array<string, string>
@@ -35,6 +45,21 @@ final class BirthDate
             "{$field}.date_format" => 'Enter a real date, for example 1990-05-17.',
             "{$field}.after" => 'Enter a real date, for example 1990-05-17.',
             "{$field}.before_or_equal" => "You must be {$age} or older to have an account. A parent or guardian can add a child as a dependent.",
+        ];
+    }
+
+    /**
+     * Plain-language messages for anyAge().
+     *
+     * @return array<string, string>
+     */
+    public static function anyAgeMessages(string $field): array
+    {
+        return [
+            "{$field}.required" => 'Enter the date of birth.',
+            "{$field}.date_format" => 'Enter a real date, for example 2018-05-17.',
+            "{$field}.after" => 'Enter a real date, for example 2018-05-17.',
+            "{$field}.before_or_equal" => 'The date of birth cannot be in the future.',
         ];
     }
 

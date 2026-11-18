@@ -24,7 +24,7 @@ final class DeviceController
 
         $devices = UserDevice::where('user_id', $user->id)->whereNull('revoked_at')->latest('last_seen_at')->get();
 
-        return ApiResponse::success(DeviceResource::collection($devices)->resolve($request));
+        return ApiResponse::success(DeviceResource::collection($devices));
     }
 
     public function destroy(Request $request, string $deviceId, DeviceRevocation $revocation, RecordsSecurityEvents $events): JsonResponse
