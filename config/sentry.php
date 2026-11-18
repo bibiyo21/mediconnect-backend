@@ -1,5 +1,6 @@
 <?php
 
+use App\Shared\Exceptions\DomainException;
 use App\Shared\Logging\SentryScrubber;
 
 /**
@@ -65,7 +66,11 @@ return [
     'data_collection' => null,
 
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#ignore_exceptions
-    // 'ignore_exceptions' => [],
+    // Expected business-rule failures (wrong password, expired code, taken slot) are 4xx
+    // responses, not defects: they stay in logs and the API envelope, not in Sentry.
+    'ignore_exceptions' => [
+        DomainException::class,
+    ],
 
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#ignore_transactions
     'ignore_transactions' => [
