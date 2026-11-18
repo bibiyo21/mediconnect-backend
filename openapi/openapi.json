@@ -1606,23 +1606,7 @@
                     "roles": {
                         "type": "array",
                         "items": {
-                            "type": "object",
-                            "properties": {
-                                "relations": {
-                                    "type": "array",
-                                    "prefixItems": [
-                                        {
-                                            "type": "string",
-                                            "const": "roles"
-                                        }
-                                    ],
-                                    "minItems": 1,
-                                    "maxItems": 1
-                                }
-                            },
-                            "required": [
-                                "relations"
-                            ]
+                            "type": "string"
                         }
                     },
                     "profile": {

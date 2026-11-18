@@ -30,6 +30,7 @@ class AccountResource extends JsonResource
             'mobile_verified' => $user->mobile_verified_at !== null,
             'status' => $user->status->value,
             'locale' => $user->locale,
+            /** @var list<string> */
             'roles' => $user->getRoleNames()->values()->all(),
             'profile' => $profile ? [
                 'first_name' => $profile->first_name,
