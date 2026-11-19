@@ -23,7 +23,7 @@ final class ClinicGuard
         return $clinic;
     }
 
-    /** @return array{update: bool, manage_hours: bool, manage_staff: bool} */
+    /** @return array{update: bool, manage_hours: bool, manage_staff: bool, manage_doctors: bool} */
     public function abilities(Request $request, string $clinicId): array
     {
         /** @var User $user */
@@ -33,6 +33,7 @@ final class ClinicGuard
             'update' => $this->access->allows($user, 'clinics.update', $clinicId),
             'manage_hours' => $this->access->allows($user, 'clinics.manage_hours', $clinicId),
             'manage_staff' => $this->access->allows($user, 'clinics.manage_staff', $clinicId),
+            'manage_doctors' => $this->access->allows($user, 'doctors.manage_assignments', $clinicId),
         ];
     }
 }

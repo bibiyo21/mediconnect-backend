@@ -7627,12 +7627,16 @@
                             },
                             "manage_staff": {
                                 "type": "boolean"
+                            },
+                            "manage_doctors": {
+                                "type": "boolean"
                             }
                         },
                         "required": [
                             "update",
                             "manage_hours",
-                            "manage_staff"
+                            "manage_staff",
+                            "manage_doctors"
                         ]
                     }
                 },

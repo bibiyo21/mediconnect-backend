@@ -21,7 +21,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 final class ClinicManagementResource extends JsonResource
 {
-    /** @param array{update: bool, manage_hours: bool, manage_staff: bool} $abilities */
+    /** @param array{update: bool, manage_hours: bool, manage_staff: bool, manage_doctors: bool} $abilities */
     public function __construct(Clinic $clinic, private readonly array $abilities)
     {
         parent::__construct($clinic);

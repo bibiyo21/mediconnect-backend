@@ -56,7 +56,7 @@ it('lets an ADMIN create a clinic with its organization and first location', fun
         ->assertJsonPath('data.locations.0.city', 'Makati')
         ->assertJsonPath('data.locations.0.timezone', 'Asia/Manila')
         ->assertJsonPath('data.locations.0.phone', '+63281234567')
-        ->assertJsonPath('data.abilities', ['update' => true, 'manage_hours' => true, 'manage_staff' => true]);
+        ->assertJsonPath('data.abilities', ['update' => true, 'manage_hours' => true, 'manage_staff' => true, 'manage_doctors' => true]);
 
     $this->getJson('/api/v1/admin/clinics', $admin)->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.location_count', 1);
     expect(DB::table('audit_logs')->where('action', 'clinic.created')->value('clinic_id'))->toBe($response->json('data.id'));
@@ -110,7 +110,7 @@ it('gives clinic staff read access only', function () {
     $m->forceFill(['clinic_id' => $clinic, 'user_id' => $staff->id, 'member_role' => 'CLINIC_STAFF', 'status' => 'ACTIVE'])->save();
     $headers = clinic_headers($staff->refresh());
 
-    $this->getJson("/api/v1/clinics/{$clinic}/management", $headers)->assertOk()->assertJsonPath('data.abilities', ['update' => false, 'manage_hours' => false, 'manage_staff' => false]);
+    $this->getJson("/api/v1/clinics/{$clinic}/management", $headers)->assertOk()->assertJsonPath('data.abilities', ['update' => false, 'manage_hours' => false, 'manage_staff' => false, 'manage_doctors' => false]);
     $this->patchJson("/api/v1/clinics/{$clinic}", ['description' => 'x'], $headers)->assertStatus(403);
 });
 
