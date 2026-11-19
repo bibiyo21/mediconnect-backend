@@ -3,9 +3,10 @@
 namespace App\Modules\Specialties\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-/** POST /admin/specialties/{id}/subspecialties and PATCH /admin/subspecialties/{id}. */
-final class SaveSubspecialtyRequest extends FormRequest
+/** POST /admin/specialties. */
+final class CreateSpecialtyRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,7 +17,9 @@ final class SaveSubspecialtyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => [$this->isMethod('post') ? 'required' : 'sometimes', 'string', 'min:2', 'max:120'],
+            'name' => ['required', 'string', 'min:2', 'max:120', Rule::unique('specialties', 'name')],
+            'synonyms' => ['sometimes', 'array', 'max:20'],
+            'synonyms.*' => ['string', 'min:2', 'max:60', 'distinct:ignore_case'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

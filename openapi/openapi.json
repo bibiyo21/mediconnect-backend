@@ -435,7 +435,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SaveSpecialtyRequest"
+                                "$ref": "#/components/schemas/CreateSpecialtyRequest"
                             }
                         }
                     }
@@ -508,11 +508,10 @@
                     }
                 ],
                 "requestBody": {
-                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SaveSpecialtyRequest"
+                                "$ref": "#/components/schemas/UpdateSpecialtyRequest"
                             }
                         }
                     }
@@ -589,7 +588,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SaveSubspecialtyRequest"
+                                "$ref": "#/components/schemas/CreateSubspecialtyRequest"
                             }
                         }
                     }
@@ -662,11 +661,10 @@
                     }
                 ],
                 "requestBody": {
-                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SaveSubspecialtyRequest"
+                                "$ref": "#/components/schemas/UpdateSubspecialtyRequest"
                             }
                         }
                     }
@@ -3920,6 +3918,52 @@
                 ],
                 "title": "ConfirmContactChangeRequest"
             },
+            "CreateSpecialtyRequest": {
+                "type": "object",
+                "description": "POST /admin/specialties.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "synonyms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 60
+                        },
+                        "maxItems": 20,
+                        "uniqueItems": true
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "CreateSpecialtyRequest"
+            },
+            "CreateSubspecialtyRequest": {
+                "type": "object",
+                "description": "POST /admin/specialties/{id}/subspecialties.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "CreateSubspecialtyRequest"
+            },
             "DependentRelationship": {
                 "type": "string",
                 "description": "How the dependent is related to the guardian (from the guardian's side: \"my CHILD\").\n",
@@ -4545,56 +4589,6 @@
                 ],
                 "title": "Role"
             },
-            "SaveSpecialtyRequest": {
-                "type": "object",
-                "description": "POST /admin/specialties and PATCH /admin/specialties/{id}.",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                    },
-                    "synonyms": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "minLength": 2,
-                            "maxLength": 60
-                        },
-                        "maxItems": 20,
-                        "uniqueItems": true
-                    },
-                    "is_active": {
-                        "type": "boolean"
-                    },
-                    "reviewed": {
-                        "type": "boolean",
-                        "description": "A MEDICAL_ADMIN marks the entry as reviewed (D-39)."
-                    }
-                },
-                "required": [
-                    "name"
-                ],
-                "title": "SaveSpecialtyRequest"
-            },
-            "SaveSubspecialtyRequest": {
-                "type": "object",
-                "description": "POST /admin/specialties/{id}/subspecialties and PATCH /admin/subspecialties/{id}.",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                    },
-                    "is_active": {
-                        "type": "boolean"
-                    }
-                },
-                "required": [
-                    "name"
-                ],
-                "title": "SaveSubspecialtyRequest"
-            },
             "Sex": {
                 "type": "string",
                 "description": "Sex where clinically required (\u00a74.3). Values follow the HL7 administrative gender set. Optional everywhere it is collected.\n",
@@ -4856,6 +4850,50 @@
                     "reason"
                 ],
                 "title": "UpdateSettingRequest"
+            },
+            "UpdateSpecialtyRequest": {
+                "type": "object",
+                "description": "PATCH /admin/specialties/{id}: only the fields sent change.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "synonyms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 60
+                        },
+                        "maxItems": 20,
+                        "uniqueItems": true
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "reviewed": {
+                        "type": "boolean",
+                        "description": "A MEDICAL_ADMIN marks the entry as reviewed (D-39)."
+                    }
+                },
+                "title": "UpdateSpecialtyRequest"
+            },
+            "UpdateSubspecialtyRequest": {
+                "type": "object",
+                "description": "PATCH /admin/subspecialties/{id}: only the fields sent change.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateSubspecialtyRequest"
             },
             "UpdateUserRolesRequest": {
                 "type": "object",

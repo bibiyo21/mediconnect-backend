@@ -5,8 +5,8 @@ namespace App\Modules\Specialties\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-/** POST /admin/specialties and PATCH /admin/specialties/{id}. */
-final class SaveSpecialtyRequest extends FormRequest
+/** PATCH /admin/specialties/{id}: only the fields sent change. */
+final class UpdateSpecialtyRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,11 +16,8 @@ final class SaveSpecialtyRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        $creating = $this->isMethod('post');
-        $id = $this->route('specialtyId');
-
         return [
-            'name' => [$creating ? 'required' : 'sometimes', 'string', 'min:2', 'max:120', Rule::unique('specialties', 'name')->ignore($id)],
+            'name' => ['sometimes', 'string', 'min:2', 'max:120', Rule::unique('specialties', 'name')->ignore($this->route('specialtyId'))],
             'synonyms' => ['sometimes', 'array', 'max:20'],
             'synonyms.*' => ['string', 'min:2', 'max:60', 'distinct:ignore_case'],
             'is_active' => ['sometimes', 'boolean'],

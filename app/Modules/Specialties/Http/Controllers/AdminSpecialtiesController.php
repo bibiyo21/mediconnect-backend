@@ -3,8 +3,10 @@
 namespace App\Modules\Specialties\Http\Controllers;
 
 use App\Modules\Audit\Contracts\RecordsAudit;
-use App\Modules\Specialties\Http\Requests\SaveSpecialtyRequest;
-use App\Modules\Specialties\Http\Requests\SaveSubspecialtyRequest;
+use App\Modules\Specialties\Http\Requests\CreateSpecialtyRequest;
+use App\Modules\Specialties\Http\Requests\CreateSubspecialtyRequest;
+use App\Modules\Specialties\Http\Requests\UpdateSpecialtyRequest;
+use App\Modules\Specialties\Http\Requests\UpdateSubspecialtyRequest;
 use App\Modules\Specialties\Http\Resources\AdminSpecialtyResource;
 use App\Modules\Specialties\Models\Specialty;
 use App\Modules\Specialties\Models\Subspecialty;
@@ -32,7 +34,7 @@ final class AdminSpecialtiesController
         return ApiResponse::success(AdminSpecialtyResource::collection(Specialty::with('subspecialties')->orderBy('name')->get()));
     }
 
-    public function store(SaveSpecialtyRequest $request): JsonResponse
+    public function store(CreateSpecialtyRequest $request): JsonResponse
     {
         $specialty = DB::transaction(function () use ($request) {
             $specialty = new Specialty([
@@ -53,7 +55,7 @@ final class AdminSpecialtiesController
         return ApiResponse::success(new AdminSpecialtyResource($specialty->load('subspecialties')), status: 201);
     }
 
-    public function update(SaveSpecialtyRequest $request, string $specialtyId): JsonResponse
+    public function update(UpdateSpecialtyRequest $request, string $specialtyId): JsonResponse
     {
         $specialty = Specialty::findOrFail($specialtyId);
 
@@ -81,7 +83,7 @@ final class AdminSpecialtiesController
         return ApiResponse::success(new AdminSpecialtyResource($specialty->load('subspecialties')));
     }
 
-    public function storeSubspecialty(SaveSubspecialtyRequest $request, string $specialtyId): JsonResponse
+    public function storeSubspecialty(CreateSubspecialtyRequest $request, string $specialtyId): JsonResponse
     {
         $specialty = Specialty::findOrFail($specialtyId);
         $name = trim((string) $request->input('name'));
@@ -96,7 +98,7 @@ final class AdminSpecialtiesController
         return ApiResponse::success(new AdminSpecialtyResource($specialty->load('subspecialties')), status: 201);
     }
 
-    public function updateSubspecialty(SaveSubspecialtyRequest $request, string $subspecialtyId): JsonResponse
+    public function updateSubspecialty(UpdateSubspecialtyRequest $request, string $subspecialtyId): JsonResponse
     {
         $sub = Subspecialty::with('specialty')->findOrFail($subspecialtyId);
 
@@ -120,7 +122,7 @@ final class AdminSpecialtiesController
     }
 
     /** @return list<string> */
-    private function synonyms(SaveSpecialtyRequest $request): array
+    private function synonyms(CreateSpecialtyRequest|UpdateSpecialtyRequest $request): array
     {
         return array_values(array_unique(array_map(fn ($s) => trim((string) $s), (array) $request->input('synonyms', []))));
     }
