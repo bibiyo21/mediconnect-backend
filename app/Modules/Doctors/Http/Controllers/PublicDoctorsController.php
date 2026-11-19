@@ -4,6 +4,7 @@ namespace App\Modules\Doctors\Http\Controllers;
 
 use App\Modules\Doctors\Http\Requests\ListPublicDoctorsRequest;
 use App\Modules\Doctors\Http\Resources\DoctorServiceResource;
+use App\Modules\Doctors\Http\Resources\PublicDoctorDetailResource;
 use App\Modules\Doctors\Http\Resources\PublicDoctorResource;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Doctors\Models\DoctorService;
@@ -33,11 +34,10 @@ final class PublicDoctorsController
             ->orderBy('display_name')->orderBy('id')
             ->paginate((int) $request->validated('per_page', 20));
 
-        /** @var list<DoctorProfile> $doctors */
-        $doctors = $page->items();
-        $languages = self::languagesFor(array_map(fn (DoctorProfile $d) => $d->id, $doctors));
+        $doctors = $page->getCollection();
+        self::attachLanguages($doctors->all());
 
-        return ApiResponse::success(array_map(fn (DoctorProfile $d) => new PublicDoctorResource($d, $languages[$d->id] ?? []), $doctors), meta: [
+        return ApiResponse::success(PublicDoctorResource::collection($doctors), meta: [
             'page' => $page->currentPage(), 'per_page' => $page->perPage(), 'total' => $page->total(), 'last_page' => $page->lastPage(),
         ]);
     }
@@ -45,8 +45,9 @@ final class PublicDoctorsController
     public function show(string $doctorId): JsonResponse
     {
         $doctor = self::listed()->with([...self::WITH, 'education'])->findOrFail($doctorId);
+        self::attachLanguages([$doctor]);
 
-        return ApiResponse::success(new PublicDoctorResource($doctor, self::languagesFor([$doctor->id])[$doctor->id] ?? [], detail: true));
+        return ApiResponse::success(new PublicDoctorDetailResource($doctor));
     }
 
     /** Services patients can see: online, or at a location where the doctor practises now. */
@@ -68,16 +69,19 @@ final class PublicDoctorsController
     }
 
     /**
-     * @param  list<string>  $ids
-     * @return array<string, list<string>>
+     * One query for every doctor's languages, set as `language_codes`.
+     *
+     * @param  array<int, DoctorProfile>  $doctors
      */
-    private static function languagesFor(array $ids): array
+    private static function attachLanguages(array $doctors): void
     {
         $map = [];
+        $ids = array_map(fn (DoctorProfile $d) => $d->id, $doctors);
         foreach (DB::table('doctor_languages')->whereIn('doctor_profile_id', $ids)->orderBy('language_code')->get(['doctor_profile_id', 'language_code']) as $row) {
             $map[(string) $row->doctor_profile_id][] = (string) $row->language_code;
         }
-
-        return $map;
+        foreach ($doctors as $doctor) {
+            $doctor->setAttribute('language_codes', $map[$doctor->id] ?? []);
+        }
     }
 }

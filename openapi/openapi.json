@@ -3357,7 +3357,7 @@
                                             "type": "boolean"
                                         },
                                         "data": {
-                                            "$ref": "#/components/schemas/PublicClinicResource"
+                                            "$ref": "#/components/schemas/PublicClinicDetailResource"
                                         },
                                         "meta": {
                                             "type": "string"
@@ -5307,7 +5307,9 @@
                                         },
                                         "data": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                "$ref": "#/components/schemas/PublicDoctorResource"
+                                            }
                                         },
                                         "meta": {
                                             "anyOf": [
@@ -6255,7 +6257,9 @@
                                         },
                                         "data": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                "$ref": "#/components/schemas/PublicClinicResource"
+                                            }
                                         },
                                         "meta": {
                                             "anyOf": [
@@ -6465,7 +6469,7 @@
                                             "type": "boolean"
                                         },
                                         "data": {
-                                            "$ref": "#/components/schemas/PublicDoctorResource"
+                                            "$ref": "#/components/schemas/PublicDoctorDetailResource"
                                         },
                                         "meta": {
                                             "type": "string"
@@ -9749,7 +9753,7 @@
                 ],
                 "title": "OnboardingStatus"
             },
-            "PublicClinicResource": {
+            "PublicClinicDetailResource": {
                 "type": "object",
                 "properties": {
                     "id": {
@@ -9959,9 +9963,177 @@
                     "locations",
                     "upcoming_closures"
                 ],
+                "title": "PublicClinicDetailResource"
+            },
+            "PublicClinicResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "organization_name": {
+                        "type": "string"
+                    },
+                    "locations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "address_line1": {
+                                    "type": "string"
+                                },
+                                "address_line2": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "barangay": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "city": {
+                                    "type": "string"
+                                },
+                                "province": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "postal_code": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "latitude": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "longitude": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "timezone": {
+                                    "type": "string"
+                                },
+                                "phone": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "description": "The clinic's public business number."
+                                },
+                                "hospital_name": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "operating_hours": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "day_of_week": {
+                                                "type": "integer"
+                                            },
+                                            "opens_at": {
+                                                "type": "string"
+                                            },
+                                            "closes_at": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "day_of_week",
+                                            "opens_at",
+                                            "closes_at"
+                                        ]
+                                    }
+                                },
+                                "services": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "description": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "name",
+                                            "description"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "name",
+                                "address_line1",
+                                "address_line2",
+                                "barangay",
+                                "city",
+                                "province",
+                                "postal_code",
+                                "latitude",
+                                "longitude",
+                                "timezone",
+                                "phone",
+                                "hospital_name",
+                                "operating_hours",
+                                "services"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "description",
+                    "organization_name",
+                    "locations"
+                ],
                 "title": "PublicClinicResource"
             },
-            "PublicDoctorResource": {
+            "PublicDoctorDetailResource": {
                 "type": "object",
                 "properties": {
                     "id": {
@@ -10018,9 +10190,7 @@
                     "languages": {
                         "type": "array",
                         "description": "ISO 639 codes",
-                        "items": {
-                            "type": "string"
-                        }
+                        "items": {}
                     },
                     "years_experience": {
                         "type": [
@@ -10116,6 +10286,115 @@
                     "medical_school",
                     "gender",
                     "education"
+                ],
+                "title": "PublicDoctorDetailResource"
+            },
+            "PublicDoctorResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "professional_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "licence_verified": {
+                        "type": "boolean",
+                        "description": "The PRC licence was checked by a MediConnect reviewer."
+                    },
+                    "primary_specialty": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "specialties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "specialty_id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "subspecialty": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "board_certified": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "specialty_id",
+                                "name",
+                                "subspecialty",
+                                "board_certified"
+                            ]
+                        }
+                    },
+                    "languages": {
+                        "type": "array",
+                        "description": "ISO 639 codes",
+                        "items": {}
+                    },
+                    "years_experience": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "practice_locations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "clinic_id": {
+                                    "type": "string"
+                                },
+                                "clinic_name": {
+                                    "type": "string"
+                                },
+                                "clinic_location_id": {
+                                    "type": "string"
+                                },
+                                "location_name": {
+                                    "type": "string"
+                                },
+                                "city": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "clinic_id",
+                                "clinic_name",
+                                "clinic_location_id",
+                                "location_name",
+                                "city"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "display_name",
+                    "professional_title",
+                    "licence_verified",
+                    "primary_specialty",
+                    "specialties",
+                    "languages",
+                    "years_experience",
+                    "practice_locations"
                 ],
                 "title": "PublicDoctorResource"
             },

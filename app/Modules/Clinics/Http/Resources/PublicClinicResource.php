@@ -17,20 +17,15 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * @mixin Clinic
  */
-final class PublicClinicResource extends JsonResource
+class PublicClinicResource extends JsonResource
 {
-    public function __construct(Clinic $clinic, private readonly bool $detail = false)
-    {
-        parent::__construct($clinic);
-    }
-
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
         /** @var Clinic $c */
         $c = $this->resource;
 
-        $data = [
+        return [
             'id' => $c->id,
             'name' => $c->name,
             'slug' => $c->slug,
@@ -57,15 +52,15 @@ final class PublicClinicResource extends JsonResource
                 'services' => $l->services->where('status', 'ACTIVE')->map(fn (ClinicService $s) => ['id' => $s->id, 'name' => $s->name, 'description' => $s->description])->values()->all(),
             ])->values()->all(),
         ];
+    }
 
-        if ($this->detail) {
-            $data['upcoming_closures'] = $c->holidays->filter(fn (ClinicHoliday $h) => $h->date->greaterThanOrEqualTo(today()))->sortBy('date')->take(10)->map(fn (ClinicHoliday $h) => [
-                'clinic_location_id' => $h->clinic_location_id, 'date' => $h->date->toDateString(), 'name' => $h->name, 'is_closed' => $h->is_closed,
-                'special_opens_at' => $h->special_opens_at !== null ? substr($h->special_opens_at, 0, 5) : null,
-                'special_closes_at' => $h->special_closes_at !== null ? substr($h->special_closes_at, 0, 5) : null,
-            ])->values()->all();
-        }
-
-        return $data;
+    /** @return array<int, array<string, mixed>> */
+    protected function closures(Clinic $c): array
+    {
+        return $c->holidays->filter(fn (ClinicHoliday $h) => $h->date->greaterThanOrEqualTo(today()))->sortBy('date')->take(10)->map(fn (ClinicHoliday $h) => [
+            'clinic_location_id' => $h->clinic_location_id, 'date' => $h->date->toDateString(), 'name' => $h->name, 'is_closed' => $h->is_closed,
+            'special_opens_at' => $h->special_opens_at !== null ? substr($h->special_opens_at, 0, 5) : null,
+            'special_closes_at' => $h->special_closes_at !== null ? substr($h->special_closes_at, 0, 5) : null,
+        ])->values()->all();
     }
 }

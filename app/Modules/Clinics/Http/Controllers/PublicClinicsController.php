@@ -3,6 +3,7 @@
 namespace App\Modules\Clinics\Http\Controllers;
 
 use App\Modules\Clinics\Http\Requests\ListPublicClinicsRequest;
+use App\Modules\Clinics\Http\Resources\PublicClinicDetailResource;
 use App\Modules\Clinics\Http\Resources\PublicClinicResource;
 use App\Modules\Clinics\Models\Clinic;
 use App\Modules\Clinics\Models\ClinicLocation;
@@ -26,10 +27,7 @@ final class PublicClinicsController
             ->orderBy('name')->orderBy('id')
             ->paginate((int) $request->validated('per_page', 20));
 
-        /** @var list<Clinic> $clinics */
-        $clinics = $page->items();
-
-        return ApiResponse::success(array_map(fn (Clinic $c) => new PublicClinicResource($c), $clinics), meta: [
+        return ApiResponse::success(PublicClinicResource::collection($page->getCollection()), meta: [
             'page' => $page->currentPage(), 'per_page' => $page->perPage(), 'total' => $page->total(), 'last_page' => $page->lastPage(),
         ]);
     }
@@ -38,7 +36,7 @@ final class PublicClinicsController
     {
         $clinic = self::listed()->with(['holidays'])->findOrFail($clinicId);
 
-        return ApiResponse::success(new PublicClinicResource($clinic, detail: true));
+        return ApiResponse::success(new PublicClinicDetailResource($clinic));
     }
 
     public function operatingHours(string $clinicId): JsonResponse

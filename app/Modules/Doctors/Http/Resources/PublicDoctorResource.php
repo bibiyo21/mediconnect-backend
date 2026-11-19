@@ -11,19 +11,14 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * A doctor as the public sees them (increment 2.11). ACTIVE doctors only; only
  * specialties a reviewer confirmed (D-40). Never the licence number, documents,
- * account or verification history (§5.2). `languages` comes from the caller's
- * prefetch so a list does not query once per doctor.
+ * account or verification history (§5.2). Languages come from the
+ * controller's prefetch (`language_codes` attribute), so a list does not
+ * query once per doctor.
  *
  * @mixin DoctorProfile
  */
-final class PublicDoctorResource extends JsonResource
+class PublicDoctorResource extends JsonResource
 {
-    /** @param list<string> $languages */
-    public function __construct(DoctorProfile $doctor, private readonly array $languages, private readonly bool $detail = false)
-    {
-        parent::__construct($doctor);
-    }
-
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
@@ -32,7 +27,7 @@ final class PublicDoctorResource extends JsonResource
         $specialties = $p->specialties->filter(fn (DoctorSpecialty $s) => $s->isConfirmed())->values();
         $primary = $specialties->first(fn (DoctorSpecialty $s) => $s->is_primary);
 
-        $data = [
+        return [
             'id' => $p->id,
             'display_name' => $p->display_name,
             'professional_title' => $p->professional_title,
@@ -46,7 +41,7 @@ final class PublicDoctorResource extends JsonResource
                 'board_certified' => $s->board_certified,
             ])->all(),
             /** ISO 639 codes */
-            'languages' => $this->languages,
+            'languages' => array_values((array) ($p->getAttribute('language_codes') ?? [])),
             'years_experience' => $p->years_experience,
             'practice_locations' => $p->activeAssignments->map(fn (DoctorClinicAssignment $a) => [
                 'clinic_id' => $a->location->clinic_id,
@@ -56,14 +51,5 @@ final class PublicDoctorResource extends JsonResource
                 'city' => $a->location->city,
             ])->values()->all(),
         ];
-
-        if ($this->detail) {
-            $data['biography'] = $p->biography;
-            $data['medical_school'] = $p->medical_school;
-            $data['gender'] = $p->gender;
-            $data['education'] = $p->education->map(fn ($e) => ['institution' => $e->institution, 'degree' => $e->degree, 'year_completed' => $e->year_completed])->values()->all();
-        }
-
-        return $data;
     }
 }
