@@ -206,3 +206,75 @@ it('answers 422 when two simultaneous requests start the same doctor profile', f
         ->and($user->refresh()->hasRole('DOCTOR'))->toBeFalse()
         ->and(DB::table('doctor_verification_events')->count())->toBe(0);
 });
+
+// D-40: self-reported specialties until a reviewer confirms them.
+
+/** Marks the doctor's specialties confirmed, as the reviewer will in 2.9. */
+function confirm_specialties(DoctorProfile $profile, string $reviewerId): void
+{
+    DB::table('doctor_specialties')->where('doctor_profile_id', $profile->id)->update(['verification_status' => 'CONFIRMED', 'confirmed_by' => $reviewerId, 'confirmed_at' => now()]);
+}
+
+it('stores new specialties as self-reported (D-40)', function () {
+    $headers = signed_in(patient_account());
+    start_doctor($headers);
+    $card = Specialty::where('slug', 'cardiology')->value('id');
+
+    $data = $this->patchJson('/api/v1/doctors/me', ['specialties' => [['specialty_id' => $card, 'is_primary' => true, 'board_certified' => true]]], $headers)->assertOk()->json('data');
+
+    expect($data['specialties'][0]['verification_status'])->toBe('SELF_REPORTED')
+        ->and($data['specialty_review_pending'])->toBeFalse(); // not verified yet: the whole profile is still under onboarding
+});
+
+it('keeps a confirmation for unchanged entries and drops it when the claim changes (D-40)', function () {
+    $user = patient_account();
+    $headers = signed_in($user);
+    start_doctor($headers);
+    $card = Specialty::where('slug', 'cardiology')->value('id');
+    $im = Specialty::where('slug', 'internal-medicine')->value('id');
+    $this->patchJson('/api/v1/doctors/me', ['specialties' => [['specialty_id' => $card, 'is_primary' => true, 'board_certified' => true]]], $headers)->assertOk();
+    $profile = DoctorProfile::sole();
+    confirm_specialties($profile, account(Role::MedicalAdmin)->id);
+
+    // Unchanged cardiology entry plus a new one: cardiology stays confirmed, the new one is self-reported.
+    $data = $this->patchJson('/api/v1/doctors/me', ['specialties' => [
+        ['specialty_id' => $card, 'is_primary' => true, 'board_certified' => true],
+        ['specialty_id' => $im],
+    ]], $headers)->assertOk()->json('data');
+    expect(collect($data['specialties'])->pluck('verification_status', 'specialty_name')->all())->toBe(['Cardiology' => 'CONFIRMED', 'Internal Medicine' => 'SELF_REPORTED']);
+
+    // Changing the board certification is a new claim: back to self-reported.
+    $data = $this->patchJson('/api/v1/doctors/me', ['specialties' => [['specialty_id' => $card, 'is_primary' => true, 'board_certified' => false]]], $headers)->assertOk()->json('data');
+    expect($data['specialties'][0]['verification_status'])->toBe('SELF_REPORTED');
+});
+
+it('flags specialty changes of a verified doctor for review without taking the doctor offline (D-40)', function () {
+    $user = patient_account();
+    $headers = signed_in($user);
+    start_doctor($headers);
+    $card = Specialty::where('slug', 'cardiology')->value('id');
+    $this->patchJson('/api/v1/doctors/me', ['specialties' => [['specialty_id' => $card, 'is_primary' => true]]], $headers)->assertOk();
+    $profile = DoctorProfile::sole();
+    $reviewer = account(Role::MedicalAdmin);
+    $onboarding = app(DoctorOnboarding::class);
+    foreach ([OnboardingStatus::DocumentsSubmitted, OnboardingStatus::UnderReview, OnboardingStatus::Verified, OnboardingStatus::Active] as $step) {
+        $profile = $onboarding->transition($profile, $step, $reviewer->id);
+    }
+    confirm_specialties($profile, $reviewer->id);
+    $this->getJson('/api/v1/doctors/me', $headers)->assertJsonPath('data.specialty_review_pending', false);
+
+    $pediatrics = Specialty::where('slug', 'pediatrics')->value('id');
+    $data = $this->patchJson('/api/v1/doctors/me', ['specialties' => [['specialty_id' => $card, 'is_primary' => true], ['specialty_id' => $pediatrics, 'board_certified' => true]]], $headers)->assertOk()->json('data');
+
+    expect($data['onboarding_status'])->toBe('ACTIVE')
+        ->and($data['specialty_review_pending'])->toBeTrue();
+});
+
+it('will not store a confirmation without who confirmed it and when', function () {
+    $headers = signed_in(patient_account());
+    start_doctor($headers);
+    $card = Specialty::where('slug', 'cardiology')->value('id');
+    $this->patchJson('/api/v1/doctors/me', ['specialties' => [['specialty_id' => $card, 'is_primary' => true]]], $headers)->assertOk();
+
+    expect(fn () => DB::transaction(fn () => DB::table('doctor_specialties')->update(['verification_status' => 'CONFIRMED'])))->toThrow(QueryException::class);
+});

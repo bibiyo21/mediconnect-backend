@@ -6347,6 +6347,14 @@
                                 },
                                 "board_certified": {
                                     "type": "boolean"
+                                },
+                                "verification_status": {
+                                    "type": "string",
+                                    "description": "D-40: confirmed by a reviewer, or as stated by the doctor",
+                                    "enum": [
+                                        "SELF_REPORTED",
+                                        "CONFIRMED"
+                                    ]
                                 }
                             },
                             "required": [
@@ -6355,9 +6363,14 @@
                                 "subspecialty_id",
                                 "subspecialty_name",
                                 "is_primary",
-                                "board_certified"
+                                "board_certified",
+                                "verification_status"
                             ]
                         }
+                    },
+                    "specialty_review_pending": {
+                        "type": "boolean",
+                        "description": "D-40: a verified doctor has specialty changes a reviewer has not confirmed yet."
                     },
                     "education": {
                         "type": "array",
@@ -6460,6 +6473,7 @@
                     "gender",
                     "languages",
                     "specialties",
+                    "specialty_review_pending",
                     "education",
                     "experience",
                     "profile_completeness",

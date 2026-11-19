@@ -7,6 +7,7 @@ use App\Modules\Doctors\Http\Requests\StartDoctorOnboardingRequest;
 use App\Modules\Doctors\Http\Requests\UpdateMyDoctorProfileRequest;
 use App\Modules\Doctors\Http\Resources\MyDoctorProfileResource;
 use App\Modules\Doctors\Models\DoctorProfile;
+use App\Modules\Doctors\Models\DoctorSpecialty;
 use App\Modules\Doctors\Services\DoctorOnboarding;
 use App\Modules\Doctors\Services\ProfileCompleteness;
 use App\Modules\Rbac\Contracts\AssignsRoles;
@@ -88,10 +89,7 @@ final class MyDoctorProfileController
                 $changed[] = 'languages';
             }
             if (array_key_exists('specialties', $data)) {
-                $profile->specialties()->delete();
-                foreach ($data['specialties'] as $s) {
-                    $profile->specialties()->create(['specialty_id' => $s['specialty_id'], 'subspecialty_id' => $s['subspecialty_id'] ?? null, 'is_primary' => (bool) ($s['is_primary'] ?? false), 'board_certified' => (bool) ($s['board_certified'] ?? false)]);
-                }
+                $this->replaceSpecialties($profile, $data['specialties']);
                 $changed[] = 'specialties';
             }
             foreach (['education', 'experience'] as $list) {
@@ -111,6 +109,38 @@ final class MyDoctorProfileController
         });
 
         return ApiResponse::success(new MyDoctorProfileResource($this->loaded($profile->refresh())));
+    }
+
+    /**
+     * Replaces the specialty list (D-40). An entry identical to one a reviewer
+     * already confirmed (same specialty, subspecialty and board certification)
+     * keeps its confirmation; anything new or changed is SELF_REPORTED until
+     * reviewed. Only confirmed entries may be shown publicly.
+     *
+     * @param  list<array{specialty_id: string, subspecialty_id?: string|null, is_primary?: bool, board_certified?: bool}>  $rows
+     */
+    private function replaceSpecialties(DoctorProfile $profile, array $rows): void
+    {
+        $confirmed = $profile->specialties()->where('verification_status', 'CONFIRMED')->get()
+            ->keyBy(fn (DoctorSpecialty $s) => $s->specialty_id.'|'.($s->subspecialty_id ?? '').'|'.($s->board_certified ? '1' : '0'));
+
+        $profile->specialties()->delete();
+        foreach ($rows as $row) {
+            $boardCertified = (bool) ($row['board_certified'] ?? false);
+            $previous = $confirmed->get($row['specialty_id'].'|'.($row['subspecialty_id'] ?? '').'|'.($boardCertified ? '1' : '0'));
+
+            $specialty = new DoctorSpecialty([
+                'specialty_id' => $row['specialty_id'],
+                'subspecialty_id' => $row['subspecialty_id'] ?? null,
+                'is_primary' => (bool) ($row['is_primary'] ?? false),
+                'board_certified' => $boardCertified,
+            ]);
+            if ($previous !== null) {
+                $specialty->forceFill(['verification_status' => 'CONFIRMED', 'confirmed_by' => $previous->getAttribute('confirmed_by'), 'confirmed_at' => $previous->confirmed_at]);
+            }
+            $specialty->doctor_profile_id = $profile->id;
+            $specialty->save();
+        }
     }
 
     /** Sets a new licence number; returns false when it is the one already stored. */

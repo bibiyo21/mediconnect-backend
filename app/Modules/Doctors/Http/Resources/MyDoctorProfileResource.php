@@ -44,7 +44,11 @@ final class MyDoctorProfileResource extends JsonResource
                 'specialty_id' => $s->specialty_id, 'specialty_name' => $s->specialty->name,
                 'subspecialty_id' => $s->subspecialty_id, 'subspecialty_name' => $s->subspecialty?->name,
                 'is_primary' => $s->is_primary, 'board_certified' => $s->board_certified,
+                /** @var 'SELF_REPORTED'|'CONFIRMED' D-40: confirmed by a reviewer, or as stated by the doctor */
+                'verification_status' => $s->verification_status,
             ])->values()->all(),
+            /** D-40: a verified doctor has specialty changes a reviewer has not confirmed yet. */
+            'specialty_review_pending' => in_array($p->onboarding_status->value, ['VERIFIED', 'ACTIVE'], true) && $p->specialties->contains(fn (DoctorSpecialty $s) => ! $s->isConfirmed()),
             'education' => $p->education->map(fn (DoctorEducation $e) => ['institution' => $e->institution, 'degree' => $e->degree, 'year_completed' => $e->year_completed])->values()->all(),
             'experience' => $p->experience->map(fn (DoctorExperience $e) => ['organization' => $e->organization, 'position' => $e->position, 'started_on' => $e->started_on?->toDateString(), 'ended_on' => $e->ended_on?->toDateString()])->values()->all(),
             'profile_completeness' => $p->profile_completeness,
