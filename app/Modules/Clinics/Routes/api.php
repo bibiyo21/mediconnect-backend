@@ -7,12 +7,21 @@ use App\Modules\Clinics\Http\Controllers\ClinicLocationsController;
 use App\Modules\Clinics\Http\Controllers\ClinicManagementController;
 use App\Modules\Clinics\Http\Controllers\ClinicMembersController;
 use App\Modules\Clinics\Http\Controllers\MyAssignmentsController;
+use App\Modules\Clinics\Http\Controllers\PublicClinicsController;
 use Illuminate\Support\Facades\Route;
 
 /*
  * Clinics module routes, under /api/v1 (api-specification.md §2.4). Management
  * routes are clinic-scoped (ClinicGuard): the public directory arrives in 2.11.
  */
+// Public directory (2.11): ACTIVE clinics and locations only; no staff or member data.
+Route::middleware('throttle:120,1')->group(function () {
+    Route::get('clinics', [PublicClinicsController::class, 'index']);
+    Route::get('clinics/{clinicId}', [PublicClinicsController::class, 'show'])->whereUuid('clinicId');
+    Route::get('clinics/{clinicId}/doctors', [PublicClinicsController::class, 'doctors'])->whereUuid('clinicId');
+    Route::get('clinics/{clinicId}/operating-hours', [PublicClinicsController::class, 'operatingHours'])->whereUuid('clinicId');
+});
+
 Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(function () {
     Route::get('admin/clinics', [AdminClinicsController::class, 'index'])->middleware('can:clinics.create');
     Route::post('admin/clinics', [AdminClinicsController::class, 'store'])->middleware('can:clinics.create');

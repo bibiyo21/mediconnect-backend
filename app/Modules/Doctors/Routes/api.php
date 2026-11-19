@@ -5,10 +5,18 @@ use App\Modules\Doctors\Http\Controllers\CredentialFileController;
 use App\Modules\Doctors\Http\Controllers\MyCredentialsController;
 use App\Modules\Doctors\Http\Controllers\MyDoctorProfileController;
 use App\Modules\Doctors\Http\Controllers\MyServicesController;
+use App\Modules\Doctors\Http\Controllers\PublicDoctorsController;
 use App\Modules\Doctors\Http\Controllers\SubmitForReviewController;
 use Illuminate\Support\Facades\Route;
 
 /* Doctors module routes, under /api/v1 (api-specification.md §2.3). */
+
+// Public directory (2.11): ACTIVE doctors only, no personal or credential data.
+Route::middleware('throttle:120,1')->group(function () {
+    Route::get('doctors', [PublicDoctorsController::class, 'index']);
+    Route::get('doctors/{doctorId}', [PublicDoctorsController::class, 'show'])->whereUuid('doctorId');
+    Route::get('doctors/{doctorId}/services', [PublicDoctorsController::class, 'services'])->whereUuid('doctorId');
+});
 Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(function () {
     Route::post('doctors', [MyDoctorProfileController::class, 'store'])->middleware('throttle:auth-strict');
     Route::get('doctors/me', [MyDoctorProfileController::class, 'show']);

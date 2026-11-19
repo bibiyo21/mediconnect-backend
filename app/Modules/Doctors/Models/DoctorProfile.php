@@ -2,6 +2,7 @@
 
 namespace App\Modules\Doctors\Models;
 
+use App\Modules\Clinics\Models\DoctorClinicAssignment;
 use App\Modules\Doctors\Enums\OnboardingStatus;
 use App\Modules\Users\Models\User;
 use Carbon\CarbonImmutable;
@@ -62,6 +63,16 @@ class DoctorProfile extends Model
     public function specialties(): HasMany
     {
         return $this->hasMany(DoctorSpecialty::class);
+    }
+
+    /**
+     * Where the doctor currently practises (read-only, Clinics module).
+     *
+     * @return HasMany<DoctorClinicAssignment, $this>
+     */
+    public function activeAssignments(): HasMany
+    {
+        return $this->hasMany(DoctorClinicAssignment::class)->where('status', 'ACTIVE');
     }
 
     /** @return HasMany<DoctorCredential, $this> */
