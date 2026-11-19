@@ -3,6 +3,7 @@
 use App\Modules\Administration\Providers\AdministrationServiceProvider;
 use App\Modules\Audit\Providers\AuditServiceProvider;
 use App\Modules\Authentication\Providers\AuthenticationServiceProvider;
+use App\Modules\Clinics\Providers\ClinicsServiceProvider;
 use App\Modules\Notifications\Providers\NotificationsServiceProvider;
 use App\Modules\Patients\Providers\PatientsServiceProvider;
 use App\Modules\Rbac\Providers\RbacServiceProvider;
@@ -22,4 +23,5 @@ return [
     AuthenticationServiceProvider::class,
     AdministrationServiceProvider::class,
     SpecialtiesServiceProvider::class,
+    ClinicsServiceProvider::class,
 ];
