@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use App\Shared\Contracts\Clock;
+use App\Shared\Contracts\MalwareScanner;
 use App\Shared\Http\Middleware\EnsureIdempotency;
 use App\Shared\Logging\ScrubbingLogManager;
+use App\Shared\Malware\ClamdScanner;
 use App\Shared\OpenApi\MarksAuthenticatedOperations;
 use App\Shared\Services\SystemClock;
 use Dedoc\Scramble\Scramble;
@@ -22,6 +24,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(Clock::class, SystemClock::class);
+        $this->app->singleton(MalwareScanner::class, fn () => new ClamdScanner(
+            (string) config('mediconnect.malware_scanner.host'),
+            (int) config('mediconnect.malware_scanner.port'),
+            (float) config('mediconnect.malware_scanner.timeout_seconds'),
+        ));
         $this->app->singleton('log', fn ($app) => new ScrubbingLogManager($app));
     }
 

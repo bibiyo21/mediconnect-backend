@@ -19,4 +19,21 @@ return [
         'max_per_guardian' => (int) env('MEDICONNECT_MAX_DEPENDENTS', 10),
         'guardian_attestation_version' => env('GUARDIAN_ATTESTATION_VERSION', 'draft-2026-11'),
     ],
+
+    // Doctor credential documents (increment 2.8, D-36, D-07).
+    'credentials' => [
+        'disk' => env('DOCUMENTS_DISK', 'documents'),
+        'max_kilobytes' => (int) env('CREDENTIAL_MAX_KILOBYTES', 10240),
+        'max_per_doctor' => (int) env('CREDENTIAL_MAX_PER_DOCTOR', 10),
+        // Content-sniffed types only; the extension must agree.
+        'mime_types' => ['application/pdf', 'image/jpeg', 'image/png'],
+        'download_ttl_seconds' => (int) env('CREDENTIAL_DOWNLOAD_TTL_SECONDS', 300),
+    ],
+
+    // ClamAV daemon (D-07). Scans fail closed: no verdict means not downloadable.
+    'malware_scanner' => [
+        'host' => env('CLAMAV_HOST', 'clamav'),
+        'port' => (int) env('CLAMAV_PORT', 3310),
+        'timeout_seconds' => (float) env('CLAMAV_TIMEOUT_SECONDS', 30),
+    ],
 ];

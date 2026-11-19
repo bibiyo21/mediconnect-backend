@@ -47,6 +47,22 @@ return [
             'report' => false,
         ],
 
+        // Private documents (doctor credentials; later medical attachments). Never public:
+        // no URL is configured, files are encrypted before upload, and downloads go through
+        // an authorised, short-lived signed API route (D-36). Locally this is SeaweedFS.
+        'documents' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'bucket' => env('AWS_BUCKET'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

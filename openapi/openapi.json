@@ -2779,6 +2779,94 @@
                 ]
             }
         },
+        "/doctors/credentials/{credentialId}/file": {
+            "get": {
+                "operationId": "doctor-credentials.file",
+                "tags": [
+                    "CredentialFile"
+                ],
+                "parameters": [
+                    {
+                        "name": "credentialId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Length": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "no-store, private"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "no-referrer"
+                                }
+                            },
+                            "Content-Security-Policy": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "default-src 'none'; sandbox"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
         "/patients/me/dependents": {
             "get": {
                 "operationId": "dependents.index",
@@ -3503,6 +3591,276 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/credentials": {
+            "get": {
+                "operationId": "myCredentials.index",
+                "tags": [
+                    "MyCredentials"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CredentialResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "myCredentials.store",
+                "tags": [
+                    "MyCredentials"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UploadCredentialRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/CredentialResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/credentials/{credentialId}": {
+            "delete": {
+                "operationId": "myCredentials.destroy",
+                "tags": [
+                    "MyCredentials"
+                ],
+                "parameters": [
+                    {
+                        "name": "credentialId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/credentials/{credentialId}/download-url": {
+            "get": {
+                "operationId": "myCredentials.downloadUrl",
+                "summary": "A short-lived signed link to download the file. Only CLEAN documents;\nthe link names the owner and stops working after the configured TTL",
+                "tags": [
+                    "MyCredentials"
+                ],
+                "parameters": [
+                    {
+                        "name": "credentialId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "url": {
+                                                    "type": "string"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "url",
+                                                "expires_at"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
                     }
                 },
                 "security": [
@@ -4925,6 +5283,57 @@
                     }
                 }
             }
+        },
+        "/doctors/me/submit": {
+            "post": {
+                "operationId": "doctors.submitForReview",
+                "tags": [
+                    "SubmitForReview"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/MyDoctorProfileResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -6002,6 +6411,98 @@
                     "name"
                 ],
                 "title": "CreateSubspecialtyRequest"
+            },
+            "CredentialResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "credential_type": {
+                        "type": "string",
+                        "enum": [
+                            "PRC_ID",
+                            "SPECIALTY_BOARD",
+                            "DIPLOMA",
+                            "OTHER"
+                        ]
+                    },
+                    "original_filename": {
+                        "type": "string"
+                    },
+                    "mime_type": {
+                        "type": "string",
+                        "enum": [
+                            "application/pdf",
+                            "image/jpeg",
+                            "image/png"
+                        ]
+                    },
+                    "size_bytes": {
+                        "type": "integer"
+                    },
+                    "scan_status": {
+                        "type": "string",
+                        "description": "Only CLEAN documents can be downloaded or reviewed.",
+                        "enum": [
+                            "PENDING_SCAN",
+                            "CLEAN",
+                            "QUARANTINED",
+                            "SCAN_FAILED"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "SUBMITTED",
+                            "ACCEPTED",
+                            "REJECTED"
+                        ]
+                    },
+                    "review_note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "expires_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "downloadable": {
+                        "type": "boolean"
+                    },
+                    "uploaded_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "credential_type",
+                    "original_filename",
+                    "mime_type",
+                    "size_bytes",
+                    "scan_status",
+                    "status",
+                    "review_note",
+                    "expires_on",
+                    "downloadable",
+                    "uploaded_at"
+                ],
+                "title": "CredentialResource"
+            },
+            "CredentialType": {
+                "type": "string",
+                "description": "Kinds of credential document (database-schema.md \u00a72).\n",
+                "enum": [
+                    "PRC_ID",
+                    "SPECIALTY_BOARD",
+                    "DIPLOMA",
+                    "OTHER"
+                ],
+                "title": "CredentialType"
             },
             "DependentRelationship": {
                 "type": "string",
@@ -7569,6 +8070,34 @@
                     "reason"
                 ],
                 "title": "UpdateUserRolesRequest"
+            },
+            "UploadCredentialRequest": {
+                "type": "object",
+                "description": "POST /doctors/me/credentials (multipart/form-data).",
+                "properties": {
+                    "credential_type": {
+                        "$ref": "#/components/schemas/CredentialType"
+                    },
+                    "file": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "description": "PDF, JPEG or PNG, checked by content as well as extension."
+                    },
+                    "expires_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date",
+                        "description": "Expiry printed on the document, if any (for example a PRC ID)."
+                    }
+                },
+                "required": [
+                    "credential_type",
+                    "file"
+                ],
+                "title": "UploadCredentialRequest"
             },
             "UserStatus": {
                 "type": "string",
