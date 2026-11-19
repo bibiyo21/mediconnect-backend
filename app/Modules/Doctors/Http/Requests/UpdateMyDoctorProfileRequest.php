@@ -71,7 +71,13 @@ final class UpdateMyDoctorProfileRequest extends FormRequest
             if ($specialties !== [] && count(array_filter($specialties, fn ($s) => (bool) ($s['is_primary'] ?? false))) !== 1) {
                 $v->errors()->add('specialties', 'Mark exactly one specialty as your main one.');
             }
+            $seen = [];
             foreach ($specialties as $i => $s) {
+                $key = $s['specialty_id'].'|'.($s['subspecialty_id'] ?? '');
+                if (isset($seen[$key])) {
+                    $v->errors()->add("specialties.{$i}.specialty_id", 'This specialty is listed twice.');
+                }
+                $seen[$key] = true;
                 if (! empty($s['subspecialty_id']) && DB::table('subspecialties')->where('id', $s['subspecialty_id'])->value('specialty_id') !== $s['specialty_id']) {
                     $v->errors()->add("specialties.{$i}.subspecialty_id", 'This subspecialty belongs to a different specialty.');
                 }

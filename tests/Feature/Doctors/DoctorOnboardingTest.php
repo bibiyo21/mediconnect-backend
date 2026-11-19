@@ -9,6 +9,7 @@ use App\Modules\Specialties\Models\Specialty;
 use Database\Seeders\SpecialtySeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     seed_roles();
@@ -150,4 +151,58 @@ it('returns 404 for doctors/me without a doctor profile, and requires sign-in', 
     $this->getJson('/api/v1/doctors/me', signed_in(patient_account()))->assertNotFound();
     $this->app['auth']->forgetGuards();
     $this->getJson('/api/v1/doctors/me')->assertStatus(401);
+});
+
+// Increment 2.7 review fixes.
+
+it('refuses the same specialty twice with a validation error, not a 500', function () {
+    $headers = signed_in(patient_account());
+    start_doctor($headers);
+    $card = Specialty::where('slug', 'cardiology')->value('id');
+
+    $this->patchJson('/api/v1/doctors/me', ['specialties' => [['specialty_id' => $card, 'is_primary' => true], ['specialty_id' => $card]]], $headers)
+        ->assertStatus(422)->assertJsonValidationErrors('specialties.1.specialty_id', 'errors');
+});
+
+it('audits the licence only when it actually changes', function () {
+    $headers = signed_in(patient_account());
+    start_doctor($headers);
+    $this->patchJson('/api/v1/doctors/me', ['prc_license_number' => '1234567'], $headers)->assertOk();
+    $this->patchJson('/api/v1/doctors/me', ['prc_license_number' => '1234567'], $headers)->assertOk();
+
+    expect(DB::table('audit_logs')->where('action', 'doctor.profile_updated')->count())->toBe(1);
+});
+
+it('answers 422 when another account takes the licence number between the check and the save', function () {
+    $headers = signed_in(patient_account());
+    start_doctor($headers);
+    $rival = DoctorProfile::forceCreate(['user_id' => account()->id, 'display_name' => 'Dr. Rival']);
+    // Simulates the other request winning the race: its row appears just before this save.
+    DoctorProfile::saving(function (DoctorProfile $p) use ($rival) {
+        if ($p->id !== $rival->id && $p->isDirty('prc_license_number_hash')) {
+            DB::table('doctor_profiles')->where('id', $rival->id)->update(['prc_license_number_hash' => $p->prc_license_number_hash]);
+        }
+    });
+
+    $this->patchJson('/api/v1/doctors/me', ['prc_license_number' => '7777777'], $headers)
+        ->assertStatus(422)->assertJsonValidationErrors('prc_license_number', 'errors');
+});
+
+it('answers 422 when two simultaneous requests start the same doctor profile', function () {
+    $user = patient_account();
+    $headers = signed_in($user);
+    // Simulates the other request winning the race: its profile exists by the time this one saves.
+    DoctorProfile::creating(function (DoctorProfile $p) use ($user) {
+        if (DB::table('doctor_profiles')->where('user_id', $user->id)->doesntExist()) {
+            DB::table('doctor_profiles')->insert(['id' => (string) Str::uuid7(), 'user_id' => $user->id, 'display_name' => 'Dr. First', 'created_at' => now(), 'updated_at' => now()]);
+        }
+    });
+
+    $this->postJson('/api/v1/doctors', ['display_name' => 'Dr. Second', 'confirm_licensed' => true], $headers)
+        ->assertStatus(422)->assertJsonValidationErrors('display_name', 'errors');
+    // Nothing from the losing request is kept: no second profile, no role, no history row.
+    // (The simulated rival row was written inside this request's transaction, so it rolls back too.)
+    expect(DoctorProfile::where('display_name', 'Dr. Second')->exists())->toBeFalse()
+        ->and($user->refresh()->hasRole('DOCTOR'))->toBeFalse()
+        ->and(DB::table('doctor_verification_events')->count())->toBe(0);
 });

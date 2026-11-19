@@ -14,6 +14,7 @@ use App\Modules\Rbac\Enums\Role;
 use App\Modules\Users\Models\User;
 use App\Shared\Http\ApiResponse;
 use App\Shared\Services\Fingerprint;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,12 @@ final class MyDoctorProfileController
         $profile = DB::transaction(function () use ($request, $user, $roles) {
             $profile = new DoctorProfile(['display_name' => trim((string) $request->input('display_name')), 'professional_title' => $request->input('professional_title')]);
             $profile->user_id = $user->id;
-            $profile->save();
+            try {
+                $profile->save();
+            } catch (UniqueConstraintViolationException) {
+                // A second, simultaneous request from the same user created the profile first.
+                throw ValidationException::withMessages(['display_name' => ['You already have a doctor profile.']]);
+            }
             $roles->assign($user, Role::Doctor);
             $this->onboarding->started($profile, $user->id);
             $this->refreshCompleteness($profile);
@@ -65,11 +71,16 @@ final class MyDoctorProfileController
             $profile->fill(array_intersect_key($data, array_flip(['display_name', 'professional_title', 'biography', 'medical_school', 'years_experience', 'gender'])));
             $changed = array_keys($profile->getDirty());
 
-            if (array_key_exists('prc_license_number', $data)) {
-                $this->setLicence($profile, (string) $data['prc_license_number']);
+            if (array_key_exists('prc_license_number', $data) && $this->setLicence($profile, (string) $data['prc_license_number'])) {
                 $changed[] = 'prc_license_number';
             }
-            $profile->save();
+
+            try {
+                $profile->save();
+            } catch (UniqueConstraintViolationException) {
+                // Another account saved the same licence number between the check and this save.
+                throw ValidationException::withMessages(['prc_license_number' => ['This licence number is already registered to another account.']]);
+            }
 
             if (array_key_exists('languages', $data)) {
                 DB::table('doctor_languages')->where('doctor_profile_id', $profile->id)->delete();
@@ -102,11 +113,12 @@ final class MyDoctorProfileController
         return ApiResponse::success(new MyDoctorProfileResource($this->loaded($profile->refresh())));
     }
 
-    private function setLicence(DoctorProfile $profile, string $number): void
+    /** Sets a new licence number; returns false when it is the one already stored. */
+    private function setLicence(DoctorProfile $profile, string $number): bool
     {
         $hash = Fingerprint::of('prc:'.$number);
         if ($hash === $profile->prc_license_number_hash) {
-            return;
+            return false;
         }
         if ($profile->onboarding_status->licenceLocked()) {
             throw ValidationException::withMessages(['prc_license_number' => ['The licence number cannot change while it is being reviewed or after it was verified. Contact support.']]);
@@ -116,6 +128,8 @@ final class MyDoctorProfileController
         }
         $profile->prc_license_number_encrypted = $number;
         $profile->prc_license_number_hash = $hash;
+
+        return true;
     }
 
     private function refreshCompleteness(DoctorProfile $profile): void
