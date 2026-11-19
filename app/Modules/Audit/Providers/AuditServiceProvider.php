@@ -12,6 +12,7 @@ use App\Modules\Audit\Services\ConsentRecorder;
 use App\Modules\Audit\Services\SecurityEventRecorder;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 final class AuditServiceProvider extends ServiceProvider
@@ -32,5 +33,7 @@ final class AuditServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([CreateAuditPartitions::class]);
         }
+
+        Route::middleware('api')->prefix('api/v1')->group(__DIR__.'/../Routes/api.php');
     }
 }

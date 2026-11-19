@@ -143,6 +143,16 @@ final class AccountService implements Accounts
         });
     }
 
+    public function suspend(User $user): void
+    {
+        $user->forceFill(['status' => UserStatus::Suspended])->save();
+    }
+
+    public function reactivate(User $user): void
+    {
+        $user->forceFill(['status' => UserStatus::Active])->save();
+    }
+
     /** Tells the account's contact addresses (no personal data in the text). */
     private function notify(User $user, string $notice): void
     {

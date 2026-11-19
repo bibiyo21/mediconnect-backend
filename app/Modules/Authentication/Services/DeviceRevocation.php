@@ -2,6 +2,7 @@
 
 namespace App\Modules\Authentication\Services;
 
+use App\Modules\Authentication\Contracts\RevokesSessions;
 use App\Modules\Authentication\Models\PersonalAccessToken;
 use App\Modules\Authentication\Models\RefreshToken;
 use App\Modules\Authentication\Models\UserDevice;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Ends sign-ins: one device, one refresh family, or every device of a user.
  */
-final class DeviceRevocation
+final class DeviceRevocation implements RevokesSessions
 {
     public function revokeDevice(UserDevice $device): void
     {

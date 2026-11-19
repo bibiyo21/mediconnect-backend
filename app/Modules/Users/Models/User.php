@@ -23,6 +23,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $email
  * @property string|null $mobile_e164
  * @property UserStatus $status
+ * @property CarbonImmutable|null $last_login_at
  * @property CarbonImmutable|null $deletion_requested_at
  * @property CarbonImmutable|null $anonymized_at
  */

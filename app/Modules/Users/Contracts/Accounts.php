@@ -63,4 +63,10 @@ interface Accounts
      * addresses) and deactivates it. IDs stay for referential integrity.
      */
     public function anonymize(User $user): void;
+
+    /** Blocks sign-in (status SUSPENDED). Sessions are ended separately. */
+    public function suspend(User $user): void;
+
+    /** Lifts a suspension (status ACTIVE). */
+    public function reactivate(User $user): void;
 }
