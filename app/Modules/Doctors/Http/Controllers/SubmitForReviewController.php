@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 /**
- * POST /doctors/me/submit: send the profile and documents for verification
+ * POST /doctors/me/submit-for-review: send the profile and documents for verification
  * (REGISTERED or REJECTED → DOCUMENTS_SUBMITTED). Needs a licence number and
  * at least one clean PRC ID document; nothing still waiting for its scan.
  */

@@ -5284,7 +5284,7 @@
                 }
             }
         },
-        "/doctors/me/submit": {
+        "/doctors/me/submit-for-review": {
             "post": {
                 "operationId": "doctors.submitForReview",
                 "tags": [

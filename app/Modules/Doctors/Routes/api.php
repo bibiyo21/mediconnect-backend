@@ -11,7 +11,7 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(func
     Route::post('doctors', [MyDoctorProfileController::class, 'store'])->middleware('throttle:auth-strict');
     Route::get('doctors/me', [MyDoctorProfileController::class, 'show']);
     Route::patch('doctors/me', [MyDoctorProfileController::class, 'update']);
-    Route::post('doctors/me/submit', SubmitForReviewController::class);
+    Route::post('doctors/me/submit-for-review', SubmitForReviewController::class);
 
     Route::get('doctors/me/credentials', [MyCredentialsController::class, 'index']);
     Route::post('doctors/me/credentials', [MyCredentialsController::class, 'store'])->middleware('throttle:uploads');

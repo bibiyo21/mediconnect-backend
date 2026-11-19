@@ -209,18 +209,18 @@ it('submits for review only with a licence number and a clean PRC ID', function 
     Queue::fake();
     $headers = doctor_headers();
 
-    $this->postJson('/api/v1/doctors/me/submit', [], $headers)->assertStatus(422)->assertJsonValidationErrors(['prc_license_number', 'credentials']);
+    $this->postJson('/api/v1/doctors/me/submit-for-review', [], $headers)->assertStatus(422)->assertJsonValidationErrors(['prc_license_number', 'credentials']);
 
     $this->patchJson('/api/v1/doctors/me', ['prc_license_number' => '0123456'], $headers)->assertOk();
     $id = upload($headers)->assertCreated()->json('data.id');
-    $this->postJson('/api/v1/doctors/me/submit', [], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
+    $this->postJson('/api/v1/doctors/me/submit-for-review', [], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
 
     DoctorCredential::whereKey($id)->update(['scan_status' => 'CLEAN', 'scanned_at' => now()]);
-    $data = $this->postJson('/api/v1/doctors/me/submit', [], $headers)->assertOk()->json('data');
+    $data = $this->postJson('/api/v1/doctors/me/submit-for-review', [], $headers)->assertOk()->json('data');
 
     expect($data['onboarding_status'])->toBe('DOCUMENTS_SUBMITTED')
         ->and(collect($data['verification_history'])->pluck('to_status')->all())->toBe(['REGISTERED', 'DOCUMENTS_SUBMITTED']);
-    $this->postJson('/api/v1/doctors/me/submit', [], $headers)->assertStatus(409);
+    $this->postJson('/api/v1/doctors/me/submit-for-review', [], $headers)->assertStatus(409);
 });
 
 it('does not accept a quarantined PRC ID for submission', function () {
@@ -228,14 +228,14 @@ it('does not accept a quarantined PRC ID for submission', function () {
     $this->patchJson('/api/v1/doctors/me', ['prc_license_number' => '0123456'], $headers)->assertOk();
     upload($headers, PDF.FakeMalwareScanner::EICAR)->assertCreated();
 
-    $this->postJson('/api/v1/doctors/me/submit', [], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
+    $this->postJson('/api/v1/doctors/me/submit-for-review', [], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
 });
 
 it('locks documents while the profile is under review', function () {
     $headers = doctor_headers();
     $this->patchJson('/api/v1/doctors/me', ['prc_license_number' => '0123456'], $headers)->assertOk();
     $id = upload($headers)->assertCreated()->json('data.id');
-    $this->postJson('/api/v1/doctors/me/submit', [], $headers)->assertOk();
+    $this->postJson('/api/v1/doctors/me/submit-for-review', [], $headers)->assertOk();
 
     // After submitting, a doctor may add a document but not remove one.
     upload($headers, PDF, 'board.pdf', 'SPECIALTY_BOARD')->assertCreated();
