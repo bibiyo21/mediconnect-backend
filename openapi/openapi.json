@@ -3515,6 +3515,201 @@
                 ]
             }
         },
+        "/doctors": {
+            "post": {
+                "operationId": "myDoctorProfile.store",
+                "tags": [
+                    "MyDoctorProfile"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StartDoctorOnboardingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/MyDoctorProfileResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me": {
+            "get": {
+                "operationId": "myDoctorProfile.show",
+                "tags": [
+                    "MyDoctorProfile"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/MyDoctorProfileResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "myDoctorProfile.update",
+                "tags": [
+                    "MyDoctorProfile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateMyDoctorProfileRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/MyDoctorProfileResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/patients/me": {
             "get": {
                 "operationId": "myPatientProfile.show",
@@ -6055,6 +6250,223 @@
                 ],
                 "title": "MfaLoginRequest"
             },
+            "MyDoctorProfileResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "professional_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "biography": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "prc_license_number_masked": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "license_verification_status": {
+                        "type": "string"
+                    },
+                    "onboarding_status": {
+                        "type": "string",
+                        "enum": [
+                            "REGISTERED",
+                            "DOCUMENTS_SUBMITTED",
+                            "UNDER_REVIEW",
+                            "REJECTED",
+                            "VERIFIED",
+                            "ACTIVE"
+                        ]
+                    },
+                    "licence_locked": {
+                        "type": "boolean"
+                    },
+                    "medical_school": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "years_experience": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "gender": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "languages": {
+                        "type": "array",
+                        "description": "ISO 639 codes",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "specialties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "specialty_id": {
+                                    "type": "string"
+                                },
+                                "specialty_name": {
+                                    "type": "string"
+                                },
+                                "subspecialty_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "subspecialty_name": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "is_primary": {
+                                    "type": "boolean"
+                                },
+                                "board_certified": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "specialty_id",
+                                "specialty_name",
+                                "subspecialty_id",
+                                "subspecialty_name",
+                                "is_primary",
+                                "board_certified"
+                            ]
+                        }
+                    },
+                    "education": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "institution": {
+                                    "type": "string"
+                                },
+                                "degree": {
+                                    "type": "string"
+                                },
+                                "year_completed": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "institution",
+                                "degree",
+                                "year_completed"
+                            ]
+                        }
+                    },
+                    "experience": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "organization": {
+                                    "type": "string"
+                                },
+                                "position": {
+                                    "type": "string"
+                                },
+                                "started_on": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "ended_on": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "organization",
+                                "position",
+                                "started_on",
+                                "ended_on"
+                            ]
+                        }
+                    },
+                    "profile_completeness": {
+                        "type": "integer"
+                    },
+                    "verification_history": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from_status": {
+                                    "type": "string"
+                                },
+                                "to_status": {
+                                    "type": "string"
+                                },
+                                "reason": {
+                                    "type": "string"
+                                },
+                                "occurred_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "from_status",
+                                "to_status",
+                                "reason",
+                                "occurred_at"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "display_name",
+                    "professional_title",
+                    "biography",
+                    "prc_license_number_masked",
+                    "license_verification_status",
+                    "onboarding_status",
+                    "licence_locked",
+                    "medical_school",
+                    "years_experience",
+                    "gender",
+                    "languages",
+                    "specialties",
+                    "education",
+                    "experience",
+                    "profile_completeness",
+                    "verification_history"
+                ],
+                "title": "MyDoctorProfileResource"
+            },
             "MyPatientProfileResource": {
                 "type": "object",
                 "properties": {
@@ -6480,6 +6892,41 @@
                 ],
                 "title": "Sex"
             },
+            "StartDoctorOnboardingRequest": {
+                "type": "object",
+                "description": "POST /doctors: start onboarding as a doctor (D-16: the patient profile stays).",
+                "properties": {
+                    "display_name": {
+                        "type": "string",
+                        "description": "The name patients see, for example \"Dr. Ana Santos\".",
+                        "minLength": 2,
+                        "maxLength": 160
+                    },
+                    "professional_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "confirm_licensed": {
+                        "description": "The applicant states they are a physician licensed by the PRC; verification follows.",
+                        "enum": [
+                            "yes",
+                            "on",
+                            "1",
+                            1,
+                            "true",
+                            true
+                        ]
+                    }
+                },
+                "required": [
+                    "display_name",
+                    "confirm_licensed"
+                ],
+                "title": "StartDoctorOnboardingRequest"
+            },
             "StoreDependentRequest": {
                 "type": "object",
                 "description": "POST /patients/me/dependents.",
@@ -6747,6 +7194,167 @@
                     }
                 },
                 "title": "UpdateLocationRequest"
+            },
+            "UpdateMyDoctorProfileRequest": {
+                "type": "object",
+                "description": "PATCH /doctors/me. Scalar fields change only when sent; the lists\n(languages, specialties, education, experience) replace the whole set.",
+                "properties": {
+                    "display_name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 160
+                    },
+                    "professional_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "biography": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 3000
+                    },
+                    "prc_license_number": {
+                        "type": "string",
+                        "description": "Digits only. Locked while under review and after verification.",
+                        "pattern": "^\\d{5,10}$"
+                    },
+                    "medical_school": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 200
+                    },
+                    "years_experience": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 70
+                    },
+                    "gender": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "FEMALE",
+                            "MALE",
+                            "OTHER",
+                            null
+                        ]
+                    },
+                    "languages": {
+                        "type": "array",
+                        "description": "ISO 639 codes, for example en, fil, ceb.",
+                        "items": {
+                            "type": "string",
+                            "pattern": "^[a-z]{2,3}$"
+                        },
+                        "maxItems": 10,
+                        "uniqueItems": true
+                    },
+                    "specialties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "specialty_id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "subspecialty_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "format": "uuid"
+                                },
+                                "is_primary": {
+                                    "type": "boolean"
+                                },
+                                "board_certified": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "specialty_id"
+                            ]
+                        },
+                        "maxItems": 5
+                    },
+                    "education": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "institution": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                },
+                                "degree": {
+                                    "type": "string",
+                                    "maxLength": 160
+                                },
+                                "year_completed": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ],
+                                    "minimum": 1950,
+                                    "maximum": 2026
+                                }
+                            },
+                            "required": [
+                                "institution",
+                                "degree"
+                            ]
+                        },
+                        "maxItems": 10
+                    },
+                    "experience": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "organization": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                },
+                                "position": {
+                                    "type": "string",
+                                    "maxLength": 160
+                                },
+                                "started_on": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "format": "date"
+                                },
+                                "ended_on": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "format": "date"
+                                }
+                            },
+                            "required": [
+                                "organization",
+                                "position"
+                            ]
+                        },
+                        "maxItems": 20
+                    }
+                },
+                "title": "UpdateMyDoctorProfileRequest"
             },
             "UpdateMyPatientProfileRequest": {
                 "type": "object",
