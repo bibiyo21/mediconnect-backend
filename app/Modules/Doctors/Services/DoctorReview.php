@@ -10,6 +10,7 @@ use App\Modules\Doctors\Exceptions\CredentialNotAvailable;
 use App\Modules\Doctors\Exceptions\InvalidOnboardingTransition;
 use App\Modules\Doctors\Models\DoctorCredential;
 use App\Modules\Doctors\Models\DoctorProfile;
+use App\Modules\Doctors\Models\DoctorService;
 use App\Modules\Doctors\Models\DoctorSpecialty;
 use App\Modules\Notifications\Contracts\SendsOneTimeMessages;
 use App\Modules\Users\Models\User;
@@ -106,8 +107,21 @@ final class DoctorReview
         return $profile;
     }
 
+    /**
+     * D-41: a doctor goes live only with something patients can book, so at
+     * least one active service: online, or at a location where they practise now.
+     */
     public function activate(DoctorProfile $profile, User $reviewer, ?string $reason): DoctorProfile
     {
+        if ($profile->onboarding_status !== OnboardingStatus::Verified) {
+            return $this->onboarding->transition($profile, OnboardingStatus::Active, $reviewer->id, $reason); // refuses with 409
+        }
+        $locations = $profile->activeAssignments()->pluck('clinic_location_id');
+        $hasService = DoctorService::where('doctor_profile_id', $profile->id)->where('status', 'ACTIVE')
+            ->where(fn ($q) => $q->whereNull('clinic_location_id')->orWhereIn('clinic_location_id', $locations))->exists();
+        if (! $hasService) {
+            throw ValidationException::withMessages(['services' => ['The doctor needs at least one active service (online, or at a clinic where they practise) before activation.']]);
+        }
         $profile = $this->onboarding->transition($profile, OnboardingStatus::Active, $reviewer->id, $reason);
         $this->notify($profile, 'Your MediConnect doctor profile is now active.');
 

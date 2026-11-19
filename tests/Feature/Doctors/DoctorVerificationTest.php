@@ -1,7 +1,12 @@
 <?php
 
+use App\Modules\Clinics\Models\Clinic;
+use App\Modules\Clinics\Models\ClinicLocation;
+use App\Modules\Clinics\Models\DoctorClinicAssignment;
+use App\Modules\Clinics\Models\Organization;
 use App\Modules\Doctors\Models\DoctorCredential;
 use App\Modules\Doctors\Models\DoctorProfile;
+use App\Modules\Doctors\Models\DoctorService;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Specialties\Models\Specialty;
 use App\Shared\Contracts\MalwareScanner;
@@ -9,6 +14,7 @@ use Database\Seeders\SpecialtySeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\Support\FakeMalwareScanner;
 
 /*
@@ -113,6 +119,9 @@ it('runs the whole review: start, accept the document, confirm specialties, veri
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/activate", ['reason' => 'Ready to list'], $headers)->assertStatus(409);
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", [], $headers)->assertStatus(422)->assertJsonValidationErrors('reason');
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", ['reason' => 'Licence checked on the PRC register'], $headers)->assertOk()->assertJsonPath('data.onboarding_status', 'VERIFIED');
+    // D-41: no service yet, so activation is refused.
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/activate", ['reason' => 'Ready to list'], $headers)->assertStatus(422)->assertJsonValidationErrors('services');
+    (new DoctorService)->forceFill(['doctor_profile_id' => $doctor->id, 'name' => 'Teleconsultation', 'consultation_type' => 'ONLINE', 'duration_minutes' => 15, 'fee_amount' => 50000, 'effective_from' => now(), 'created_by' => $doctor->user_id])->save();
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/activate", ['reason' => 'Ready to list'], $headers)->assertOk()->assertJsonPath('data.onboarding_status', 'ACTIVE');
 
     $doctor->refresh();
@@ -213,4 +222,25 @@ it('withdraws an accepted PRC ID when the doctor changes the licence number afte
     [, $headers] = reviewer_session();
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/start-review", [], $headers)->assertOk();
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", ['reason' => 'Licence checked'], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
+});
+
+it('does not count a service at a clinic where the doctor no longer practises (D-41)', function () {
+    $doctor = submitted_doctor();
+    [, $headers] = reviewer_session();
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/start-review", [], $headers)->assertOk();
+    $credentialId = DoctorCredential::firstOrFail()->id;
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/credentials/{$credentialId}/review", ['decision' => 'ACCEPTED'], $headers)->assertOk();
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", ['reason' => 'Licence checked'], $headers)->assertOk();
+
+    // An in-person service at a location where the assignment has ended does not count.
+    $org = new Organization;
+    $org->forceFill(['name' => 'Test Group', 'organization_type' => 'CLINIC_GROUP'])->save();
+    $clinic = new Clinic;
+    $clinic->forceFill(['organization_id' => $org->id, 'name' => 'Test Clinic', 'slug' => 'test-clinic-'.Str::random(4)])->save();
+    $location = new ClinicLocation;
+    $location->forceFill(['clinic_id' => $clinic->id, 'name' => 'Main', 'address_line1' => 'Mabini St', 'city' => 'Makati'])->save();
+    (new DoctorClinicAssignment)->forceFill(['doctor_profile_id' => $doctor->id, 'clinic_location_id' => $location->id, 'status' => 'ENDED', 'requested_by' => $doctor->user_id, 'effective_until' => now()])->save();
+    (new DoctorService)->forceFill(['doctor_profile_id' => $doctor->id, 'clinic_location_id' => $location->id, 'name' => 'Consultation', 'consultation_type' => 'IN_PERSON', 'duration_minutes' => 20, 'fee_amount' => 65000, 'effective_from' => now(), 'created_by' => $doctor->user_id])->save();
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/activate", ['reason' => 'Ready to list'], $headers)->assertStatus(422)->assertJsonValidationErrors('services');
+    expect($doctor->refresh()->onboarding_status->value)->toBe('VERIFIED');
 });
