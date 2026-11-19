@@ -6,6 +6,7 @@ use App\Modules\Authentication\Providers\AuthenticationServiceProvider;
 use App\Modules\Notifications\Providers\NotificationsServiceProvider;
 use App\Modules\Patients\Providers\PatientsServiceProvider;
 use App\Modules\Rbac\Providers\RbacServiceProvider;
+use App\Modules\Specialties\Providers\SpecialtiesServiceProvider;
 use App\Modules\Users\Providers\UsersServiceProvider;
 use App\Providers\AppServiceProvider;
 
@@ -20,4 +21,5 @@ return [
     NotificationsServiceProvider::class,
     AuthenticationServiceProvider::class,
     AdministrationServiceProvider::class,
+    SpecialtiesServiceProvider::class,
 ];
