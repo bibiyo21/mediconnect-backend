@@ -3,9 +3,12 @@
 namespace App\Modules\Doctors\Http\Controllers;
 
 use App\Modules\Audit\Contracts\RecordsAudit;
+use App\Modules\Doctors\Enums\CredentialStatus;
+use App\Modules\Doctors\Enums\CredentialType;
 use App\Modules\Doctors\Http\Requests\StartDoctorOnboardingRequest;
 use App\Modules\Doctors\Http\Requests\UpdateMyDoctorProfileRequest;
 use App\Modules\Doctors\Http\Resources\MyDoctorProfileResource;
+use App\Modules\Doctors\Models\DoctorCredential;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Doctors\Models\DoctorSpecialty;
 use App\Modules\Doctors\Services\DoctorOnboarding;
@@ -74,6 +77,9 @@ final class MyDoctorProfileController
 
             if (array_key_exists('prc_license_number', $data) && $this->setLicence($profile, (string) $data['prc_license_number'])) {
                 $changed[] = 'prc_license_number';
+                // A PRC ID accepted for the old number proves nothing about the new one.
+                DoctorCredential::where('doctor_profile_id', $profile->id)->where('credential_type', CredentialType::PrcId->value)->where('status', CredentialStatus::Accepted->value)
+                    ->update(['status' => CredentialStatus::Submitted->value, 'reviewed_by' => null, 'reviewed_at' => null, 'review_note' => null]);
             }
 
             try {

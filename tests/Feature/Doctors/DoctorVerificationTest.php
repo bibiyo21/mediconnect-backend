@@ -192,3 +192,23 @@ it("refuses to confirm another doctor's specialties", function () {
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/specialties/confirm", ['specialty_ids' => [$foreign]], $headers)->assertStatus(422);
     expect($other->specialties()->firstOrFail()->verification_status)->toBe('SELF_REPORTED');
 });
+
+it('withdraws an accepted PRC ID when the doctor changes the licence number after a rejection', function () {
+    $doctor = submitted_doctor();
+    [, $headers] = reviewer_session();
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/start-review", [], $headers)->assertOk();
+    $credentialId = DoctorCredential::firstOrFail()->id;
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/credentials/{$credentialId}/review", ['decision' => 'ACCEPTED'], $headers)->assertOk();
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/reject", ['reason' => 'Name does not match the register'], $headers)->assertOk();
+    switch_user();
+
+    $doctorHeaders = bearer(native_login($doctor->user)->json('data.tokens.access_token'));
+    switch_user();
+    $this->patchJson('/api/v1/doctors/me', ['prc_license_number' => '7654321'], $doctorHeaders)->assertOk();
+    expect(DoctorCredential::findOrFail($credentialId)->status->value)->toBe('SUBMITTED');
+    $this->postJson('/api/v1/doctors/me/submit-for-review', [], $doctorHeaders)->assertOk();
+
+    [, $headers] = reviewer_session();
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/start-review", [], $headers)->assertOk();
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", [], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
+});
