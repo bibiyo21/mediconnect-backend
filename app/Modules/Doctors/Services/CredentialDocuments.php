@@ -91,7 +91,8 @@ final class CredentialDocuments
             if (! in_array($profile->onboarding_status, self::REMOVE_STATES, true)) {
                 throw CredentialNotAvailable::locked();
             }
-            if ($credential->status !== CredentialStatus::Submitted) {
+            // A rejected document may be replaced; an accepted one is evidence for the decision.
+            if ($credential->status === CredentialStatus::Accepted) {
                 throw CredentialNotAvailable::reviewed();
             }
             $credential->delete();

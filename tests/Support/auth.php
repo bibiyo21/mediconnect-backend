@@ -63,6 +63,7 @@ function current_totp(string $secret, int $offsetSteps = 0): string
 function enroll_mfa(User $user): array
 {
     $limited = native_login($user)->json('data.tokens.access_token');
+    app('auth')->forgetGuards(); // the login request can leave an earlier test user cached on the guard
     $secret = test()->postJson('/api/v1/auth/mfa/totp/setup', [], bearer($limited))->assertOk()->json('data.secret');
     $confirm = test()->postJson('/api/v1/auth/mfa/totp/confirm', ['code' => current_totp($secret)], bearer($limited))->assertOk()->json('data');
     app('auth')->forgetGuards();

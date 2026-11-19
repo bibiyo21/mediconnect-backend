@@ -20,7 +20,7 @@ final class CredentialNotAvailable extends DomainException
 
     public static function reviewed(): self
     {
-        return new self('A reviewed document cannot be removed.');
+        return new self('An accepted document cannot be removed.');
     }
 
     public function errorCode(): ErrorCode

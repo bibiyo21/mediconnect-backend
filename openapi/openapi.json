@@ -294,6 +294,733 @@
                 ]
             }
         },
+        "/admin/doctors": {
+            "get": {
+                "operationId": "adminDoctors.index",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "filter[onboarding_status]",
+                        "in": "query",
+                        "description": "Defaults to the queue: DOCUMENTS_SUBMITTED and UNDER_REVIEW.",
+                        "schema": {
+                            "$ref": "#/components/schemas/OnboardingStatus"
+                        }
+                    },
+                    {
+                        "name": "filter[search]",
+                        "in": "query",
+                        "description": "Matches the start of the display name.",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdminDoctorSummaryResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "per_page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        },
+                                                        "last_page": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "page",
+                                                        "per_page",
+                                                        "total",
+                                                        "last_page"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/doctors/{doctorId}": {
+            "get": {
+                "operationId": "adminDoctors.show",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminDoctorResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/doctors/{doctorId}/start-review": {
+            "post": {
+                "operationId": "adminDoctors.startReview",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminDoctorResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/doctors/{doctorId}/credentials/{credentialId}/download-url": {
+            "get": {
+                "operationId": "adminDoctors.credentialDownloadUrl",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "credentialId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "url": {
+                                                    "type": "string"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "url",
+                                                "expires_at"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/doctors/{doctorId}/credentials/{credentialId}/review": {
+            "post": {
+                "operationId": "adminDoctors.reviewCredential",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "credentialId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReviewCredentialRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/CredentialResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/doctors/{doctorId}/specialties/confirm": {
+            "post": {
+                "operationId": "adminDoctors.confirmSpecialties",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConfirmSpecialtiesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminDoctorResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/doctors/{doctorId}/verify": {
+            "post": {
+                "operationId": "adminDoctors.verify",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DoctorDecisionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminDoctorResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/doctors/{doctorId}/activate": {
+            "post": {
+                "operationId": "adminDoctors.activate",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DoctorDecisionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminDoctorResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/doctors/{doctorId}/reject": {
+            "post": {
+                "operationId": "adminDoctors.reject",
+                "tags": [
+                    "AdminDoctors"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RejectDoctorRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminDoctorResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/admin/overview": {
             "get": {
                 "operationId": "administration.adminOverview",
@@ -5483,6 +6210,281 @@
                 ],
                 "title": "AddMemberRequest"
             },
+            "AdminDoctorResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "professional_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "biography": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "prc_license_number": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "license_verification_status": {
+                        "type": "string"
+                    },
+                    "onboarding_status": {
+                        "type": "string",
+                        "enum": [
+                            "REGISTERED",
+                            "DOCUMENTS_SUBMITTED",
+                            "UNDER_REVIEW",
+                            "REJECTED",
+                            "VERIFIED",
+                            "ACTIVE"
+                        ]
+                    },
+                    "medical_school": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "years_experience": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "profile_completeness": {
+                        "type": "integer"
+                    },
+                    "specialties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "specialty_name": {
+                                    "type": "string"
+                                },
+                                "subspecialty_name": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "is_primary": {
+                                    "type": "boolean"
+                                },
+                                "board_certified": {
+                                    "type": "boolean"
+                                },
+                                "verification_status": {
+                                    "type": "string",
+                                    "enum": [
+                                        "SELF_REPORTED",
+                                        "CONFIRMED"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "specialty_name",
+                                "subspecialty_name",
+                                "is_primary",
+                                "board_certified",
+                                "verification_status"
+                            ]
+                        }
+                    },
+                    "credentials": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "credential_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "PRC_ID",
+                                        "SPECIALTY_BOARD",
+                                        "DIPLOMA",
+                                        "OTHER"
+                                    ]
+                                },
+                                "original_filename": {
+                                    "type": "string"
+                                },
+                                "mime_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "application/pdf",
+                                        "image/jpeg",
+                                        "image/png"
+                                    ]
+                                },
+                                "size_bytes": {
+                                    "type": "integer"
+                                },
+                                "scan_status": {
+                                    "type": "string",
+                                    "description": "Only CLEAN documents can be downloaded or reviewed.",
+                                    "enum": [
+                                        "PENDING_SCAN",
+                                        "CLEAN",
+                                        "QUARANTINED",
+                                        "SCAN_FAILED"
+                                    ]
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": [
+                                        "SUBMITTED",
+                                        "ACCEPTED",
+                                        "REJECTED"
+                                    ]
+                                },
+                                "review_note": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "expires_on": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "downloadable": {
+                                    "type": "boolean"
+                                },
+                                "uploaded_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "credential_type",
+                                "original_filename",
+                                "mime_type",
+                                "size_bytes",
+                                "scan_status",
+                                "status",
+                                "review_note",
+                                "expires_on",
+                                "downloadable",
+                                "uploaded_at"
+                            ]
+                        }
+                    },
+                    "verification_history": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from_status": {
+                                    "type": "string"
+                                },
+                                "to_status": {
+                                    "type": "string"
+                                },
+                                "reason": {
+                                    "type": "string"
+                                },
+                                "occurred_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "from_status",
+                                "to_status",
+                                "reason",
+                                "occurred_at"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "display_name",
+                    "professional_title",
+                    "biography",
+                    "prc_license_number",
+                    "license_verification_status",
+                    "onboarding_status",
+                    "medical_school",
+                    "years_experience",
+                    "profile_completeness",
+                    "specialties",
+                    "credentials",
+                    "verification_history"
+                ],
+                "title": "AdminDoctorResource"
+            },
+            "AdminDoctorSummaryResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "professional_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "onboarding_status": {
+                        "type": "string",
+                        "enum": [
+                            "REGISTERED",
+                            "DOCUMENTS_SUBMITTED",
+                            "UNDER_REVIEW",
+                            "REJECTED",
+                            "VERIFIED",
+                            "ACTIVE"
+                        ]
+                    },
+                    "submitted_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "When the doctor last submitted for review."
+                    },
+                    "document_count": {
+                        "type": "integer"
+                    },
+                    "profile_completeness": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "display_name",
+                    "professional_title",
+                    "onboarding_status",
+                    "submitted_at",
+                    "document_count",
+                    "profile_completeness"
+                ],
+                "title": "AdminDoctorSummaryResource"
+            },
             "AdminSpecialtyResource": {
                 "type": "object",
                 "properties": {
@@ -6047,6 +7049,23 @@
                     "verification_token"
                 ],
                 "title": "ConfirmContactChangeRequest"
+            },
+            "ConfirmSpecialtiesRequest": {
+                "type": "object",
+                "description": "POST /admin/doctors/{id}/specialties/confirm (D-40)",
+                "properties": {
+                    "specialty_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                },
+                "required": [
+                    "specialty_ids"
+                ],
+                "title": "ConfirmSpecialtiesRequest"
             },
             "CreateClinicRequest": {
                 "type": "object",
@@ -6641,6 +7660,20 @@
                 ],
                 "title": "DeviceResource"
             },
+            "DoctorDecisionRequest": {
+                "type": "object",
+                "description": "Verify or activate: step-up on the route; the reason is optional and audited.",
+                "properties": {
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 1000
+                    }
+                },
+                "title": "DoctorDecisionRequest"
+            },
             "ForgotPasswordRequest": {
                 "type": "object",
                 "properties": {
@@ -7108,6 +8141,19 @@
                 ],
                 "title": "MyPatientProfileResource"
             },
+            "OnboardingStatus": {
+                "type": "string",
+                "description": "Doctor onboarding (CLAUDE.md \u00a75.2). Only ACTIVE doctors can be booked or listed.\n",
+                "enum": [
+                    "REGISTERED",
+                    "DOCUMENTS_SUBMITTED",
+                    "UNDER_REVIEW",
+                    "REJECTED",
+                    "VERIFIED",
+                    "ACTIVE"
+                ],
+                "title": "OnboardingStatus"
+            },
             "RefreshRequest": {
                 "type": "object",
                 "properties": {
@@ -7241,6 +8287,25 @@
                     "password_confirmation"
                 ],
                 "title": "RegisterRequest"
+            },
+            "RejectDoctorRequest": {
+                "type": "object",
+                "description": "POST /admin/doctors/{id}/reject: the reason is shown to the doctor so they can fix it.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 1000
+                    },
+                    "more_documents": {
+                        "type": "boolean",
+                        "description": "True asks for more documents rather than rejecting outright; the doctor may resubmit either way."
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "RejectDoctorRequest"
             },
             "ReplaceHoursRequest": {
                 "type": "object",
@@ -7378,6 +8443,31 @@
                     "password_confirmation"
                 ],
                 "title": "ResetPasswordRequest"
+            },
+            "ReviewCredentialRequest": {
+                "type": "object",
+                "description": "POST /admin/doctors/{id}/credentials/{credentialId}/review",
+                "properties": {
+                    "decision": {
+                        "type": "string",
+                        "enum": [
+                            "ACCEPTED",
+                            "REJECTED"
+                        ]
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Shown to the doctor; required when rejecting.",
+                        "maxLength": 1000
+                    }
+                },
+                "required": [
+                    "decision"
+                ],
+                "title": "ReviewCredentialRequest"
             },
             "Role": {
                 "type": "string",

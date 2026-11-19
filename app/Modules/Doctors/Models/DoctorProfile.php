@@ -64,6 +64,12 @@ class DoctorProfile extends Model
         return $this->hasMany(DoctorSpecialty::class);
     }
 
+    /** @return HasMany<DoctorCredential, $this> */
+    public function credentials(): HasMany
+    {
+        return $this->hasMany(DoctorCredential::class)->orderBy('created_at');
+    }
+
     /** @return HasMany<DoctorEducation, $this> */
     public function education(): HasMany
     {

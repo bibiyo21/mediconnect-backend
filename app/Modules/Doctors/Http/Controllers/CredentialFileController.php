@@ -26,7 +26,8 @@ final class CredentialFileController
         abort_unless($credential->downloadable(), 404);
 
         $contents = $documents->read($credential);
-        $audit->record('doctor.credential_downloaded', 'doctor_credential', $credential->id, accessEvent: true);
+        // `viewer` is set on links issued to a reviewer; the signature covers it.
+        $audit->record('doctor.credential_downloaded', 'doctor_credential', $credential->id, ['viewer' => $request->query('viewer') !== null ? (string) $request->query('viewer') : 'owner'], accessEvent: true);
 
         return response($contents, 200, [
             'Content-Type' => $credential->mime_type,
