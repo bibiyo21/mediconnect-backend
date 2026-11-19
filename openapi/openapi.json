@@ -809,6 +809,7 @@
                     }
                 ],
                 "requestBody": {
+                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
@@ -885,6 +886,7 @@
                     }
                 ],
                 "requestBody": {
+                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
@@ -7662,16 +7664,17 @@
             },
             "DoctorDecisionRequest": {
                 "type": "object",
-                "description": "Verify or activate: step-up on the route; the reason is optional and audited.",
+                "description": "Verify or activate: step-up on the route and a reason, as for every step-up action (rbac-permissions.md \u00a77).",
                 "properties": {
                     "reason": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
+                        "type": "string",
+                        "minLength": 5,
                         "maxLength": 1000
                     }
                 },
+                "required": [
+                    "reason"
+                ],
                 "title": "DoctorDecisionRequest"
             },
             "ForgotPasswordRequest": {

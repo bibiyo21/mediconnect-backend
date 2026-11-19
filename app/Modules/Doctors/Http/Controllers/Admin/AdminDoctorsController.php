@@ -100,7 +100,7 @@ final class AdminDoctorsController
 
     public function verify(DoctorDecisionRequest $request, string $doctorId): JsonResponse
     {
-        return $this->detail($this->review->verify($this->decidable($request, $doctorId), $this->reviewer($request), $request->validated('reason')));
+        return $this->detail($this->review->verify($this->decidable($request, $doctorId), $this->reviewer($request), (string) $request->validated('reason')));
     }
 
     public function reject(RejectDoctorRequest $request, string $doctorId): JsonResponse

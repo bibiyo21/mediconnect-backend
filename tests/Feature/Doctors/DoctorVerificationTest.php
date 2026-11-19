@@ -103,15 +103,16 @@ it('runs the whole review: start, accept the document, confirm specialties, veri
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/start-review", [], $headers)->assertOk()->assertJsonPath('data.onboarding_status', 'UNDER_REVIEW');
 
     // Verifying before the PRC ID is accepted is refused.
-    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", [], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", ['reason' => 'Licence checked'], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
 
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/credentials/{$credentialId}/review", ['decision' => 'ACCEPTED'], $headers)->assertOk()->assertJsonPath('data.status', 'ACCEPTED');
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/specialties/confirm", ['specialty_ids' => [$detail['specialties'][0]['id']]], $headers)->assertOk()->assertJsonPath('data.specialties.0.verification_status', 'CONFIRMED');
 
     // Cannot activate before verification.
-    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/activate", [], $headers)->assertStatus(409);
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/activate", ['reason' => 'Ready to list'], $headers)->assertStatus(409);
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", [], $headers)->assertStatus(422)->assertJsonValidationErrors('reason');
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", ['reason' => 'Licence checked on the PRC register'], $headers)->assertOk()->assertJsonPath('data.onboarding_status', 'VERIFIED');
-    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/activate", [], $headers)->assertOk()->assertJsonPath('data.onboarding_status', 'ACTIVE');
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/activate", ['reason' => 'Ready to list'], $headers)->assertOk()->assertJsonPath('data.onboarding_status', 'ACTIVE');
 
     $doctor->refresh();
     expect($doctor->license_verification_status)->toBe('VERIFIED')
@@ -129,7 +130,7 @@ it('needs a fresh step-up to verify or reject', function () {
     [, $headers] = reviewer_session(stepUp: false);
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/start-review", [], $headers)->assertOk();
 
-    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", [], $headers)->assertStatus(401)->assertJsonPath('code', 'STEP_UP_REQUIRED');
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", ['reason' => 'Licence checked'], $headers)->assertStatus(401)->assertJsonPath('code', 'STEP_UP_REQUIRED');
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/reject", ['reason' => 'Licence photo is unreadable'], $headers)->assertStatus(401)->assertJsonPath('code', 'STEP_UP_REQUIRED');
 });
 
@@ -165,7 +166,7 @@ it('never lets a reviewer decide on their own profile', function () {
     DB::table('doctor_profiles')->where('id', $profile->id)->update(['onboarding_status' => 'DOCUMENTS_SUBMITTED']);
 
     $this->postJson("/api/v1/admin/doctors/{$profile->id}/start-review", [], $headers)->assertForbidden();
-    $this->postJson("/api/v1/admin/doctors/{$profile->id}/verify", [], $headers)->assertForbidden();
+    $this->postJson("/api/v1/admin/doctors/{$profile->id}/verify", ['reason' => 'Licence checked'], $headers)->assertForbidden();
 });
 
 it('gives reviewers an audited signed link to clean documents only', function () {
@@ -210,5 +211,5 @@ it('withdraws an accepted PRC ID when the doctor changes the licence number afte
 
     [, $headers] = reviewer_session();
     $this->postJson("/api/v1/admin/doctors/{$doctor->id}/start-review", [], $headers)->assertOk();
-    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", [], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
+    $this->postJson("/api/v1/admin/doctors/{$doctor->id}/verify", ['reason' => 'Licence checked'], $headers)->assertStatus(422)->assertJsonValidationErrors('credentials');
 });
