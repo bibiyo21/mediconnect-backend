@@ -10190,7 +10190,9 @@
                     "languages": {
                         "type": "array",
                         "description": "ISO 639 codes",
-                        "items": {}
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "years_experience": {
                         "type": [
@@ -10346,7 +10348,9 @@
                     "languages": {
                         "type": "array",
                         "description": "ISO 639 codes",
-                        "items": {}
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "years_experience": {
                         "type": [

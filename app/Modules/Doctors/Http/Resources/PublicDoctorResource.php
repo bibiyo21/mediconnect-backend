@@ -40,7 +40,7 @@ class PublicDoctorResource extends JsonResource
                 'subspecialty' => $s->subspecialty?->name,
                 'board_certified' => $s->board_certified,
             ])->all(),
-            /** ISO 639 codes */
+            /** @var list<string> ISO 639 codes */
             'languages' => array_values((array) ($p->getAttribute('language_codes') ?? [])),
             'years_experience' => $p->years_experience,
             'practice_locations' => $p->activeAssignments->map(fn (DoctorClinicAssignment $a) => [
