@@ -28,7 +28,8 @@ beforeEach(function () {
 /** A doctor who has submitted a licence number, a clean PRC ID and one specialty. */
 function submitted_doctor(): DoctorProfile
 {
-    $headers = signed_in(patient_account());
+    $user = patient_account();
+    $headers = signed_in($user);
     app('auth')->forgetGuards();
     test()->postJson('/api/v1/doctors', ['display_name' => 'Dr. Ana Santos', 'confirm_licensed' => true], $headers)->assertCreated();
     $specialty = Specialty::firstOrFail();
@@ -37,7 +38,7 @@ function submitted_doctor(): DoctorProfile
     test()->postJson('/api/v1/doctors/me/submit-for-review', [], $headers)->assertOk();
     app('auth')->forgetGuards();
 
-    return DoctorProfile::latest()->firstOrFail();
+    return DoctorProfile::where('user_id', $user->id)->firstOrFail();
 }
 
 /** The test client keeps the previous user (guards and the in-memory session) between requests. */

@@ -2279,6 +2279,229 @@
                 ]
             }
         },
+        "/clinics/{clinicId}/doctor-assignments": {
+            "get": {
+                "operationId": "clinicDoctorAssignments.index",
+                "tags": [
+                    "ClinicDoctorAssignments"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/DoctorAssignmentResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/clinics/{clinicId}/doctors": {
+            "post": {
+                "operationId": "clinicDoctorAssignments.store",
+                "tags": [
+                    "ClinicDoctorAssignments"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AssignDoctorRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DoctorAssignmentResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/clinics/{clinicId}/doctor-assignments/{assignmentId}/end": {
+            "post": {
+                "operationId": "clinicDoctorAssignments.end",
+                "tags": [
+                    "ClinicDoctorAssignments"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "assignmentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EndAssignmentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DoctorAssignmentResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/clinics/{clinicId}/holidays": {
             "post": {
                 "operationId": "clinicHolidays.store",
@@ -4332,6 +4555,196 @@
                 ]
             }
         },
+        "/doctors/me/assignments": {
+            "get": {
+                "operationId": "myAssignments.index",
+                "tags": [
+                    "MyAssignments"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/DoctorAssignmentResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/assignments/{assignmentId}/accept": {
+            "post": {
+                "operationId": "myAssignments.accept",
+                "tags": [
+                    "MyAssignments"
+                ],
+                "parameters": [
+                    {
+                        "name": "assignmentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DoctorAssignmentResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/assignments/{assignmentId}/end": {
+            "post": {
+                "operationId": "myAssignments.end",
+                "summary": "Declines a pending invitation or ends an active assignment",
+                "tags": [
+                    "MyAssignments"
+                ],
+                "parameters": [
+                    {
+                        "name": "assignmentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EndAssignmentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DoctorAssignmentResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/doctors/me/credentials": {
             "get": {
                 "operationId": "myCredentials.index",
@@ -4903,6 +5316,254 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/services": {
+            "get": {
+                "operationId": "myServices.index",
+                "tags": [
+                    "MyServices"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/DoctorServiceResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "myServices.store",
+                "tags": [
+                    "MyServices"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateDoctorServiceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DoctorServiceResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/services/{serviceId}": {
+            "patch": {
+                "operationId": "myServices.update",
+                "tags": [
+                    "MyServices"
+                ],
+                "parameters": [
+                    {
+                        "name": "serviceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateDoctorServiceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DoctorServiceResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "delete": {
+                "operationId": "myServices.destroy",
+                "tags": [
+                    "MyServices"
+                ],
+                "parameters": [
+                    {
+                        "name": "serviceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
                     }
                 },
                 "security": [
@@ -6634,6 +7295,26 @@
                 ],
                 "title": "AdminUserResource"
             },
+            "AssignDoctorRequest": {
+                "type": "object",
+                "description": "POST /clinics/{id}/doctors: invite a verified doctor to a location, found\nby PRC licence number. The doctor must accept before the assignment counts.",
+                "properties": {
+                    "clinic_location_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "prc_license_number": {
+                        "type": "string",
+                        "description": "The doctor's PRC licence number (digits). Only verified doctors can be found.",
+                        "pattern": "^\\d{5,10}$"
+                    }
+                },
+                "required": [
+                    "clinic_location_id",
+                    "prc_license_number"
+                ],
+                "title": "AssignDoctorRequest"
+            },
             "ClinicManagementResource": {
                 "type": "object",
                 "properties": {
@@ -7069,6 +7750,14 @@
                 ],
                 "title": "ConfirmSpecialtiesRequest"
             },
+            "ConsultationType": {
+                "type": "string",
+                "enum": [
+                    "ONLINE",
+                    "IN_PERSON"
+                ],
+                "title": "ConsultationType"
+            },
             "CreateClinicRequest": {
                 "type": "object",
                 "description": "POST /admin/clinics: a clinic in an existing or new organization, optionally with its first location.",
@@ -7252,6 +7941,65 @@
                     "name"
                 ],
                 "title": "CreateClinicServiceRequest"
+            },
+            "CreateDoctorServiceRequest": {
+                "type": "object",
+                "description": "POST /doctors/me/services. The fee is in centavos (D-18): \u20b1650.00 is 65000.",
+                "properties": {
+                    "consultation_type": {
+                        "$ref": "#/components/schemas/ConsultationType"
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Required for IN_PERSON (a location where you have an active assignment); not allowed for ONLINE."
+                    },
+                    "clinic_service_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Optional link to one of the location's clinic services."
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 120
+                    },
+                    "is_follow_up": {
+                        "type": "boolean"
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "minimum": 5,
+                        "maximum": 240
+                    },
+                    "buffer_minutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60
+                    },
+                    "fee_amount": {
+                        "type": "integer",
+                        "description": "Centavos. Every service publishes a fee (R-17); 0 means free.",
+                        "minimum": 0,
+                        "maximum": 100000000
+                    },
+                    "is_hmo_eligible": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "consultation_type",
+                    "name",
+                    "duration_minutes",
+                    "fee_amount"
+                ],
+                "title": "CreateDoctorServiceRequest"
             },
             "CreateHolidayRequest": {
                 "type": "object",
@@ -7662,6 +8410,80 @@
                 ],
                 "title": "DeviceResource"
             },
+            "DoctorAssignmentResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "PENDING",
+                            "ACTIVE",
+                            "ENDED"
+                        ]
+                    },
+                    "doctor_profile_id": {
+                        "type": "string"
+                    },
+                    "doctor_display_name": {
+                        "type": "string"
+                    },
+                    "clinic_id": {
+                        "type": "string"
+                    },
+                    "clinic_name": {
+                        "type": "string"
+                    },
+                    "clinic_location_id": {
+                        "type": "string"
+                    },
+                    "location_name": {
+                        "type": "string"
+                    },
+                    "location_city": {
+                        "type": "string"
+                    },
+                    "effective_from": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "effective_until": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "end_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "requested_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status",
+                    "doctor_profile_id",
+                    "doctor_display_name",
+                    "clinic_id",
+                    "clinic_name",
+                    "clinic_location_id",
+                    "location_name",
+                    "location_city",
+                    "effective_from",
+                    "effective_until",
+                    "end_reason",
+                    "requested_at"
+                ],
+                "title": "DoctorAssignmentResource"
+            },
             "DoctorDecisionRequest": {
                 "type": "object",
                 "description": "Verify or activate: step-up on the route and a reason, as for every step-up action (rbac-permissions.md \u00a77).",
@@ -7676,6 +8498,119 @@
                     "reason"
                 ],
                 "title": "DoctorDecisionRequest"
+            },
+            "DoctorServiceResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "consultation_type": {
+                        "type": "string",
+                        "enum": [
+                            "ONLINE",
+                            "IN_PERSON"
+                        ]
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "location_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "clinic_service_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_follow_up": {
+                        "type": "boolean"
+                    },
+                    "duration_minutes": {
+                        "type": "integer"
+                    },
+                    "buffer_minutes": {
+                        "type": "integer"
+                    },
+                    "fee": {
+                        "type": "object",
+                        "description": "Fee in centavos, its currency and a display string such as \"\u20b1650.00\".",
+                        "properties": {
+                            "amount": {
+                                "type": "integer"
+                            },
+                            "currency": {
+                                "type": "string"
+                            },
+                            "formatted": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "amount",
+                            "currency",
+                            "formatted"
+                        ]
+                    },
+                    "is_hmo_eligible": {
+                        "type": "boolean",
+                        "description": "Whether the doctor accepts HMOs for this service; coverage is never assumed (\u00a712.10)."
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "effective_from": {
+                        "type": "string"
+                    },
+                    "effective_until": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "consultation_type",
+                    "clinic_location_id",
+                    "location_name",
+                    "clinic_service_id",
+                    "is_follow_up",
+                    "duration_minutes",
+                    "buffer_minutes",
+                    "fee",
+                    "is_hmo_eligible",
+                    "status",
+                    "effective_from",
+                    "effective_until"
+                ],
+                "title": "DoctorServiceResource"
+            },
+            "EndAssignmentRequest": {
+                "type": "object",
+                "description": "End (or withdraw) an assignment: a short reason is kept with it.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 200
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "EndAssignmentRequest"
             },
             "ForgotPasswordRequest": {
                 "type": "object",
@@ -8713,6 +9648,40 @@
                     }
                 },
                 "title": "UpdateDependentRequest"
+            },
+            "UpdateDoctorServiceRequest": {
+                "type": "object",
+                "description": "PATCH /doctors/me/services/{id}: a change ends this row and starts a replacement.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 120
+                    },
+                    "is_follow_up": {
+                        "type": "boolean"
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "minimum": 5,
+                        "maximum": 240
+                    },
+                    "buffer_minutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60
+                    },
+                    "fee_amount": {
+                        "type": "integer",
+                        "description": "Centavos (D-18).",
+                        "minimum": 0,
+                        "maximum": 100000000
+                    },
+                    "is_hmo_eligible": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateDoctorServiceRequest"
             },
             "UpdateLocationRequest": {
                 "type": "object",

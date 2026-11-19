@@ -1,10 +1,12 @@
 <?php
 
 use App\Modules\Clinics\Http\Controllers\AdminClinicsController;
+use App\Modules\Clinics\Http\Controllers\ClinicDoctorAssignmentsController;
 use App\Modules\Clinics\Http\Controllers\ClinicHolidaysController;
 use App\Modules\Clinics\Http\Controllers\ClinicLocationsController;
 use App\Modules\Clinics\Http\Controllers\ClinicManagementController;
 use App\Modules\Clinics\Http\Controllers\ClinicMembersController;
+use App\Modules\Clinics\Http\Controllers\MyAssignmentsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,6 +18,11 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(func
     Route::post('admin/clinics', [AdminClinicsController::class, 'store'])->middleware('can:clinics.create');
 
     Route::get('me/clinics', [ClinicManagementController::class, 'mine']);
+
+    // The doctor's side of clinic assignments (2.10).
+    Route::get('doctors/me/assignments', [MyAssignmentsController::class, 'index']);
+    Route::post('doctors/me/assignments/{assignmentId}/accept', [MyAssignmentsController::class, 'accept'])->whereUuid('assignmentId');
+    Route::post('doctors/me/assignments/{assignmentId}/end', [MyAssignmentsController::class, 'end'])->whereUuid('assignmentId');
 
     Route::prefix('clinics/{clinicId}')->whereUuid('clinicId')->group(function () {
         Route::get('management', [ClinicManagementController::class, 'show']);
@@ -29,6 +36,10 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(func
 
         Route::post('holidays', [ClinicHolidaysController::class, 'store']);
         Route::delete('holidays/{holidayId}', [ClinicHolidaysController::class, 'destroy'])->whereUuid('holidayId');
+
+        Route::get('doctor-assignments', [ClinicDoctorAssignmentsController::class, 'index']);
+        Route::post('doctors', [ClinicDoctorAssignmentsController::class, 'store']);
+        Route::post('doctor-assignments/{assignmentId}/end', [ClinicDoctorAssignmentsController::class, 'end'])->whereUuid('assignmentId');
 
         Route::post('members', [ClinicMembersController::class, 'store']);
         Route::delete('members/{memberId}', [ClinicMembersController::class, 'destroy'])->whereUuid('memberId');

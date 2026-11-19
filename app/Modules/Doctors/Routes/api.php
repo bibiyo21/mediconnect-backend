@@ -4,6 +4,7 @@ use App\Modules\Doctors\Http\Controllers\Admin\AdminDoctorsController;
 use App\Modules\Doctors\Http\Controllers\CredentialFileController;
 use App\Modules\Doctors\Http\Controllers\MyCredentialsController;
 use App\Modules\Doctors\Http\Controllers\MyDoctorProfileController;
+use App\Modules\Doctors\Http\Controllers\MyServicesController;
 use App\Modules\Doctors\Http\Controllers\SubmitForReviewController;
 use Illuminate\Support\Facades\Route;
 
@@ -13,6 +14,11 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(func
     Route::get('doctors/me', [MyDoctorProfileController::class, 'show']);
     Route::patch('doctors/me', [MyDoctorProfileController::class, 'update']);
     Route::post('doctors/me/submit-for-review', SubmitForReviewController::class);
+
+    Route::get('doctors/me/services', [MyServicesController::class, 'index']);
+    Route::post('doctors/me/services', [MyServicesController::class, 'store']);
+    Route::patch('doctors/me/services/{serviceId}', [MyServicesController::class, 'update'])->whereUuid('serviceId');
+    Route::delete('doctors/me/services/{serviceId}', [MyServicesController::class, 'destroy'])->whereUuid('serviceId');
 
     Route::get('doctors/me/credentials', [MyCredentialsController::class, 'index']);
     Route::post('doctors/me/credentials', [MyCredentialsController::class, 'store'])->middleware('throttle:uploads');
