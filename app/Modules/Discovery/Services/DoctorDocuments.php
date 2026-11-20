@@ -35,6 +35,7 @@ final class DoctorDocuments
             'specialties' => $confirmed->map(fn (DoctorSpecialty $s) => $s->specialty->name)->unique()->values()->all(),
             'specialty_ids' => $confirmed->pluck('specialty_id')->unique()->values()->all(),
             'subspecialties' => $confirmed->map(fn (DoctorSpecialty $s) => $s->subspecialty?->name)->filter()->unique()->values()->all(),
+            'subspecialty_ids' => $confirmed->pluck('subspecialty_id')->filter()->unique()->values()->all(),
             'languages' => DB::table('doctor_languages')->where('doctor_profile_id', $doctor->id)->orderBy('language_code')->pluck('language_code')->all(),
             'gender' => $doctor->gender,
             'years_experience' => $doctor->years_experience,

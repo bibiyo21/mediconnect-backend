@@ -24,6 +24,7 @@ final class SearchIndexer
         $keep = array_map(fn (array $d) => '`'.$d['id'].'`', $documents);
         $filter = $keyField.':=`'.$keyValue.'`'.($keep === [] ? '' : ' && id:!=['.implode(',', $keep).']');
         $this->engine->deleteWhere($name, $filter);
+        SearchCache::bump($collection);
     }
 
     /** Collections are created on deploy (search:install); this covers a fresh environment. */

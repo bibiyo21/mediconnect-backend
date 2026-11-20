@@ -21,6 +21,9 @@ final class InMemorySearchEngine implements SearchEngine
     /** @var array<string, list<array<string, mixed>>> */
     public array $synonymSets = [];
 
+    /** @var list<array<string, mixed>> parameters of every search, for assertions */
+    public array $searches = [];
+
     public bool $down = false;
 
     public function healthy(): bool
@@ -72,9 +75,40 @@ final class InMemorySearchEngine implements SearchEngine
     public function search(string $collection, array $params): array
     {
         $this->guard();
-        $docs = array_values(array_filter($this->collections[$this->resolve($collection)]['docs'] ?? [], fn (array $d) => ! isset($params['filter_by']) || $this->matches($d, (string) $params['filter_by'])));
+        $this->searches[] = $params;
+        $q = mb_strtolower((string) ($params['q'] ?? '*'));
+        $fields = explode(',', (string) ($params['query_by'] ?? ''));
+        $docs = array_values(array_filter($this->collections[$this->resolve($collection)]['docs'] ?? [], function (array $d) use ($params, $q, $fields) {
+            if (isset($params['filter_by']) && ! $this->matches($d, (string) $params['filter_by'])) {
+                return false;
+            }
+            if ($q === '*' || $q === '') {
+                return true;
+            }
+            foreach ($fields as $f) {
+                foreach ((array) ($d[$f] ?? []) as $value) {
+                    if (str_contains(mb_strtolower((string) $value), $q)) {
+                        return true;
+                    }
+                }
+            }
 
-        return ['found' => count($docs), 'hits' => array_map(fn (array $d) => ['document' => $d], $docs)];
+            return false;
+        }));
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $perPage = (int) ($params['per_page'] ?? 10);
+
+        if (isset($params['group_by'])) {
+            $groups = [];
+            foreach ($docs as $d) {
+                $groups[(string) $d[$params['group_by']]][] = ['document' => $d];
+            }
+            $grouped = array_map(fn ($hits, $key) => ['group_key' => [$key], 'hits' => $hits], array_values($groups), array_keys($groups));
+
+            return ['found' => count($grouped), 'grouped_hits' => array_slice($grouped, ($page - 1) * $perPage, $perPage), 'facet_counts' => []];
+        }
+
+        return ['found' => count($docs), 'hits' => array_map(fn (array $d) => ['document' => $d], array_slice($docs, ($page - 1) * $perPage, $perPage))];
     }
 
     public function putSynonymSet(string $name, array $items): void
@@ -94,11 +128,14 @@ final class InMemorySearchEngine implements SearchEngine
         return $this->aliases[$name] ?? $name;
     }
 
-    /** Supports `a:=x`, `a:=\`x\``, `id:!=[\`a\`,\`b\`]` joined with &&. */
+    /** Supports `:=` (also on arrays), `:!=[...]`, `:>=`, `:<=` joined with &&; geo clauses are ignored. */
     private function matches(array $doc, string $filter): bool
     {
         foreach (explode('&&', $filter) as $clause) {
             $clause = trim($clause);
+            if (str_starts_with($clause, 'location:(')) {
+                continue;
+            }
             if (preg_match('/^(\w+):!=\[(.*)\]$/', $clause, $m) === 1) {
                 $excluded = array_map(fn ($v) => trim(trim($v), '`'), explode(',', $m[2]));
                 if (in_array((string) ($doc[$m[1]] ?? ''), $excluded, true)) {
@@ -107,9 +144,20 @@ final class InMemorySearchEngine implements SearchEngine
 
                 continue;
             }
+            if (preg_match('/^(\w+):(>=|<=)(\d+)$/', $clause, $m) === 1) {
+                $actual = $doc[$m[1]] ?? null;
+                if ($actual === null || ($m[2] === '>=' ? $actual < (int) $m[3] : $actual > (int) $m[3])) {
+                    return false;
+                }
+
+                continue;
+            }
             [$field, $value] = array_map('trim', explode(':=', $clause, 2)) + [1 => ''];
             $actual = $doc[$field] ?? null;
             $value = trim($value, '`');
+            if (is_bool($actual)) {
+                $actual = $actual ? 'true' : 'false';
+            }
             if (is_array($actual) ? ! in_array($value, $actual, true) : (string) $actual !== $value) {
                 return false;
             }

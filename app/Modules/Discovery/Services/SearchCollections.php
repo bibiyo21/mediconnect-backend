@@ -64,6 +64,7 @@ final class SearchCollections
     {
         $previous = $this->engine->aliasTarget($this->alias($name));
         $this->engine->pointAlias($this->alias($name), $collection);
+        SearchCache::bump($name);
         if ($previous !== null && $previous !== $collection) {
             $this->engine->dropCollection($previous);
         }

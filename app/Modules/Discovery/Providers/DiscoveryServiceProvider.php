@@ -10,6 +10,7 @@ use App\Modules\Discovery\Listeners\QueueSearchIndexing;
 use App\Modules\Doctors\Events\DoctorDirectoryChanged;
 use App\Modules\Specialties\Events\SpecialtyCatalogChanged;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 /** Doctor discovery and search (CLAUDE.md §3.1 module 7, Phase 3). */
@@ -20,6 +21,8 @@ final class DiscoveryServiceProvider extends ServiceProvider
         Event::listen(DoctorDirectoryChanged::class, [QueueSearchIndexing::class, 'handleDoctor']);
         Event::listen(ClinicDirectoryChanged::class, [QueueSearchIndexing::class, 'handleClinic']);
         Event::listen(SpecialtyCatalogChanged::class, [QueueSearchIndexing::class, 'handleSpecialty']);
+
+        Route::middleware('api')->prefix('api/v1')->group(__DIR__.'/../Routes/api.php');
 
         if ($this->app->runningInConsole()) {
             $this->commands([InstallSearchCommand::class, SearchStatusCommand::class, RebuildSearchCommand::class]);

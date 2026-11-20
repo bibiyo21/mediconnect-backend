@@ -6669,6 +6669,587 @@
                 }
             }
         },
+        "/search/doctors": {
+            "get": {
+                "operationId": "search.doctors",
+                "tags": [
+                    "Search"
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Free text: a name, specialty, condition keyword, service or clinic. Up to 100 characters.",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "maxLength": 200
+                        }
+                    },
+                    {
+                        "name": "specialty",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "subspecialty",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "name": "province",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "name": "clinic_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "consultation_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ONLINE",
+                                "IN_PERSON"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "fee_min",
+                        "in": "query",
+                        "description": "Centavos.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100000000
+                        }
+                    },
+                    {
+                        "name": "fee_max",
+                        "in": "query",
+                        "description": "Centavos.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100000000
+                        }
+                    },
+                    {
+                        "name": "gender",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 20
+                        }
+                    },
+                    {
+                        "name": "language",
+                        "in": "query",
+                        "description": "ISO 639 code, for example `fil`.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 10
+                        }
+                    },
+                    {
+                        "name": "experience_min",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 70
+                        }
+                    },
+                    {
+                        "name": "verified",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "lat",
+                        "in": "query",
+                        "schema": {
+                            "type": "number",
+                            "minimum": 4,
+                            "maximum": 22
+                        }
+                    },
+                    {
+                        "name": "lng",
+                        "in": "query",
+                        "schema": {
+                            "type": "number",
+                            "minimum": 116,
+                            "maximum": 127
+                        }
+                    },
+                    {
+                        "name": "radius_km",
+                        "in": "query",
+                        "schema": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "relevance",
+                                "distance",
+                                "fee",
+                                "rating"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "description": "Opaque, from `meta.next_cursor`.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 200
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/DoctorSearchResultResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "found": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                },
+                                                                {
+                                                                    "type": "string"
+                                                                }
+                                                            ]
+                                                        },
+                                                        "next_cursor": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "took_ms": {
+                                                            "type": "integer"
+                                                        },
+                                                        "cache_hit": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "degraded": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "facets": {
+                                                            "type": "object",
+                                                            "additionalProperties": {
+                                                                "type": "object",
+                                                                "additionalProperties": {
+                                                                    "type": "integer"
+                                                                }
+                                                            }
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "found",
+                                                        "next_cursor",
+                                                        "took_ms",
+                                                        "cache_hit",
+                                                        "degraded",
+                                                        "facets"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/search/clinics": {
+            "get": {
+                "operationId": "search.clinics",
+                "tags": [
+                    "Search"
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "maxLength": 200
+                        }
+                    },
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "name": "lat",
+                        "in": "query",
+                        "schema": {
+                            "type": "number",
+                            "minimum": 4,
+                            "maximum": 22
+                        }
+                    },
+                    {
+                        "name": "lng",
+                        "in": "query",
+                        "schema": {
+                            "type": "number",
+                            "minimum": 116,
+                            "maximum": 127
+                        }
+                    },
+                    {
+                        "name": "radius_km",
+                        "in": "query",
+                        "schema": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 200
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ClinicSearchResultResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "found": {
+                                                            "type": "string"
+                                                        },
+                                                        "next_cursor": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "took_ms": {
+                                                            "type": "integer"
+                                                        },
+                                                        "cache_hit": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "degraded": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "found",
+                                                        "next_cursor",
+                                                        "took_ms",
+                                                        "cache_hit",
+                                                        "degraded"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/search/specialties": {
+            "get": {
+                "operationId": "search.specialties",
+                "tags": [
+                    "Search"
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SpecialtySuggestionResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "found": {
+                                                            "type": "string"
+                                                        },
+                                                        "next_cursor": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "took_ms": {
+                                                            "type": "integer"
+                                                        },
+                                                        "cache_hit": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "degraded": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "found",
+                                                        "next_cursor",
+                                                        "took_ms",
+                                                        "cache_hit",
+                                                        "degraded"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "operationId": "session.login",
@@ -8311,6 +8892,59 @@
                 ],
                 "title": "ClinicManagementResource"
             },
+            "ClinicSearchResultResource": {
+                "type": "object",
+                "properties": {
+                    "clinic_id": {
+                        "type": "string"
+                    },
+                    "clinic_location_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "location_name": {
+                        "type": "string"
+                    },
+                    "barangay": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "city": {
+                        "type": "string"
+                    },
+                    "services": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "doctor_count": {
+                        "type": "integer"
+                    },
+                    "distance_km": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "clinic_id",
+                    "clinic_location_id",
+                    "name",
+                    "location_name",
+                    "barangay",
+                    "city",
+                    "services",
+                    "doctor_count",
+                    "distance_km"
+                ],
+                "title": "ClinicSearchResultResource"
+            },
             "ClinicSummaryResource": {
                 "type": "object",
                 "properties": {
@@ -9159,6 +9793,136 @@
                     "reason"
                 ],
                 "title": "DoctorDecisionRequest"
+            },
+            "DoctorSearchResultResource": {
+                "type": "object",
+                "properties": {
+                    "doctor_id": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "professional_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "specialties": {
+                        "type": "array",
+                        "description": "confirmed specialties only (D-40)",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "languages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "years_experience": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "is_verified": {
+                        "type": "boolean",
+                        "description": "PRC licence checked by MediConnect"
+                    },
+                    "offers_online": {
+                        "type": "boolean"
+                    },
+                    "fee_from": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "lowest fee among the matching services",
+                        "properties": {
+                            "amount": {
+                                "type": "integer"
+                            },
+                            "currency": {
+                                "type": "string"
+                            },
+                            "formatted": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "amount",
+                            "currency",
+                            "formatted"
+                        ]
+                    },
+                    "locations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "clinic_id": {
+                                    "type": "string"
+                                },
+                                "clinic_name": {
+                                    "type": "string"
+                                },
+                                "clinic_location_id": {
+                                    "type": "string"
+                                },
+                                "location_name": {
+                                    "type": "string"
+                                },
+                                "city": {
+                                    "type": "string"
+                                },
+                                "fee_min": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ]
+                                },
+                                "fee_max": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ]
+                                },
+                                "distance_km": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "clinic_id",
+                                "clinic_name",
+                                "clinic_location_id",
+                                "location_name",
+                                "city",
+                                "fee_min",
+                                "fee_max",
+                                "distance_km"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "doctor_id",
+                    "display_name",
+                    "professional_title",
+                    "specialties",
+                    "languages",
+                    "years_experience",
+                    "is_verified",
+                    "offers_online",
+                    "fee_from",
+                    "locations"
+                ],
+                "title": "DoctorSearchResultResource"
             },
             "DoctorServiceResource": {
                 "type": "object",
@@ -10744,6 +11508,47 @@
                     "UNKNOWN"
                 ],
                 "title": "Sex"
+            },
+            "SpecialtySuggestionResource": {
+                "type": "object",
+                "properties": {
+                    "specialty_id": {
+                        "type": "string",
+                        "description": "the parent specialty, for filtering doctor search"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "SPECIALTY",
+                            "SUBSPECIALTY"
+                        ]
+                    },
+                    "parent_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "doctor_count": {
+                        "type": "integer",
+                        "description": "ACTIVE doctors with this confirmed specialty"
+                    }
+                },
+                "required": [
+                    "specialty_id",
+                    "id",
+                    "name",
+                    "kind",
+                    "parent_name",
+                    "doctor_count"
+                ],
+                "title": "SpecialtySuggestionResource"
             },
             "StartDoctorOnboardingRequest": {
                 "type": "object",

@@ -20,7 +20,7 @@ it('installs every collection behind its alias, once', function () {
     $created = $collections->install();
 
     expect($created)->toHaveCount(3)
-        ->and($engine->aliasTarget('mc_test_doctors'))->toStartWith('mc_test_doctors_v1_')
+        ->and($engine->aliasTarget('mc_test_doctors'))->toStartWith('mc_test_doctors_v2_')
         ->and($collections->install())->toBe([]);
 });
 

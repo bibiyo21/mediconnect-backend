@@ -22,6 +22,11 @@ return [
     // Synonyms live in one set shared by the collections that list it (Typesense 30).
     'synonym_set' => 'medical',
 
+    // Search API (3.3, architecture.md §12.5-12.6)
+    'cache_ttl_seconds' => (int) env('SEARCH_CACHE_TTL_SECONDS', 300),
+    // After a failure, skip the engine (PostgreSQL fallback) for this long.
+    'breaker_open_seconds' => (int) env('SEARCH_BREAKER_OPEN_SECONDS', 30),
+
     /*
      * Collection schemas, without the name. Bump `version` when a schema changes:
      * search:rebuild then builds the new version beside the old and swaps the alias.
@@ -30,7 +35,7 @@ return [
      */
     'collections' => [
         'doctors' => [
-            'version' => 1,
+            'version' => 2, // v2 (3.3): subspecialty_ids for the subspecialty filter
             'schema' => [
                 'fields' => [
                     ['name' => 'doctor_id', 'type' => 'string', 'facet' => true],
@@ -39,6 +44,7 @@ return [
                     ['name' => 'specialties', 'type' => 'string[]', 'facet' => true],
                     ['name' => 'specialty_ids', 'type' => 'string[]', 'facet' => true],
                     ['name' => 'subspecialties', 'type' => 'string[]', 'facet' => true, 'optional' => true],
+                    ['name' => 'subspecialty_ids', 'type' => 'string[]', 'facet' => true, 'optional' => true],
                     ['name' => 'services', 'type' => 'string[]', 'optional' => true],
                     ['name' => 'keywords', 'type' => 'string[]', 'optional' => true],
                     ['name' => 'languages', 'type' => 'string[]', 'facet' => true],
