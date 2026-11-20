@@ -7,10 +7,12 @@ use App\Modules\Clinics\Models\ClinicService;
 use App\Modules\Clinics\Models\DoctorClinicAssignment;
 use App\Modules\Doctors\Enums\ConsultationType;
 use App\Modules\Doctors\Enums\OnboardingStatus;
+use App\Modules\Doctors\Events\DoctorDirectoryChanged;
 use App\Modules\Doctors\Exceptions\ServiceNotAllowed;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Doctors\Models\DoctorService;
 use App\Modules\Users\Models\User;
+use App\Shared\Services\Outbox;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +24,7 @@ use Illuminate\Validation\ValidationException;
  */
 final class DoctorServices
 {
-    public function __construct(private readonly RecordsAudit $audit) {}
+    public function __construct(private readonly RecordsAudit $audit, private readonly Outbox $outbox) {}
 
     /** @param array<string, mixed> $data validated input */
     public function create(DoctorProfile $profile, array $data, User $actor): DoctorService
@@ -87,14 +89,18 @@ final class DoctorServices
     public function end(DoctorService $service): void
     {
         DoctorService::whereKey($service->id)->where('status', 'ACTIVE')->update(['status' => 'ENDED', 'effective_until' => now()]);
+        $this->outbox->record(new DoctorDirectoryChanged($service->doctor_profile_id)); // mass update: no model event
         $this->audit->record('doctor.service_ended', 'doctor_service', $service->id);
     }
 
     /** Ends every active in-person service at a location (the assignment ended). */
     public function endAtLocation(string $doctorProfileId, string $clinicLocationId): int
     {
-        return DoctorService::where('doctor_profile_id', $doctorProfileId)->where('clinic_location_id', $clinicLocationId)
+        $count = DoctorService::where('doctor_profile_id', $doctorProfileId)->where('clinic_location_id', $clinicLocationId)
             ->where('status', 'ACTIVE')->update(['status' => 'ENDED', 'effective_until' => now()]);
+        $this->outbox->record(new DoctorDirectoryChanged($doctorProfileId)); // mass update: no model event
+
+        return $count;
     }
 
     /** Only verified or active doctors publish services. */

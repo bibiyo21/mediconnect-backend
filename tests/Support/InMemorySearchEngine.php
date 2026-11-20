@@ -94,10 +94,19 @@ final class InMemorySearchEngine implements SearchEngine
         return $this->aliases[$name] ?? $name;
     }
 
-    /** Supports `a:=x && b:=y` exact matches. */
+    /** Supports `a:=x`, `a:=\`x\``, `id:!=[\`a\`,\`b\`]` joined with &&. */
     private function matches(array $doc, string $filter): bool
     {
         foreach (explode('&&', $filter) as $clause) {
+            $clause = trim($clause);
+            if (preg_match('/^(\w+):!=\[(.*)\]$/', $clause, $m) === 1) {
+                $excluded = array_map(fn ($v) => trim(trim($v), '`'), explode(',', $m[2]));
+                if (in_array((string) ($doc[$m[1]] ?? ''), $excluded, true)) {
+                    return false;
+                }
+
+                continue;
+            }
             [$field, $value] = array_map('trim', explode(':=', $clause, 2)) + [1 => ''];
             $actual = $doc[$field] ?? null;
             $value = trim($value, '`');

@@ -4,6 +4,10 @@ namespace App\Modules\Doctors\Providers;
 
 use App\Modules\Clinics\Events\DoctorAssignmentEnded;
 use App\Modules\Doctors\Listeners\EndServicesWhenAssignmentEnds;
+use App\Modules\Doctors\Models\DoctorProfile;
+use App\Modules\Doctors\Models\DoctorService;
+use App\Modules\Doctors\Models\DoctorSpecialty;
+use App\Modules\Doctors\Observers\DirectoryObserver;
 use App\Shared\Services\Fingerprint;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -21,6 +25,11 @@ final class DoctorsServiceProvider extends ServiceProvider
         RateLimiter::for('downloads', fn (Request $request) => Limit::perMinute(30)->by('downloads:'.Fingerprint::ip($request->ip())));
 
         Event::listen(DoctorAssignmentEnded::class, EndServicesWhenAssignmentEnds::class);
+
+        // Search indexing (Phase 3): models feeding the public doctor documents record outbox events.
+        foreach ([DoctorProfile::class, DoctorSpecialty::class, DoctorService::class] as $model) {
+            $model::observe(DirectoryObserver::class);
+        }
 
         Route::middleware('api')->prefix('api/v1')->group(__DIR__.'/../Routes/api.php');
     }

@@ -13,18 +13,6 @@ use Typesense\Client;
  * skipped where it is not reachable (CI has none).
  */
 
-function live_engine(): ?SearchEngine
-{
-    $c = (array) config('search.typesense');
-    if (empty($c['api_key'])) {
-        return null;
-    }
-    $node = ['host' => (string) $c['host'], 'port' => (string) $c['port'], 'protocol' => (string) $c['protocol']];
-    $engine = new TypesenseEngine(new Client(['api_key' => (string) $c['api_key'], 'nodes' => [$node], 'connection_timeout_seconds' => 1, 'num_retries' => 0]), $node['protocol'].'://'.$node['host'].':'.$node['port'], (string) $c['api_key']);
-
-    return $engine->healthy() ? $engine : null;
-}
-
 it('installs every collection behind its alias, once', function () {
     $collections = app(SearchCollections::class);
     $engine = app(SearchEngine::class);

@@ -6,6 +6,7 @@ use App\Modules\Audit\Contracts\RecordsAudit;
 use App\Modules\Doctors\Enums\CredentialStatus;
 use App\Modules\Doctors\Enums\CredentialType;
 use App\Modules\Doctors\Enums\OnboardingStatus;
+use App\Modules\Doctors\Events\DoctorDirectoryChanged;
 use App\Modules\Doctors\Exceptions\CredentialNotAvailable;
 use App\Modules\Doctors\Exceptions\InvalidOnboardingTransition;
 use App\Modules\Doctors\Models\DoctorCredential;
@@ -15,6 +16,7 @@ use App\Modules\Doctors\Models\DoctorSpecialty;
 use App\Modules\Notifications\Contracts\SendsOneTimeMessages;
 use App\Modules\Users\Models\User;
 use App\Shared\Enums\DeliveryChannel;
+use App\Shared\Services\Outbox;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -73,6 +75,7 @@ final class DoctorReview
         $count = DoctorSpecialty::whereIn('id', $entries->modelKeys())->where('verification_status', 'SELF_REPORTED')
             ->update(['verification_status' => 'CONFIRMED', 'confirmed_by' => $reviewer->id, 'confirmed_at' => now()]);
         $this->audit->record('doctor.specialties_confirmed', 'doctor_profile', $profile->id, ['count' => $count]);
+        app(Outbox::class)->record(new DoctorDirectoryChanged($profile->id)); // mass update: no model event
 
         return $count;
     }
