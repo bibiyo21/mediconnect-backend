@@ -12,5 +12,6 @@ Schedule::command('idempotency:purge')->hourly()->withoutOverlapping();
 Schedule::command('audit:partitions')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('accounts:anonymize-deleted')->dailyAt('02:30')->withoutOverlapping(); // D-38
 // Search counts (doctors per clinic and specialty) drift slowly; a nightly rebuild corrects them (§12.3).
+Schedule::command('search:partitions')->dailyAt('01:20')->withoutOverlapping(); // 13-month retention
 Schedule::command('search:rebuild specialties')->dailyAt('03:00')->withoutOverlapping();
 Schedule::command('search:rebuild clinics')->dailyAt('03:10')->withoutOverlapping();

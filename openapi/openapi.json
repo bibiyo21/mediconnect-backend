@@ -1121,6 +1121,624 @@
                 ]
             }
         },
+        "/admin/search/overview": {
+            "get": {
+                "operationId": "adminSearch.overview",
+                "summary": "Search health over the last N days (default 7): volume, rates, latency percentiles, top queries",
+                "tags": [
+                    "AdminSearch"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "days": {},
+                                                "searches": {
+                                                    "type": "integer"
+                                                },
+                                                "zero_result_rate": {
+                                                    "type": "number",
+                                                    "description": "Share of searches with no results (0-1)."
+                                                },
+                                                "cache_hit_rate": {
+                                                    "type": "number"
+                                                },
+                                                "degraded_rate": {
+                                                    "type": "number",
+                                                    "description": "Share answered by the PostgreSQL fallback."
+                                                },
+                                                "latency_ms": {
+                                                    "type": "object",
+                                                    "description": "Milliseconds, as measured by the API.",
+                                                    "properties": {
+                                                        "p50": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "p95": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "p99": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "p50",
+                                                        "p95",
+                                                        "p99"
+                                                    ]
+                                                },
+                                                "top_queries": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "query": {
+                                                                "type": "string"
+                                                            },
+                                                            "searches": {
+                                                                "type": "integer"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "query",
+                                                            "searches"
+                                                        ]
+                                                    }
+                                                },
+                                                "open_zero_results": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "days",
+                                                "searches",
+                                                "zero_result_rate",
+                                                "cache_hit_rate",
+                                                "degraded_rate",
+                                                "latency_ms",
+                                                "top_queries",
+                                                "open_zero_results"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/search/zero-results": {
+            "get": {
+                "operationId": "adminSearch.zeroResults",
+                "tags": [
+                    "AdminSearch"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": "NEW"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "meta": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "per_page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        },
+                                                        "last_page": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "page",
+                                                        "per_page",
+                                                        "total",
+                                                        "last_page"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/search/zero-results/{zeroResultId}/ignore": {
+            "post": {
+                "operationId": "adminSearch.ignore",
+                "tags": [
+                    "AdminSearch"
+                ],
+                "parameters": [
+                    {
+                        "name": "zeroResultId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "query": {
+                                                    "type": "string"
+                                                },
+                                                "collection": {
+                                                    "type": "string"
+                                                },
+                                                "occurrences": {
+                                                    "type": "integer"
+                                                },
+                                                "first_seen_at": {
+                                                    "type": "string"
+                                                },
+                                                "last_seen_at": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "query",
+                                                "collection",
+                                                "occurrences",
+                                                "first_seen_at",
+                                                "last_seen_at",
+                                                "status"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/search/synonyms": {
+            "get": {
+                "operationId": "adminSearch.synonyms",
+                "tags": [
+                    "AdminSearch"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string"
+                                                    },
+                                                    "synonyms": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "root_term": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "status": {
+                                                        "type": "string"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "synonyms",
+                                                    "root_term",
+                                                    "status",
+                                                    "updated_at"
+                                                ]
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "adminSearch.store",
+                "tags": [
+                    "AdminSearch"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveSynonymRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "synonyms": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "root_term": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string"
+                                                },
+                                                "synced": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "synonyms",
+                                                "root_term",
+                                                "status",
+                                                "updated_at",
+                                                "synced"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/admin/search/synonyms/{synonymId}": {
+            "patch": {
+                "operationId": "adminSearch.update",
+                "tags": [
+                    "AdminSearch"
+                ],
+                "parameters": [
+                    {
+                        "name": "synonymId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveSynonymRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "synonyms": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "root_term": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string"
+                                                },
+                                                "synced": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "synonyms",
+                                                "root_term",
+                                                "status",
+                                                "updated_at",
+                                                "synced"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/admin/settings": {
             "get": {
                 "operationId": "adminSettings.index",
@@ -11497,6 +12115,44 @@
                     "MODERATOR"
                 ],
                 "title": "Role"
+            },
+            "SaveSynonymRequest": {
+                "type": "object",
+                "description": "POST /admin/search/synonyms and PATCH /admin/search/synonyms/{id}.",
+                "properties": {
+                    "synonyms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                        }
+                    },
+                    "root_term": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Set for a one-way synonym: searching this term also finds the synonyms, not the reverse.",
+                        "maxLength": 100
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ACTIVE",
+                            "INACTIVE"
+                        ]
+                    },
+                    "zero_result_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Marks this zero-result query as handled."
+                    }
+                },
+                "required": [
+                    "synonyms"
+                ],
+                "title": "SaveSynonymRequest"
             },
             "Sex": {
                 "type": "string",

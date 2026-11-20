@@ -5,6 +5,7 @@ namespace App\Modules\Discovery\Providers;
 use App\Modules\Clinics\Events\ClinicDirectoryChanged;
 use App\Modules\Discovery\Console\InstallSearchCommand;
 use App\Modules\Discovery\Console\RebuildSearchCommand;
+use App\Modules\Discovery\Console\SearchAnalyticsPartitionsCommand;
 use App\Modules\Discovery\Console\SearchStatusCommand;
 use App\Modules\Discovery\Listeners\QueueSearchIndexing;
 use App\Modules\Doctors\Events\DoctorDirectoryChanged;
@@ -25,7 +26,7 @@ final class DiscoveryServiceProvider extends ServiceProvider
         Route::middleware('api')->prefix('api/v1')->group(__DIR__.'/../Routes/api.php');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([InstallSearchCommand::class, SearchStatusCommand::class, RebuildSearchCommand::class]);
+            $this->commands([InstallSearchCommand::class, SearchStatusCommand::class, RebuildSearchCommand::class, SearchAnalyticsPartitionsCommand::class]);
         }
     }
 }

@@ -10,6 +10,7 @@ use App\Modules\Discovery\Http\Resources\DoctorSearchResultResource;
 use App\Modules\Discovery\Http\Resources\SpecialtySuggestionResource;
 use App\Modules\Discovery\Services\DirectorySearch;
 use App\Modules\Discovery\Services\DoctorSearch;
+use App\Modules\Discovery\Services\SearchAnalytics;
 use App\Shared\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -21,11 +22,12 @@ use Illuminate\Validation\ValidationException;
  */
 final class SearchController
 {
-    public function doctors(SearchDoctorsRequest $request, DoctorSearch $search): JsonResponse
+    public function doctors(SearchDoctorsRequest $request, DoctorSearch $search, SearchAnalytics $analytics): JsonResponse
     {
         $started = hrtime(true);
         $criteria = $request->safe()->except(['cursor']);
         $result = $search->search([...$criteria, 'page' => self::page($request->validated('cursor'))]);
+        $analytics->record('doctors', $criteria, $result['found'], self::elapsed($started), $result['cache_hit'], $result['degraded']);
 
         return ApiResponse::success(DoctorSearchResultResource::collection($result['results']), meta: [
             ...self::meta($result, $started),
@@ -34,10 +36,12 @@ final class SearchController
         ]);
     }
 
-    public function clinics(SearchClinicsRequest $request, DirectorySearch $search): JsonResponse
+    public function clinics(SearchClinicsRequest $request, DirectorySearch $search, SearchAnalytics $analytics): JsonResponse
     {
         $started = hrtime(true);
-        $result = $search->clinics([...$request->safe()->except(['cursor']), 'page' => self::page($request->validated('cursor'))]);
+        $criteria = $request->safe()->except(['cursor']);
+        $result = $search->clinics([...$criteria, 'page' => self::page($request->validated('cursor'))]);
+        $analytics->record('clinics', $criteria, $result['found'], self::elapsed($started), $result['cache_hit'], $result['degraded']);
 
         return ApiResponse::success(ClinicSearchResultResource::collection($result['results']), meta: self::meta($result, $started));
     }
@@ -61,10 +65,15 @@ final class SearchController
         return [
             'found' => $result['found'],
             'next_cursor' => $more ? rtrim(strtr(base64_encode((string) json_encode(['p' => $result['page'] + 1])), '+/', '-_'), '=') : null,
-            'took_ms' => (int) round((hrtime(true) - $started) / 1_000_000),
+            'took_ms' => self::elapsed($started),
             'cache_hit' => $result['cache_hit'],
             'degraded' => $result['degraded'],
         ];
+    }
+
+    private static function elapsed(int|float $started): int
+    {
+        return (int) round((hrtime(true) - $started) / 1_000_000);
     }
 
     private static function page(?string $cursor): int

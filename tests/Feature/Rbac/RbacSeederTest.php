@@ -23,7 +23,7 @@ it('seeds the ten roles and every permission', function () {
     expect(Role::pluck('name')->sort()->values()->all())
         ->toBe(collect(RoleName::cases())->map->value->sort()->values()->all())
         ->and(Permission::count())->toBe(count(config('rbac.permissions')))
-        ->and(Permission::count())->toBe(73);
+        ->and(Permission::count())->toBe(74);
 });
 
 it('is idempotent and removes permissions that are no longer listed', function () {
@@ -32,7 +32,7 @@ it('is idempotent and removes permissions that are no longer listed', function (
     $this->seed(RbacSeeder::class);
     $this->seed(RbacSeeder::class);
 
-    expect(Permission::count())->toBe(73)
+    expect(Permission::count())->toBe(74)
         ->and(Permission::where('name', 'legacy.removed')->exists())->toBeFalse()
         ->and(Role::count())->toBe(10);
 });

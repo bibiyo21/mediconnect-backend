@@ -78,14 +78,10 @@ final class SearchCollections
         $this->engine->putSynonymSet((string) config('search.synonym_set'), $this->synonymItems());
     }
 
-    /**
-     * Synonym items from search_synonyms (3.4); none until then.
-     *
-     * @return list<array{id: string, synonyms: list<string>, root?: string}>
-     */
+    /** @return list<array{id: string, synonyms: list<string>, root?: string}> */
     public function synonymItems(): array
     {
-        return [];
+        return SynonymSync::items();
     }
 
     private function assertKnown(string $name): void
