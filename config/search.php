@@ -20,7 +20,34 @@ return [
     'prefix' => env('SEARCH_PREFIX', 'mc'),
 
     // Synonyms live in one set shared by the collections that list it (Typesense 30).
-    'synonym_set' => 'medical',
+    'synonym_set' => env('SEARCH_SYNONYM_SET', 'medical'),
+
+    /*
+     * Ranking (architecture.md §12.4, increment 3.5). Configuration, not code:
+     * tune against the judged queries (`search:evaluate`). Paid placement is
+     * never an input (§11.4).
+     */
+    'ranking' => [
+        // Text relevance: fields and their weights (doctor search).
+        'doctor_fields' => [
+            'display_name' => 8,
+            'specialties' => 5,
+            'subspecialties' => 4,
+            'services' => 2,
+            'clinic_name' => 2,
+            'city' => 1,
+            'hospital_name' => 1,
+        ],
+        'num_typos' => 2,
+        // rank_score: secondary sort after text match, primary order when browsing.
+        'rank_score' => [
+            'profile_completeness' => 0.67,
+            'rating' => 0.33,
+            // Bayesian damping: a new doctor's rating starts at the prior and moves with reviews.
+            'rating_prior' => 3.5,
+            'rating_prior_weight' => 10,
+        ],
+    ],
 
     // Search API (3.3, architecture.md §12.5-12.6)
     'cache_ttl_seconds' => (int) env('SEARCH_CACHE_TTL_SECONDS', 300),
@@ -69,7 +96,7 @@ return [
                     ['name' => 'updated_at', 'type' => 'int64'],
                 ],
                 'default_sorting_field' => 'rank_score',
-                'synonym_sets' => ['medical'],
+                'synonym_sets' => [env('SEARCH_SYNONYM_SET', 'medical')],
             ],
         ],
         'clinics' => [
@@ -90,7 +117,7 @@ return [
                     ['name' => 'updated_at', 'type' => 'int64'],
                 ],
                 'default_sorting_field' => 'doctor_count',
-                'synonym_sets' => ['medical'],
+                'synonym_sets' => [env('SEARCH_SYNONYM_SET', 'medical')],
             ],
         ],
         'specialties' => [
@@ -105,7 +132,7 @@ return [
                     ['name' => 'doctor_count', 'type' => 'int32'],
                 ],
                 'default_sorting_field' => 'doctor_count',
-                'synonym_sets' => ['medical'],
+                'synonym_sets' => [env('SEARCH_SYNONYM_SET', 'medical')],
             ],
         ],
     ],

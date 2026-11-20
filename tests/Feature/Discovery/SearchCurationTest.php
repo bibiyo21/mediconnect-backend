@@ -70,7 +70,7 @@ it('lets a medical admin add a synonym from the zero-result queue, pushing it to
     expect($created['synonyms'])->toBe(['kardyolohista', 'cardiologist', 'cardiology'])
         ->and($created['synced'])->toBeTrue()
         ->and($zero->refresh()->status)->toBe('SYNONYM_ADDED')
-        ->and(collect($this->engine->synonymSets['medical'])->pluck('synonyms')->flatten()->all())->toContain('kardyolohista')
+        ->and(collect($this->engine->synonymSets['medical_test'])->pluck('synonyms')->flatten()->all())->toContain('kardyolohista')
         ->and(DB::table('audit_logs')->where('action', 'search.synonym_created')->exists())->toBeTrue();
 });
 
@@ -81,7 +81,7 @@ it('deactivates a synonym and removes it from the engine set', function () {
 
     $this->patchJson("/api/v1/admin/search/synonyms/{$synonym->id}", ['status' => 'INACTIVE'], $headers)->assertOk()->assertJsonPath('data.status', 'INACTIVE');
 
-    expect(collect($this->engine->synonymSets['medical'])->pluck('id')->all())->not->toContain($synonym->id);
+    expect(collect($this->engine->synonymSets['medical_test'])->pluck('id')->all())->not->toContain($synonym->id);
     $this->getJson('/api/v1/admin/search/synonyms', $headers)->assertOk();
 });
 

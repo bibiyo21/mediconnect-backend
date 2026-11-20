@@ -56,10 +56,12 @@ final class DoctorSearch
         $q = $criteria['q'] === '' ? '*' : $criteria['q'];
         $params = [
             'q' => $q,
-            'query_by' => 'display_name,specialties,subspecialties,services,clinic_name,hospital_name',
-            'query_by_weights' => '6,4,3,2,1,1',
+            'query_by' => implode(',', array_keys($fields = (array) config('search.ranking.doctor_fields'))),
+            'query_by_weights' => implode(',', array_values($fields)),
             'prioritize_exact_match' => true,
-            'num_typos' => 2,
+            'prioritize_token_position' => true,
+            'num_typos' => (int) config('search.ranking.num_typos', 2),
+            'text_match_type' => 'max_weight',
             'group_by' => 'doctor_id',
             'group_limit' => 5,
             'page' => $page,
