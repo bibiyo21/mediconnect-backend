@@ -3,7 +3,8 @@
 namespace App\Modules\Discovery\Http\Controllers;
 
 use App\Modules\Audit\Contracts\RecordsAudit;
-use App\Modules\Discovery\Http\Requests\SaveSynonymRequest;
+use App\Modules\Discovery\Http\Requests\CreateSynonymRequest;
+use App\Modules\Discovery\Http\Requests\UpdateSynonymRequest;
 use App\Modules\Discovery\Models\SearchSynonym;
 use App\Modules\Discovery\Models\SearchZeroResult;
 use App\Modules\Discovery\Services\SynonymSync;
@@ -74,7 +75,7 @@ final class AdminSearchController
         return ApiResponse::success($rows->map(fn (SearchSynonym $s) => self::synonym($s))->values()->all());
     }
 
-    public function store(SaveSynonymRequest $request): JsonResponse
+    public function store(CreateSynonymRequest $request): JsonResponse
     {
         $synonym = DB::transaction(function () use ($request) {
             $s = new SearchSynonym;
@@ -95,7 +96,7 @@ final class AdminSearchController
         return ApiResponse::success([...self::synonym($synonym), 'synced' => $synced], status: 201);
     }
 
-    public function update(SaveSynonymRequest $request, string $synonymId): JsonResponse
+    public function update(UpdateSynonymRequest $request, string $synonymId): JsonResponse
     {
         $s = SearchSynonym::findOrFail($synonymId);
         $data = $request->validated();

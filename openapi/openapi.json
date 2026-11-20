@@ -1538,7 +1538,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SaveSynonymRequest"
+                                "$ref": "#/components/schemas/CreateSynonymRequest"
                             }
                         }
                     }
@@ -1645,11 +1645,10 @@
                     }
                 ],
                 "requestBody": {
-                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SaveSynonymRequest"
+                                "$ref": "#/components/schemas/UpdateSynonymRequest"
                             }
                         }
                     }
@@ -10094,6 +10093,37 @@
                 ],
                 "title": "CreateSubspecialtyRequest"
             },
+            "CreateSynonymRequest": {
+                "type": "object",
+                "description": "POST /admin/search/synonyms",
+                "properties": {
+                    "synonyms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                        }
+                    },
+                    "root_term": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Set for a one-way synonym: searching this term also finds the synonyms, not the reverse.",
+                        "maxLength": 100
+                    },
+                    "zero_result_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Marks this zero-result query as handled."
+                    }
+                },
+                "required": [
+                    "synonyms"
+                ],
+                "title": "CreateSynonymRequest"
+            },
             "CredentialResource": {
                 "type": "object",
                 "properties": {
@@ -12116,44 +12146,6 @@
                 ],
                 "title": "Role"
             },
-            "SaveSynonymRequest": {
-                "type": "object",
-                "description": "POST /admin/search/synonyms and PATCH /admin/search/synonyms/{id}.",
-                "properties": {
-                    "synonyms": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 100
-                        }
-                    },
-                    "root_term": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "description": "Set for a one-way synonym: searching this term also finds the synonyms, not the reverse.",
-                        "maxLength": 100
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": [
-                            "ACTIVE",
-                            "INACTIVE"
-                        ]
-                    },
-                    "zero_result_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "Marks this zero-result query as handled."
-                    }
-                },
-                "required": [
-                    "synonyms"
-                ],
-                "title": "SaveSynonymRequest"
-            },
             "Sex": {
                 "type": "string",
                 "description": "Sex where clinically required (\u00a74.3). Values follow the HL7 administrative gender set. Optional everywhere it is collected.\n",
@@ -12879,6 +12871,35 @@
                     }
                 },
                 "title": "UpdateSubspecialtyRequest"
+            },
+            "UpdateSynonymRequest": {
+                "type": "object",
+                "description": "PATCH /admin/search/synonyms/{id}: only the fields sent change.",
+                "properties": {
+                    "synonyms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                        }
+                    },
+                    "root_term": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ACTIVE",
+                            "INACTIVE"
+                        ]
+                    }
+                },
+                "title": "UpdateSynonymRequest"
             },
             "UpdateUserRolesRequest": {
                 "type": "object",
