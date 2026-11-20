@@ -2,6 +2,7 @@
 
 namespace App\Shared\Http\Controllers;
 
+use App\Shared\Contracts\SearchEngine;
 use App\Shared\Http\ApiResponse;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,8 @@ use Throwable;
 /**
  * GET /health  — liveness: the process answers. No dependency details, no auth.
  * GET /ready   — readiness: PostgreSQL, Redis and migrations are usable.
+ *                Search is reported but does not fail readiness: search has
+ *                a PostgreSQL fallback (architecture.md §12.6).
  *                Internal networks only (config/health.php), because component
  *                status helps an attacker; anyone else gets 404.
  */
@@ -25,7 +28,7 @@ final class HealthController
         return ApiResponse::success(['status' => 'ok']);
     }
 
-    public function ready(Request $request, Migrator $migrator): JsonResponse
+    public function ready(Request $request, Migrator $migrator, SearchEngine $search): JsonResponse
     {
         /** @var list<string> $allowed */
         $allowed = config('health.ready_allowed_cidrs');
@@ -49,6 +52,7 @@ final class HealthController
         ];
 
         $ready = ! in_array('fail', $checks, true);
+        $checks['search'] = $search->healthy() ? 'ok' : 'degraded';
 
         return ApiResponse::success(['status' => $ready ? 'ready' : 'not_ready', 'checks' => $checks], status: $ready ? 200 : 503);
     }

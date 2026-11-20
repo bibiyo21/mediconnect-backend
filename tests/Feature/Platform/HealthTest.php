@@ -9,7 +9,7 @@ it('answers liveness without revealing anything', function () {
 it('reports readiness of database, redis and migrations to internal callers', function () {
     $this->getJson('/api/v1/ready')->assertOk()
         ->assertJsonPath('data.status', 'ready')
-        ->assertJsonPath('data.checks', ['database' => 'ok', 'redis' => 'ok', 'migrations' => 'ok']);
+        ->assertJsonPath('data.checks', ['database' => 'ok', 'redis' => 'ok', 'migrations' => 'ok', 'search' => 'ok']);
 });
 
 it('hides readiness details from outside networks', function () {
