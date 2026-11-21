@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__.'/Support/auth.php';
+require_once __DIR__.'/Support/clinics.php';
 require_once __DIR__.'/Support/directory.php';
 require_once __DIR__.'/Support/search.php';
 

@@ -8,6 +8,8 @@ use App\Modules\Clinics\Models\DoctorClinicAssignment;
 use App\Modules\Doctors\Enums\ConsultationType;
 use App\Modules\Doctors\Enums\OnboardingStatus;
 use App\Modules\Doctors\Events\DoctorDirectoryChanged;
+use App\Modules\Doctors\Events\DoctorServiceReplaced;
+use App\Modules\Doctors\Events\DoctorServicesEnded;
 use App\Modules\Doctors\Exceptions\ServiceNotAllowed;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Doctors\Models\DoctorService;
@@ -15,6 +17,7 @@ use App\Modules\Users\Models\User;
 use App\Shared\Services\Outbox;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -77,6 +80,7 @@ final class DoctorServices
             $current->forceFill(['status' => 'ENDED', 'effective_until' => $now])->save();
             $next->forceFill(['status' => 'ACTIVE', 'effective_from' => $now, 'effective_until' => null, 'replaces_id' => $current->id, 'created_by' => $actor->id]);
             $this->saveUnique($next);
+            Event::dispatch(new DoctorServiceReplaced($current->doctor_profile_id, $current->id, $next->id));
             $this->audit->record('doctor.service_changed', 'doctor_service', $next->id, [
                 'replaces' => $current->id, 'fields' => array_values(array_intersect($fields, array_keys($changes))),
                 'fee_from' => $current->fee_amount, 'fee_to' => $next->fee_amount,
@@ -88,19 +92,30 @@ final class DoctorServices
 
     public function end(DoctorService $service): void
     {
-        DoctorService::whereKey($service->id)->where('status', 'ACTIVE')->update(['status' => 'ENDED', 'effective_until' => now()]);
-        $this->outbox->record(new DoctorDirectoryChanged($service->doctor_profile_id)); // mass update: no model event
+        DB::transaction(function () use ($service) {
+            $ended = DoctorService::whereKey($service->id)->where('status', 'ACTIVE')->update(['status' => 'ENDED', 'effective_until' => now()]);
+            $this->outbox->record(new DoctorDirectoryChanged($service->doctor_profile_id)); // mass update: no model event
+            if ($ended > 0) {
+                Event::dispatch(new DoctorServicesEnded($service->doctor_profile_id, [$service->id]));
+            }
+        });
         $this->audit->record('doctor.service_ended', 'doctor_service', $service->id);
     }
 
     /** Ends every active in-person service at a location (the assignment ended). */
     public function endAtLocation(string $doctorProfileId, string $clinicLocationId): int
     {
-        $count = DoctorService::where('doctor_profile_id', $doctorProfileId)->where('clinic_location_id', $clinicLocationId)
-            ->where('status', 'ACTIVE')->update(['status' => 'ENDED', 'effective_until' => now()]);
-        $this->outbox->record(new DoctorDirectoryChanged($doctorProfileId)); // mass update: no model event
+        return DB::transaction(function () use ($doctorProfileId, $clinicLocationId) {
+            $ids = DoctorService::where('doctor_profile_id', $doctorProfileId)->where('clinic_location_id', $clinicLocationId)
+                ->where('status', 'ACTIVE')->lockForUpdate()->pluck('id')->map(fn ($id) => (string) $id)->all();
+            DoctorService::whereKey($ids)->update(['status' => 'ENDED', 'effective_until' => now()]);
+            $this->outbox->record(new DoctorDirectoryChanged($doctorProfileId)); // mass update: no model event
+            if ($ids !== []) {
+                Event::dispatch(new DoctorServicesEnded($doctorProfileId, array_values($ids)));
+            }
 
-        return $count;
+            return count($ids);
+        });
     }
 
     /** Only verified or active doctors publish services. */

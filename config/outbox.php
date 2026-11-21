@@ -2,6 +2,7 @@
 
 use App\Modules\Clinics\Events\ClinicDirectoryChanged;
 use App\Modules\Doctors\Events\DoctorDirectoryChanged;
+use App\Modules\Scheduling\Events\SchedulingChanged;
 use App\Modules\Specialties\Events\SpecialtyCatalogChanged;
 
 /*
@@ -18,5 +19,7 @@ return [
         'doctors.directory_changed' => DoctorDirectoryChanged::class,
         'clinics.directory_changed' => ClinicDirectoryChanged::class,
         'specialties.catalog_changed' => SpecialtyCatalogChanged::class,
+        // Availability refresh (Phase 4, architecture.md §8.2)
+        'scheduling.inputs_changed' => SchedulingChanged::class,
     ],
 ];

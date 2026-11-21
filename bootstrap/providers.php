@@ -9,6 +9,7 @@ use App\Modules\Doctors\Providers\DoctorsServiceProvider;
 use App\Modules\Notifications\Providers\NotificationsServiceProvider;
 use App\Modules\Patients\Providers\PatientsServiceProvider;
 use App\Modules\Rbac\Providers\RbacServiceProvider;
+use App\Modules\Scheduling\Providers\SchedulingServiceProvider;
 use App\Modules\Specialties\Providers\SpecialtiesServiceProvider;
 use App\Modules\Users\Providers\UsersServiceProvider;
 use App\Providers\AppServiceProvider;
@@ -28,4 +29,5 @@ return [
     ClinicsServiceProvider::class,
     DoctorsServiceProvider::class,
     DiscoveryServiceProvider::class,
+    SchedulingServiceProvider::class,
 ];

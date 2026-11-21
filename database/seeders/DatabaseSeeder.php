@@ -15,5 +15,6 @@ class DatabaseSeeder extends Seeder
         $this->call(RbacSeeder::class);
         $this->call(SpecialtySeeder::class);
         $this->call(SearchSynonymSeeder::class);
+        $this->call(SchedulingPolicySeeder::class);
     }
 }

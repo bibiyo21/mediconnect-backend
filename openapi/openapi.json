@@ -4161,6 +4161,159 @@
                 ]
             }
         },
+        "/clinics/{clinicId}/service-modes": {
+            "get": {
+                "operationId": "clinicServiceModes.index",
+                "tags": [
+                    "ClinicServiceModes"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "doctor_profile_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ServiceModeResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/clinics/{clinicId}/services/{serviceId}/mode": {
+            "put": {
+                "operationId": "clinicServiceModes.update",
+                "tags": [
+                    "ClinicServiceModes"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "serviceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetServiceModeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ServiceModeResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/contact/otp": {
             "post": {
                 "operationId": "contactChange.requestCode",
@@ -6209,6 +6362,134 @@
                     },
                     "403": {
                         "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/service-modes": {
+            "get": {
+                "operationId": "myServiceModes.index",
+                "tags": [
+                    "MyServiceModes"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ServiceModeResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/doctors/me/services/{serviceId}/mode": {
+            "put": {
+                "operationId": "myServiceModes.update",
+                "tags": [
+                    "MyServiceModes"
+                ],
+                "parameters": [
+                    {
+                        "name": "serviceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetServiceModeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ServiceModeResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -12145,6 +12426,89 @@
                     "MODERATOR"
                 ],
                 "title": "Role"
+            },
+            "ServiceMode": {
+                "type": "string",
+                "description": "How patients reach a doctor for one service at one location (\u00a77.1).\n",
+                "enum": [
+                    "APPOINTMENT",
+                    "WALK_IN",
+                    "BOTH"
+                ],
+                "title": "ServiceMode"
+            },
+            "ServiceModeResource": {
+                "type": "object",
+                "properties": {
+                    "doctor_service_id": {
+                        "type": "string"
+                    },
+                    "doctor_profile_id": {
+                        "type": "string"
+                    },
+                    "service_name": {
+                        "type": "string"
+                    },
+                    "consultation_type": {
+                        "type": "string"
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Null for online services."
+                    },
+                    "location_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "service_mode": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "APPOINTMENT, WALK_IN or BOTH; null when not set yet. Online services are APPOINTMENT only."
+                    },
+                    "service_mode_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "effective_from": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "doctor_service_id",
+                    "doctor_profile_id",
+                    "service_name",
+                    "consultation_type",
+                    "clinic_location_id",
+                    "location_name",
+                    "service_mode",
+                    "service_mode_id",
+                    "effective_from"
+                ],
+                "title": "ServiceModeResource"
+            },
+            "SetServiceModeRequest": {
+                "type": "object",
+                "properties": {
+                    "service_mode": {
+                        "$ref": "#/components/schemas/ServiceMode"
+                    }
+                },
+                "required": [
+                    "service_mode"
+                ],
+                "title": "SetServiceModeRequest"
             },
             "Sex": {
                 "type": "string",
