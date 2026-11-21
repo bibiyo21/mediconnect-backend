@@ -43,6 +43,8 @@ final class ServiceModes
         }
 
         return DB::transaction(function () use ($service, $mode, $online, $clinicId) {
+            // Serializes concurrent first-time sets for one service (otherwise both would insert).
+            DoctorService::whereKey($service->id)->lockForUpdate()->first();
             /** @var DoctorServiceMode|null $current */
             $current = DoctorServiceMode::where('doctor_service_id', $service->id)->where('status', 'ACTIVE')->lockForUpdate()->first();
             if ($current !== null && $current->service_mode === $mode->value) {
