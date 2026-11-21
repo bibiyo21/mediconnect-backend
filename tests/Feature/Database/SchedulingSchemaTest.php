@@ -129,13 +129,16 @@ it('rejects overlapping shifts in one schedule on the same weekday', function ()
 it('lets only special hours add time (D-11)', function () {
     $exception = fn (string $type, string $effect) => DB::table('doctor_schedule_exceptions')->insert([
         'id' => (string) Str::uuid7(), 'doctor_profile_id' => $this->doctor->id, 'exception_type' => $type, 'effect' => $effect, 'priority' => 2,
+        'doctor_service_mode_id' => $effect === 'ADD_HOURS' ? $this->inPersonMode : null, // 4.4: added hours name their service
         'starts_at' => '2026-12-24 00:00:00+00', 'ends_at' => '2026-12-26 00:00:00+00', 'requested_by' => $this->user,
     ]);
 
     expect(db_rejects(fn () => $exception('SPECIAL_HOURS', 'BLOCK')))->toBe('23514')
         ->and(db_rejects(fn () => $exception('VACATION', 'ADD_HOURS')))->toBe('23514')
         ->and(db_rejects(fn () => $exception('VACATION', 'BLOCK')))->toBeNull()
-        ->and(db_rejects(fn () => $exception('SPECIAL_HOURS', 'ADD_HOURS')))->toBeNull();
+        ->and(db_rejects(fn () => $exception('SPECIAL_HOURS', 'ADD_HOURS')))->toBeNull()
+        // Blocking never names a service; adding hours always does.
+        ->and(db_rejects(fn () => DB::table('doctor_schedule_exceptions')->insert(['id' => (string) Str::uuid7(), 'doctor_profile_id' => $this->doctor->id, 'exception_type' => 'SPECIAL_HOURS', 'effect' => 'ADD_HOURS', 'priority' => 4, 'starts_at' => '2026-12-27 00:00:00+00', 'ends_at' => '2026-12-28 00:00:00+00', 'requested_by' => $this->user])))->toBe('23514');
 });
 
 it('keeps policy scope consistent and leaves undecided values empty', function () {

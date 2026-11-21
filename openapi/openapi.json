@@ -7652,6 +7652,247 @@
                 }
             }
         },
+        "/schedule-exceptions": {
+            "get": {
+                "operationId": "scheduleExceptions.index",
+                "tags": [
+                    "ScheduleExceptions"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinic_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ScheduleExceptionResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error\n\nAn error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Error overview.",
+                                                    "examples": [
+                                                        "You do not have access to this clinic."
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Error overview.",
+                                                    "examples": [
+                                                        ""
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "scheduleExceptions.store",
+                "tags": [
+                    "ScheduleExceptions"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateScheduleExceptionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "affected_appointments": {
+                                                    "type": "array",
+                                                    "description": "Live appointments in the blocked time: flagged for rescheduling, never cancelled.",
+                                                    "items": {}
+                                                }
+                                            },
+                                            "required": [
+                                                "affected_appointments"
+                                            ],
+                                            "additionalProperties": {}
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/schedule-exceptions/{exceptionId}": {
+            "delete": {
+                "operationId": "scheduleExceptions.destroy",
+                "tags": [
+                    "ScheduleExceptions"
+                ],
+                "parameters": [
+                    {
+                        "name": "exceptionId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ScheduleExceptionResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/schedules": {
             "get": {
                 "operationId": "schedules.index",
@@ -10952,6 +11193,75 @@
                 ],
                 "title": "CreateLocationRequest"
             },
+            "CreateScheduleExceptionRequest": {
+                "type": "object",
+                "properties": {
+                    "doctor_profile_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Null or absent: every place of this doctor (only the doctor may set that)."
+                    },
+                    "exception_type": {
+                        "type": "string",
+                        "enum": [
+                            "VACATION",
+                            "SICK_LEAVE",
+                            "EMERGENCY_LEAVE",
+                            "PUBLIC_HOLIDAY",
+                            "CLINIC_CLOSURE",
+                            "TEMPORARY_UNAVAILABILITY",
+                            "SPECIAL_HOURS",
+                            "DOCTOR_REQUESTED_CHANGE",
+                            "CLINIC_REQUESTED_CHANGE"
+                        ]
+                    },
+                    "effect": {
+                        "type": "string",
+                        "description": "BLOCK (default) or ADD_HOURS; special hours always add.",
+                        "enum": [
+                            "BLOCK",
+                            "ADD_HOURS"
+                        ]
+                    },
+                    "doctor_service_mode_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Required when adding hours: the service the extra time is for."
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 with an offset, for example 2026-12-24T00:00:00+08:00."
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "exception_type",
+                    "starts_at",
+                    "ends_at"
+                ],
+                "title": "CreateScheduleExceptionRequest"
+            },
             "CreateSpecialtyRequest": {
                 "type": "object",
                 "description": "POST /admin/specialties.",
@@ -13050,6 +13360,64 @@
                     "MODERATOR"
                 ],
                 "title": "Role"
+            },
+            "ScheduleExceptionResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "doctor_profile_id": {
+                        "type": "string"
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "doctor_service_mode_id": {},
+                    "exception_type": {
+                        "type": "string"
+                    },
+                    "effect": {
+                        "type": "string"
+                    },
+                    "priority": {
+                        "type": "integer",
+                        "description": "D-11: 1 is the highest."
+                    },
+                    "starts_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "ends_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "reason": {},
+                    "status": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "doctor_profile_id",
+                    "clinic_location_id",
+                    "doctor_service_mode_id",
+                    "exception_type",
+                    "effect",
+                    "priority",
+                    "starts_at",
+                    "ends_at",
+                    "reason",
+                    "status"
+                ],
+                "title": "ScheduleExceptionResource"
             },
             "ScheduleRequest": {
                 "type": "object",

@@ -3,6 +3,7 @@
 use App\Modules\Scheduling\Http\Controllers\ClinicServiceModesController;
 use App\Modules\Scheduling\Http\Controllers\MyServiceModesController;
 use App\Modules\Scheduling\Http\Controllers\PublicSchedulesController;
+use App\Modules\Scheduling\Http\Controllers\ScheduleExceptionsController;
 use App\Modules\Scheduling\Http\Controllers\SchedulesController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,4 +25,9 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(func
     Route::get('schedules/{scheduleId}', [SchedulesController::class, 'show'])->whereUuid('scheduleId');
     Route::patch('schedules/{scheduleId}', [SchedulesController::class, 'update'])->whereUuid('scheduleId');
     Route::delete('schedules/{scheduleId}', [SchedulesController::class, 'destroy'])->whereUuid('scheduleId');
+
+    // Exceptions (4.4): leave, closures, unavailability and special hours (D-11).
+    Route::get('schedule-exceptions', [ScheduleExceptionsController::class, 'index']);
+    Route::post('schedule-exceptions', [ScheduleExceptionsController::class, 'store']);
+    Route::delete('schedule-exceptions/{exceptionId}', [ScheduleExceptionsController::class, 'destroy'])->whereUuid('exceptionId');
 });
