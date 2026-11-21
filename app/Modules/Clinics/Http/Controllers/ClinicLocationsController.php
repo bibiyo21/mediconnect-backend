@@ -3,6 +3,7 @@
 namespace App\Modules\Clinics\Http\Controllers;
 
 use App\Modules\Audit\Contracts\RecordsAudit;
+use App\Modules\Clinics\Events\ClinicDirectoryChanged;
 use App\Modules\Clinics\Http\Requests\ClinicRules;
 use App\Modules\Clinics\Http\Requests\CreateClinicServiceRequest;
 use App\Modules\Clinics\Http\Requests\CreateLocationRequest;
@@ -15,6 +16,7 @@ use App\Modules\Clinics\Models\ClinicLocation;
 use App\Modules\Clinics\Models\ClinicService;
 use App\Modules\Clinics\Services\ClinicGuard;
 use App\Shared\Http\ApiResponse;
+use App\Shared\Services\Outbox;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +28,7 @@ final class ClinicLocationsController
     public function __construct(
         private readonly ClinicGuard $guard,
         private readonly RecordsAudit $audit,
+        private readonly Outbox $outbox,
     ) {}
 
     public function store(CreateLocationRequest $request, string $clinicId): JsonResponse
@@ -64,7 +67,8 @@ final class ClinicLocationsController
         $location = $this->location($clinic, $locationId);
 
         DB::transaction(function () use ($request, $location, $clinic) {
-            $location->operatingHours()->delete();
+            $location->operatingHours()->delete(); // mass delete: no model events, so the change is recorded below
+            $this->outbox->record(new ClinicDirectoryChanged($clinic->id));
             foreach ((array) $request->validated('hours') as $h) {
                 $location->operatingHours()->create(['day_of_week' => (int) $h['day_of_week'], 'opens_at' => $h['opens_at'], 'closes_at' => $h['closes_at']]);
             }

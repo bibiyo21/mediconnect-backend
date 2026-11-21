@@ -1,7 +1,9 @@
 <?php
 
 use App\Modules\Discovery\Services\DoctorDocuments;
+use App\Modules\Scheduling\Services\AvailabilityProjector;
 use Database\Seeders\PerformanceDatasetSeeder;
+use Database\Seeders\SchedulingPolicySeeder;
 use Database\Seeders\SpecialtySeeder;
 use Illuminate\Support\Facades\DB;
 
@@ -64,3 +66,16 @@ it('refuses outside LOCAL and testing', function (string $env) {
     $this->artisan('perf:dataset')->assertFailed();
     expect(DB::table('doctor_profiles')->count())->toBe(0);
 })->with(['production', 'staging']);
+
+it('gives seeded doctors schedules that project into slots, and still removes cleanly (Phase 4)', function () {
+    $this->seed(SchedulingPolicySeeder::class);
+    (new PerformanceDatasetSeeder(doctors: 12, locations: 4))->run();
+    $doctor = (string) DB::table('doctor_schedules')->value('doctor_profile_id');
+    $result = app(AvailabilityProjector::class)->refresh($doctor);
+
+    expect($result['generated'])->toBeGreaterThan(0)
+        ->and(DB::table('clinic_operating_hours')->count())->toBe(4 * 6)
+        ->and(PerformanceDatasetSeeder::remove())->toBe(12)
+        ->and(DB::table('doctor_availability_slots')->count())->toBe(0)
+        ->and(DB::table('doctor_schedules')->count())->toBe(0);
+});

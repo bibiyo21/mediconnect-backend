@@ -84,7 +84,7 @@ final class PerformanceDatasetSeeder extends Seeder
 
         for ($start = 0; $start < $this->doctors; $start += 500) {
             DB::transaction(function () use ($start, $now, $password, $locationIds, $specialties) {
-                $rows = ['users' => [], 'doctor_profiles' => [], 'doctor_specialties' => [], 'doctor_languages' => [], 'doctor_clinic_assignments' => [], 'doctor_services' => []];
+                $rows = ['users' => [], 'doctor_profiles' => [], 'doctor_specialties' => [], 'doctor_languages' => [], 'doctor_clinic_assignments' => [], 'doctor_services' => [], 'doctor_service_modes' => [], 'doctor_schedules' => [], 'doctor_schedule_shifts' => []];
                 for ($n = $start; $n < min($start + 500, $this->doctors); $n++) {
                     $userId = (string) Str::uuid7();
                     $doctorId = (string) Str::uuid7();
@@ -107,18 +107,41 @@ final class PerformanceDatasetSeeder extends Seeder
                     $roll = mt_rand(1, 100);
                     $count = $roll <= 35 ? 1 : ($roll <= 75 ? 2 : 3);
                     $fee = 30_000 + 5_000 * mt_rand(0, 34); // PHP 300 to 2,000, in centavos
-                    foreach (self::distinct($locationIds, $count) as $locationId) {
+                    foreach (self::distinct($locationIds, $count) as $k => $locationId) {
                         $rows['doctor_clinic_assignments'][] = ['id' => (string) Str::uuid7(), 'doctor_profile_id' => $doctorId, 'clinic_location_id' => $locationId, 'status' => 'ACTIVE', 'requested_by' => $userId, 'approved_by' => $userId, 'effective_from' => $now, 'created_at' => $now, 'updated_at' => $now];
-                        $rows['doctor_services'][] = self::service($doctorId, $locationId, 'Consultation', 'IN_PERSON', 20, $fee, $userId, $now);
+                        $service = self::service($doctorId, $locationId, 'Consultation', 'IN_PERSON', 20, $fee, $userId, $now);
+                        $rows['doctor_services'][] = $service;
+                        // Phase 4: a weekly schedule per place, on its own two weekdays, so the doctor is never in two places at once.
+                        self::schedule($rows, $doctorId, $userId, $service['id'], $locationId, $n % 3 === 0 ? 'BOTH' : 'APPOINTMENT', [2 * $k + 1, 2 * $k + 2], $n % 2 === 0 ? ['09:00', '12:00'] : ['13:00', '17:00'], 20, 5, $now);
                     }
                     if (mt_rand(1, 100) <= 60) {
-                        $rows['doctor_services'][] = self::service($doctorId, null, 'Teleconsultation', 'ONLINE', 15, max(30_000, $fee - 10_000), $userId, $now);
+                        $service = self::service($doctorId, null, 'Teleconsultation', 'ONLINE', 15, max(30_000, $fee - 10_000), $userId, $now);
+                        $rows['doctor_services'][] = $service;
+                        self::schedule($rows, $doctorId, $userId, $service['id'], null, 'APPOINTMENT', [1, 3, 5], ['19:00', '21:00'], 15, 0, $now);
                     }
                 }
                 foreach ($rows as $table => $batch) {
                     DB::table($table)->insert($batch);
                 }
             });
+        }
+    }
+
+    /**
+     * Adds a service mode, an ACTIVE weekly schedule and its shifts (Phase 4).
+     *
+     * @param  array<string, list<array<string, mixed>>>  $rows
+     * @param  list<int>  $days
+     * @param  array{string, string}  $hours
+     */
+    private static function schedule(array &$rows, string $doctorId, string $userId, string $serviceId, ?string $locationId, string $mode, array $days, array $hours, int $duration, int $buffer, \DateTimeInterface $now): void
+    {
+        $modeId = (string) Str::uuid7();
+        $scheduleId = (string) Str::uuid7();
+        $rows['doctor_service_modes'][] = ['id' => $modeId, 'doctor_profile_id' => $doctorId, 'clinic_location_id' => $locationId, 'doctor_service_id' => $serviceId, 'consultation_type' => $locationId === null ? 'ONLINE' : 'IN_PERSON', 'service_mode' => $mode, 'status' => 'ACTIVE', 'effective_from' => '2026-01-01', 'created_at' => $now, 'updated_at' => $now];
+        $rows['doctor_schedules'][] = ['id' => $scheduleId, 'doctor_profile_id' => $doctorId, 'name' => $locationId === null ? 'Online evenings' : 'Clinic hours', 'effective_from' => '2026-01-01', 'status' => 'ACTIVE', 'version' => 1, 'created_by' => $userId, 'created_at' => $now, 'updated_at' => $now];
+        foreach ($days as $day) {
+            $rows['doctor_schedule_shifts'][] = ['id' => (string) Str::uuid7(), 'doctor_schedule_id' => $scheduleId, 'day_of_week' => $day, 'clinic_location_id' => $locationId, 'doctor_service_mode_id' => $modeId, 'starts_at_local' => $hours[0], 'ends_at_local' => $hours[1], 'timezone' => 'Asia/Manila', 'slot_duration_minutes' => $duration, 'buffer_minutes' => $buffer, 'max_appointments' => null, 'walkin_capacity' => $mode === 'BOTH' ? 5 : null, 'created_at' => $now, 'updated_at' => $now];
         }
     }
 
@@ -131,6 +154,12 @@ final class PerformanceDatasetSeeder extends Seeder
             $users = DB::table('users')->where('email', 'like', '%@'.self::EMAIL_DOMAIN)->pluck('id');
             $doctors = DB::table('doctor_profiles')->whereIn('user_id', $users)->pluck('id');
             foreach ($doctors->chunk(1000) as $chunk) {
+                // Scheduling rows (Phase 4) reference services and locations, so they go first.
+                DB::table('appointment_slot_reservations')->whereIn('doctor_profile_id', $chunk)->delete();
+                DB::table('doctor_availability_slots')->whereIn('doctor_profile_id', $chunk)->delete();
+                DB::table('doctor_schedule_exceptions')->whereIn('doctor_profile_id', $chunk)->delete();
+                DB::table('doctor_schedules')->whereIn('doctor_profile_id', $chunk)->delete(); // shifts and breaks cascade
+                DB::table('doctor_service_modes')->whereIn('doctor_profile_id', $chunk)->delete();
                 foreach (['doctor_services', 'doctor_clinic_assignments', 'doctor_languages', 'doctor_specialties'] as $table) {
                     DB::table($table)->whereIn('doctor_profile_id', $chunk)->delete();
                 }
@@ -141,6 +170,7 @@ final class PerformanceDatasetSeeder extends Seeder
             }
             $organizations = DB::table('organizations')->where('legal_name', self::ORGANIZATION_MARKER)->pluck('id');
             $clinics = DB::table('clinics')->whereIn('organization_id', $organizations)->pluck('id');
+            DB::table('clinic_operating_hours')->whereIn('clinic_location_id', DB::table('clinic_locations')->whereIn('clinic_id', $clinics)->select('id'))->delete();
             DB::table('clinic_locations')->whereIn('clinic_id', $clinics)->delete();
             DB::table('clinics')->whereIn('id', $clinics)->delete();
             DB::table('organizations')->whereIn('id', $organizations)->delete();
@@ -192,6 +222,14 @@ final class PerformanceDatasetSeeder extends Seeder
                 ];
             }
             DB::table('clinic_locations')->insert($rows);
+            // Monday to Saturday, 08:00 to 17:00 (a location without hours offers no in-person times, Phase 4 plan Q9).
+            $hours = [];
+            foreach ($rows as $location) {
+                foreach (range(1, 6) as $day) {
+                    $hours[] = ['id' => (string) Str::uuid7(), 'clinic_location_id' => $location['id'], 'day_of_week' => $day, 'opens_at' => '08:00', 'closes_at' => '17:00', 'created_at' => $now, 'updated_at' => $now];
+                }
+            }
+            DB::table('clinic_operating_hours')->insert($hours);
             $made += $branches;
         }
 

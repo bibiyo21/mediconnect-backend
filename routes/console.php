@@ -15,3 +15,5 @@ Schedule::command('accounts:anonymize-deleted')->dailyAt('02:30')->withoutOverla
 Schedule::command('search:partitions')->dailyAt('01:20')->withoutOverlapping(); // 13-month retention
 Schedule::command('search:rebuild specialties')->dailyAt('03:00')->withoutOverlapping();
 Schedule::command('search:rebuild clinics')->dailyAt('03:10')->withoutOverlapping();
+// Availability horizon (Phase 4, §24 GenerateAvailabilitySlots): every scheduled doctor, nightly.
+Schedule::command('availability:generate')->dailyAt('02:30')->withoutOverlapping();

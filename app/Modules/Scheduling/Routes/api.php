@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Scheduling\Http\Controllers\AvailabilityController;
 use App\Modules\Scheduling\Http\Controllers\ClinicServiceModesController;
 use App\Modules\Scheduling\Http\Controllers\MyServiceModesController;
 use App\Modules\Scheduling\Http\Controllers\PublicSchedulesController;
@@ -10,7 +11,12 @@ use Illuminate\Support\Facades\Route;
 /* Scheduling module routes, under /api/v1 (api-specification.md scheduling rows). */
 
 // Public weekly summary (4.3): hours only, ACTIVE doctors only.
-Route::get('doctors/{doctorId}/schedules', PublicSchedulesController::class)->whereUuid('doctorId')->middleware('throttle:120,1');
+Route::middleware('throttle:120,1')->group(function () {
+    Route::get('doctors/{doctorId}/schedules', PublicSchedulesController::class)->whereUuid('doctorId');
+    // Availability (4.6): the projection, advisory (§11.6). 120 a minute per IP (Phase 4 plan Q11).
+    Route::get('doctors/{doctorId}/availability', [AvailabilityController::class, 'doctor'])->whereUuid('doctorId');
+    Route::get('availability', [AvailabilityController::class, 'many']);
+});
 
 Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(function () {
     // Service modes (4.2): the doctor's own, and a clinic's for its locations.
