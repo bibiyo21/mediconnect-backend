@@ -7481,6 +7481,91 @@
                 }
             }
         },
+        "/doctors/{doctorId}/schedules": {
+            "get": {
+                "operationId": "scheduling.publicSchedules",
+                "tags": [
+                    "PublicSchedules"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "note": {
+                                                            "type": "string",
+                                                            "const": "Regular hours. Exceptions such as leave and holidays apply; check availability for bookable times."
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "note"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/auth/register": {
             "post": {
                 "operationId": "authentication.registration",
@@ -7565,6 +7650,545 @@
                         "$ref": "#/components/responses/ValidationException"
                     }
                 }
+            }
+        },
+        "/schedules": {
+            "get": {
+                "operationId": "schedules.index",
+                "tags": [
+                    "Schedules"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinic_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "doctor_profile_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ScheduleResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error\n\nAn error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Error overview.",
+                                                    "examples": [
+                                                        "You do not have access to this clinic."
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Error overview.",
+                                                    "examples": [
+                                                        ""
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "schedules.store",
+                "tags": [
+                    "Schedules"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScheduleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ScheduleResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/schedules/{scheduleId}": {
+            "get": {
+                "operationId": "schedules.show",
+                "tags": [
+                    "Schedules"
+                ],
+                "parameters": [
+                    {
+                        "name": "scheduleId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ScheduleResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "schedules.update",
+                "tags": [
+                    "Schedules"
+                ],
+                "parameters": [
+                    {
+                        "name": "scheduleId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScheduleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ScheduleResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "delete": {
+                "operationId": "schedules.destroy",
+                "tags": [
+                    "Schedules"
+                ],
+                "parameters": [
+                    {
+                        "name": "scheduleId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "doctor_profile_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                        }
+                    },
+                    {
+                        "name": "effective_from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "effective_until",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "DRAFT",
+                                "ACTIVE"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "shifts",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "day_of_week": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 7
+                                    },
+                                    "doctor_service_mode_id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "starts_at": {
+                                        "type": "string"
+                                    },
+                                    "ends_at": {
+                                        "type": "string"
+                                    },
+                                    "timezone": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "slot_duration_minutes": {
+                                        "type": "integer",
+                                        "minimum": 5,
+                                        "maximum": 480
+                                    },
+                                    "buffer_minutes": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 120
+                                    },
+                                    "max_appointments": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": 1,
+                                        "maximum": 500
+                                    },
+                                    "walkin_capacity": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": 0,
+                                        "maximum": 500
+                                    },
+                                    "breaks": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "starts_at": {
+                                                    "type": "string"
+                                                },
+                                                "ends_at": {
+                                                    "type": "string"
+                                                },
+                                                "label": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "maxLength": 80
+                                                }
+                                            },
+                                            "required": [
+                                                "starts_at",
+                                                "ends_at"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "day_of_week",
+                                    "doctor_service_mode_id",
+                                    "starts_at",
+                                    "ends_at",
+                                    "slot_duration_minutes"
+                                ]
+                            }
+                        },
+                        "x-deepObject-style": "qs"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "const": "ARCHIVED"
+                                                },
+                                                "affected_appointments": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "status",
+                                                "affected_appointments"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
             }
         },
         "/search/doctors": {
@@ -12426,6 +13050,273 @@
                     "MODERATOR"
                 ],
                 "title": "Role"
+            },
+            "ScheduleRequest": {
+                "type": "object",
+                "description": "Create (POST) or change (PATCH) a weekly schedule with its shifts and breaks\nin one payload. On PATCH every field is optional, `shifts` replaces all\nshifts, and the version comes from `If-Match` (or `version`).",
+                "properties": {
+                    "doctor_profile_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "effective_from": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "effective_until": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "DRAFT",
+                            "ACTIVE"
+                        ]
+                    },
+                    "version": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "shifts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "day_of_week": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 7
+                                },
+                                "doctor_service_mode_id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "starts_at": {
+                                    "type": "string"
+                                },
+                                "ends_at": {
+                                    "type": "string"
+                                },
+                                "timezone": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "slot_duration_minutes": {
+                                    "type": "integer",
+                                    "minimum": 5,
+                                    "maximum": 480
+                                },
+                                "buffer_minutes": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 120
+                                },
+                                "max_appointments": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ],
+                                    "minimum": 1,
+                                    "maximum": 500
+                                },
+                                "walkin_capacity": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ],
+                                    "minimum": 0,
+                                    "maximum": 500
+                                },
+                                "breaks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "starts_at": {
+                                                "type": "string"
+                                            },
+                                            "ends_at": {
+                                                "type": "string"
+                                            },
+                                            "label": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ],
+                                                "maxLength": 80
+                                            }
+                                        },
+                                        "required": [
+                                            "starts_at",
+                                            "ends_at"
+                                        ]
+                                    },
+                                    "maxItems": 10
+                                }
+                            },
+                            "required": [
+                                "day_of_week",
+                                "doctor_service_mode_id",
+                                "starts_at",
+                                "ends_at",
+                                "slot_duration_minutes"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 50
+                    }
+                },
+                "required": [
+                    "name",
+                    "effective_from",
+                    "shifts"
+                ],
+                "title": "ScheduleRequest"
+            },
+            "ScheduleResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "doctor_profile_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "integer",
+                        "description": "Send back as If-Match when changing the schedule."
+                    },
+                    "effective_from": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "effective_until": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "shifts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "day_of_week": {
+                                    "type": "integer"
+                                },
+                                "doctor_service_mode_id": {
+                                    "type": "string"
+                                },
+                                "clinic_location_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "description": "null for online shifts"
+                                },
+                                "starts_at": {
+                                    "type": "string"
+                                },
+                                "ends_at": {
+                                    "type": "string"
+                                },
+                                "timezone": {
+                                    "type": "string"
+                                },
+                                "slot_duration_minutes": {
+                                    "type": "integer"
+                                },
+                                "buffer_minutes": {
+                                    "type": "integer"
+                                },
+                                "max_appointments": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ]
+                                },
+                                "walkin_capacity": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ]
+                                },
+                                "breaks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "starts_at": {
+                                                "type": "string"
+                                            },
+                                            "ends_at": {
+                                                "type": "string"
+                                            },
+                                            "label": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "required": [
+                                            "starts_at",
+                                            "ends_at",
+                                            "label"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "day_of_week",
+                                "doctor_service_mode_id",
+                                "clinic_location_id",
+                                "starts_at",
+                                "ends_at",
+                                "timezone",
+                                "slot_duration_minutes",
+                                "buffer_minutes",
+                                "max_appointments",
+                                "walkin_capacity",
+                                "breaks"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "doctor_profile_id",
+                    "name",
+                    "status",
+                    "version",
+                    "effective_from",
+                    "effective_until",
+                    "shifts"
+                ],
+                "title": "ScheduleResource"
             },
             "ServiceMode": {
                 "type": "string",
