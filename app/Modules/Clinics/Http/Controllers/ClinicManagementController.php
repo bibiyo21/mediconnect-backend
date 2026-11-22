@@ -43,7 +43,7 @@ final class ClinicManagementController
 
     public function update(UpdateClinicRequest $request, string $clinicId): JsonResponse
     {
-        $clinic = $this->guard->authorize($request, 'clinics.update', $clinicId);
+        $clinic = $this->guard->authorizeWide($request, 'clinics.update', $clinicId);
         $clinic->fill($request->safe()->only(['name', 'description']));
         if ($request->has('status')) {
             $clinic->status = (string) $request->input('status');

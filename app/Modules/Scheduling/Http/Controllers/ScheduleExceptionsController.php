@@ -3,7 +3,6 @@
 namespace App\Modules\Scheduling\Http\Controllers;
 
 use App\Modules\Clinics\Contracts\ClinicAccess;
-use App\Modules\Clinics\Models\ClinicLocation;
 use App\Modules\Scheduling\Http\Requests\CreateScheduleExceptionRequest;
 use App\Modules\Scheduling\Http\Resources\ScheduleExceptionResource;
 use App\Modules\Scheduling\Models\DoctorScheduleException;
@@ -29,7 +28,7 @@ final class ScheduleExceptionsController
         $query = DoctorScheduleException::where('status', 'ACTIVE')->where('ends_at', '>', now())->orderBy('starts_at');
         if (is_string($clinicId) && Str::isUuid($clinicId)) {
             abort_unless($this->clinics->allows($user, 'schedules.view', $clinicId), 403, 'You do not have access to this clinic.');
-            $query->whereIn('clinic_location_id', ClinicLocation::where('clinic_id', $clinicId)->select('id'));
+            $query->whereIn('clinic_location_id', $this->clinics->allowedLocationIds($user, 'schedules.view', $clinicId));
         } else {
             abort_unless($user->can('schedules.view'), 403);
             $own = $this->access->ownProfileId($user) ?? abort(404, 'You do not have a doctor profile.');

@@ -33,7 +33,7 @@ final class ClinicLocationsController
 
     public function store(CreateLocationRequest $request, string $clinicId): JsonResponse
     {
-        $clinic = $this->guard->authorize($request, 'clinics.update', $clinicId);
+        $clinic = $this->guard->authorizeWide($request, 'clinics.update', $clinicId);
         $data = $request->validated();
         $data['phone'] = ClinicRules::normalisePhone($data['phone'] ?? null);
         $location = $clinic->locations()->create($data);
@@ -44,7 +44,7 @@ final class ClinicLocationsController
 
     public function update(UpdateLocationRequest $request, string $clinicId, string $locationId): JsonResponse
     {
-        $clinic = $this->guard->authorize($request, 'clinics.update', $clinicId);
+        $clinic = $this->guard->authorizeAtLocation($request, 'clinics.update', $clinicId, $locationId);
         $location = $this->location($clinic, $locationId);
         $data = $request->validated();
         if (array_key_exists('phone', $data)) {
@@ -63,7 +63,7 @@ final class ClinicLocationsController
     /** Replaces the weekly hours of one location atomically. */
     public function replaceHours(ReplaceHoursRequest $request, string $clinicId, string $locationId): JsonResponse
     {
-        $clinic = $this->guard->authorize($request, 'clinics.manage_hours', $clinicId);
+        $clinic = $this->guard->authorizeAtLocation($request, 'clinics.manage_hours', $clinicId, $locationId);
         $location = $this->location($clinic, $locationId);
 
         DB::transaction(function () use ($request, $location, $clinic) {
@@ -80,7 +80,7 @@ final class ClinicLocationsController
 
     public function storeService(CreateClinicServiceRequest $request, string $clinicId, string $locationId): JsonResponse
     {
-        $clinic = $this->guard->authorize($request, 'clinics.update', $clinicId);
+        $clinic = $this->guard->authorizeAtLocation($request, 'clinics.update', $clinicId, $locationId);
         $location = $this->location($clinic, $locationId);
         if ($location->services()->whereRaw('lower(name) = ?', [mb_strtolower(trim((string) $request->input('name')))])->exists()) {
             throw ValidationException::withMessages(['name' => ['This location already offers a service with that name.']]);
@@ -93,7 +93,7 @@ final class ClinicLocationsController
 
     public function updateService(UpdateClinicServiceRequest $request, string $clinicId, string $locationId, string $serviceId): JsonResponse
     {
-        $clinic = $this->guard->authorize($request, 'clinics.update', $clinicId);
+        $clinic = $this->guard->authorizeAtLocation($request, 'clinics.update', $clinicId, $locationId);
         $location = $this->location($clinic, $locationId);
         /** @var ClinicService $service */
         $service = $location->services()->whereKey($serviceId)->firstOrFail();

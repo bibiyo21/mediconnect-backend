@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 function session_for(User $user): array
 {
     app('auth')->forgetGuards();
-    $privileged = $user->getRoleNames()->intersect(['ADMIN', 'SUPER_ADMIN', 'MEDICAL_ADMIN', 'CLINIC_MANAGER'])->isNotEmpty();
+    $privileged = $user->getRoleNames()->contains(fn (string $role) => Role::from($role)->requiresMfa());
     $headers = $privileged ? bearer(enroll_mfa($user)[2]) : signed_in($user);
     app('auth')->forgetGuards();
 
@@ -69,4 +69,32 @@ function assign(string $clinicId, string $locationId, array $managerHeaders, arr
 function in_person(string $locationId, int $fee, string $name = 'Consultation'): array
 {
     return ['consultation_type' => 'IN_PERSON', 'clinic_location_id' => $locationId, 'name' => $name, 'duration_minutes' => 20, 'buffer_minutes' => 5, 'fee_amount' => $fee];
+}
+
+/** A second (or further) location for a clinic, through the manager's API; returns its id. */
+function add_location(string $clinicId, array $managerHeaders, string $name = 'Second branch'): string
+{
+    $clinic = test()->postJson("/api/v1/clinics/{$clinicId}/locations", ['name' => $name, 'address_line1' => '45 Rizal Ave', 'city' => 'Quezon City', 'postal_code' => '1100', 'phone' => '+63 2 8765 4321'], $managerHeaders)->assertCreated()->json('data');
+    app('auth')->forgetGuards();
+
+    return (string) collect($clinic['locations'])->firstWhere('name', $name)['id'];
+}
+
+/**
+ * A clinic member with the given role: all locations of the clinic when $locationId is null,
+ * otherwise only that location (clinic_members.clinic_location_id, database-schema.md §4).
+ *
+ * @return array{0: User, 1: array<string, string>} the user and fresh session headers
+ */
+function clinic_member(string $clinicId, Role $role, ?string $locationId = null, string $status = 'ACTIVE'): array
+{
+    $user = account($role);
+    $row = (new ClinicMember)->forceFill([
+        'clinic_id' => $clinicId, 'clinic_location_id' => $locationId, 'user_id' => $user->id,
+        'member_role' => $role === Role::ClinicManager ? 'CLINIC_MANAGER' : 'CLINIC_STAFF', 'status' => $status,
+        'joined_at' => now(), 'removed_at' => $status === 'REMOVED' ? now() : null,
+    ]);
+    $row->save();
+
+    return [$user->refresh(), session_for($user->refresh())];
 }

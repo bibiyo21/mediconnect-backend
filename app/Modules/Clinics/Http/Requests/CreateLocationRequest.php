@@ -5,6 +5,11 @@ namespace App\Modules\Clinics\Http\Requests;
 /** POST /clinics/{id}/locations. */
 final class CreateLocationRequest extends ClinicScopedRequest
 {
+    protected function clinicWide(): bool
+    {
+        return true;
+    }
+
     protected function permission(): string
     {
         return 'clinics.update';

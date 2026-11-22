@@ -7,6 +7,13 @@ use Illuminate\Validation\Validator;
 /** PUT /clinics/{id}/locations/{locationId}/operating-hours: the complete weekly set. */
 final class ReplaceHoursRequest extends ClinicScopedRequest
 {
+    protected function locationId(): ?string
+    {
+        $id = $this->route('locationId');
+
+        return is_string($id) ? $id : null;
+    }
+
     protected function permission(): string
     {
         return 'clinics.manage_hours';

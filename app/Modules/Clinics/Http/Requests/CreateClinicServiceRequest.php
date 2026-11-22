@@ -5,6 +5,13 @@ namespace App\Modules\Clinics\Http\Requests;
 /** POST /clinics/{id}/locations/{locationId}/services. */
 final class CreateClinicServiceRequest extends ClinicScopedRequest
 {
+    protected function locationId(): ?string
+    {
+        $id = $this->route('locationId');
+
+        return is_string($id) ? $id : null;
+    }
+
     protected function permission(): string
     {
         return 'clinics.update';

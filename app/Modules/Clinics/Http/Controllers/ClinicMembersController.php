@@ -36,13 +36,19 @@ final class ClinicMembersController
 
     public function store(AddMemberRequest $request, string $clinicId): JsonResponse
     {
-        $clinic = $this->guard->authorize($request, 'clinics.manage_staff', $clinicId);
         $locationId = $request->input('clinic_location_id');
-        if ($locationId !== null) {
-            $clinic->locations()->whereKey($locationId)->firstOrFail();
-        }
+        // A location row needs access at that location; a clinic-wide row needs clinic-wide access,
+        // so a manager restricted to one location cannot widen anyone's reach (or their own).
+        $clinic = is_string($locationId)
+            ? $this->guard->authorizeAtLocation($request, 'clinics.manage_staff', $clinicId, $locationId)
+            : $this->guard->authorizeWide($request, 'clinics.manage_staff', $clinicId);
 
         $user = $this->findAccount($request);
+        /** @var User $actor */
+        $actor = $request->user();
+        if ($user->id === $actor->id) {
+            throw ValidationException::withMessages(['member' => ['You cannot change your own membership. Ask another manager.']]);
+        }
         $role = Role::from((string) $request->input('member_role'));
 
         $exists = ClinicMember::where('clinic_id', $clinic->id)->where('user_id', $user->id)->where('status', 'ACTIVE')
@@ -51,8 +57,6 @@ final class ClinicMembersController
             throw ValidationException::withMessages(['email' => ['This person is already a member here.']]);
         }
 
-        /** @var User $actor */
-        $actor = $request->user();
         DB::transaction(function () use ($clinic, $user, $role, $locationId, $actor) {
             $this->roles->assign($user, $role);
             $member = new ClinicMember;
@@ -74,8 +78,13 @@ final class ClinicMembersController
         /** @var User $actor */
         $actor = $request->user();
 
+        // Same rule as adding: a location row needs access at that location, a clinic-wide row clinic-wide access.
+        $member->clinic_location_id !== null
+            ? $this->guard->authorizeAtLocation($request, 'clinics.manage_staff', $clinicId, $member->clinic_location_id)
+            : $this->guard->authorizeWide($request, 'clinics.manage_staff', $clinicId);
+
         if ($member->user_id === $actor->id) {
-            throw ValidationException::withMessages(['member' => ['You cannot remove yourself. Ask another manager.']]);
+            throw ValidationException::withMessages(['member' => ['You cannot change your own membership. Ask another manager.']]);
         }
 
         DB::transaction(function () use ($member, $clinic) {

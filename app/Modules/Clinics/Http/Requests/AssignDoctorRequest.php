@@ -8,6 +8,13 @@ namespace App\Modules\Clinics\Http\Requests;
  */
 final class AssignDoctorRequest extends ClinicScopedRequest
 {
+    protected function locationId(): ?string
+    {
+        $id = $this->input('clinic_location_id');
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
     protected function permission(): string
     {
         return 'doctors.manage_assignments';

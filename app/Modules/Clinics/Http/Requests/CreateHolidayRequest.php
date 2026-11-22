@@ -5,6 +5,18 @@ namespace App\Modules\Clinics\Http\Requests;
 /** POST /clinics/{id}/holidays: a closure or special hours on one date. */
 final class CreateHolidayRequest extends ClinicScopedRequest
 {
+    protected function locationId(): ?string
+    {
+        $id = $this->input('clinic_location_id');
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    protected function clinicWide(): bool
+    {
+        return true;
+    }
+
     protected function permission(): string
     {
         return 'clinics.manage_hours';

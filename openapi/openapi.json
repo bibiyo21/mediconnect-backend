@@ -3199,6 +3199,140 @@
                 }
             }
         },
+        "/broadcasting/auth": {
+            "post": {
+                "operationId": "notifications.broadcastAuth",
+                "summary": "Authorize a channel subscription",
+                "tags": [
+                    "BroadcastAuth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BroadcastAuthRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "auth": {
+                                            "type": "string"
+                                        },
+                                        "channel_data": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "auth"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                "Realtime updates are not available."
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "description": "The channel does not exist or is not yours to join.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        },
+                                        "code": {
+                                            "type": "string"
+                                        },
+                                        "request_id": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "errors",
+                                        "code",
+                                        "request_id"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/clinics/{clinicId}/doctor-assignments": {
             "get": {
                 "operationId": "clinicDoctorAssignments.index",
@@ -4594,6 +4728,28 @@
                                         "success",
                                         "data",
                                         "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                "You do not have access to this location."
+                                            ]
+                                        }
+                                    },
+                                    "required": [
                                         "message"
                                     ]
                                 }
@@ -10889,6 +11045,29 @@
                     "consultation_type"
                 ],
                 "title": "AvailabilitySlotResource"
+            },
+            "BroadcastAuthRequest": {
+                "type": "object",
+                "description": "The Pusher-protocol subscription handshake. Only plain private channels are authorized here\n(no presence channels until a module needs one, and no private-encrypted- channels, which\nwould sign a name the callbacks never match); whether this user may join the named channel\nis decided by the channel callback in routes/channels.php.",
+                "properties": {
+                    "socket_id": {
+                        "type": "string",
+                        "description": "The connection id the WebSocket server gave the client, like `1234.5678`.",
+                        "pattern": "^\\d+\\.\\d+$",
+                        "maxLength": 64
+                    },
+                    "channel_name": {
+                        "type": "string",
+                        "description": "The channel to join, with its prefix, like `private-user.{id}`.",
+                        "pattern": "^private-(?!encrypted-)[A-Za-z0-9_.\\-]+$",
+                        "maxLength": 190
+                    }
+                },
+                "required": [
+                    "socket_id",
+                    "channel_name"
+                ],
+                "title": "BroadcastAuthRequest"
             },
             "ClinicManagementResource": {
                 "type": "object",

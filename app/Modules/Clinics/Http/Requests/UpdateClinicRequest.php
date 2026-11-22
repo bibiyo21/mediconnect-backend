@@ -5,6 +5,11 @@ namespace App\Modules\Clinics\Http\Requests;
 /** PATCH /clinics/{id}: only the fields sent change. */
 final class UpdateClinicRequest extends ClinicScopedRequest
 {
+    protected function clinicWide(): bool
+    {
+        return true;
+    }
+
     protected function permission(): string
     {
         return 'clinics.update';

@@ -30,7 +30,7 @@ final class ClinicServiceModesController
     {
         $clinic = $this->clinic($request, 'schedules.view', $clinicId);
         $doctorId = $request->query('doctor_profile_id');
-        $services = $this->services($clinic)->when(is_string($doctorId) && Str::isUuid($doctorId), fn ($q) => $q->where('doctor_profile_id', $doctorId))->get();
+        $services = $this->services($clinic, $this->allowedLocations($request, 'schedules.view', $clinic))->when(is_string($doctorId) && Str::isUuid($doctorId), fn ($q) => $q->where('doctor_profile_id', $doctorId))->get();
         $modes = $this->modes->forServices($services->pluck('id'));
 
         return ApiResponse::success(ServiceModeResource::collection($services->map(fn (DoctorService $s) => ['service' => $s, 'mode' => $modes[$s->id] ?? null])));
@@ -40,6 +40,8 @@ final class ClinicServiceModesController
     {
         $clinic = $this->clinic($request, 'schedules.update', $clinicId);
         $service = $this->services($clinic)->whereKey($serviceId)->firstOrFail();
+        // Location-aware (Phase 5 plan Q14): staff restricted to another location cannot change this one.
+        abort_unless($this->access->allowsAtLocation($this->user($request), 'schedules.update', (string) $service->clinic_location_id), 403, 'You do not have access to this location.');
         $mode = $this->modes->set($service, ServiceMode::from((string) $request->validated('service_mode')), $clinic->id);
 
         return ApiResponse::success(new ServiceModeResource(['service' => $service, 'mode' => $mode]));
@@ -48,17 +50,35 @@ final class ClinicServiceModesController
     private function clinic(Request $request, string $permission, string $clinicId): Clinic
     {
         $clinic = Clinic::findOrFail($clinicId);
-        /** @var User $user */
-        $user = $request->user();
-        abort_unless($this->access->allows($user, $permission, $clinic->id), 403, 'You do not have access to this clinic.');
+        abort_unless($this->access->allows($this->user($request), $permission, $clinic->id), 403, 'You do not have access to this clinic.');
 
         return $clinic;
     }
 
-    /** @return Builder<DoctorService> */
-    private function services(Clinic $clinic)
+    /** @return list<string> */
+    private function allowedLocations(Request $request, string $permission, Clinic $clinic): array
+    {
+        return $this->access->allowedLocationIds($this->user($request), $permission, $clinic->id);
+    }
+
+    private function user(Request $request): User
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $user;
+    }
+
+    /**
+     * @param  list<string>|null  $onlyLocations  narrow to these locations (null = all of the clinic's)
+     * @return Builder<DoctorService>
+     */
+    private function services(Clinic $clinic, ?array $onlyLocations = null)
     {
         $locations = $clinic->locations()->select('id');
+        if ($onlyLocations !== null) {
+            $locations->whereIn('id', $onlyLocations);
+        }
         $assigned = DoctorClinicAssignment::where('status', 'ACTIVE')->whereIn('clinic_location_id', $locations)->select('doctor_profile_id');
 
         return DoctorService::with('location')->where('status', 'ACTIVE')->whereIn('clinic_location_id', $locations)

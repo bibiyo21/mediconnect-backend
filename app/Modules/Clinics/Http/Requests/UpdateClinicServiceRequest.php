@@ -5,6 +5,13 @@ namespace App\Modules\Clinics\Http\Requests;
 /** PATCH /clinics/{id}/locations/{locationId}/services/{serviceId}: only the fields sent change. */
 final class UpdateClinicServiceRequest extends ClinicScopedRequest
 {
+    protected function locationId(): ?string
+    {
+        $id = $this->route('locationId');
+
+        return is_string($id) ? $id : null;
+    }
+
     protected function permission(): string
     {
         return 'clinics.update';

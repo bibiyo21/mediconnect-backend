@@ -3,7 +3,6 @@
 namespace App\Modules\Scheduling\Http\Controllers;
 
 use App\Modules\Clinics\Contracts\ClinicAccess;
-use App\Modules\Clinics\Models\ClinicLocation;
 use App\Modules\Scheduling\Http\Requests\ScheduleRequest;
 use App\Modules\Scheduling\Http\Resources\ScheduleResource;
 use App\Modules\Scheduling\Models\DoctorSchedule;
@@ -35,7 +34,7 @@ final class SchedulesController
         $query = DoctorSchedule::with('shifts.breaks')->where('status', '<>', 'ARCHIVED')->orderBy('effective_from');
         if (is_string($clinicId) && Str::isUuid($clinicId)) {
             abort_unless($this->clinics->allows($user, 'schedules.view', $clinicId), 403, 'You do not have access to this clinic.');
-            $query->whereHas('shifts', fn ($q) => $q->whereIn('clinic_location_id', ClinicLocation::where('clinic_id', $clinicId)->select('id')));
+            $query->whereHas('shifts', fn ($q) => $q->whereIn('clinic_location_id', $this->clinics->allowedLocationIds($user, 'schedules.view', $clinicId)));
             $doctorId = $request->query('doctor_profile_id');
             $query->when(is_string($doctorId) && Str::isUuid($doctorId), fn ($q) => $q->where('doctor_profile_id', $doctorId));
         } else {
