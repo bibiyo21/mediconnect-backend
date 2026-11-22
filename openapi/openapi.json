@@ -7750,6 +7750,597 @@
                 }
             }
         },
+        "/presence/me": {
+            "get": {
+                "operationId": "presence.me",
+                "summary": "Your own presence: the open session, or NOT_CHECKED_IN",
+                "tags": [
+                    "Presence"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PresenceStateResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/presence/check-in": {
+            "post": {
+                "operationId": "presence.checkIn",
+                "description": "Needs an active assignment and an active service at the location, and the clinic open now or\nwithin your shift window, which starts up to 60 minutes before the shift (422 with a `reason_code` such as\n`no_assignment`, `outside_hours` otherwise). Already IN here: 200 with the current state. Open session in\nanother state or at another location: 409 `open_session`.",
+                "summary": "Check in at a clinic location",
+                "tags": [
+                    "Presence"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CheckInRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PresenceStateResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PresenceStateResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "description": "VALIDATION_FAILED. For a check-in the rules refused, reason_code is one of: doctor_not_active, location_not_active, no_assignment, no_service_mode, clinic_closed, closed_holiday, outside_hours; otherwise errors lists the invalid fields.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION, reason_code `open_session`: the doctor already has an open session in another state or at another location (errors.clinic_location_id only for the doctor and staff of that location), or `change_in_progress` (CONCURRENT_MODIFICATION): retry.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/presence/break/start": {
+            "post": {
+                "operationId": "presence.startBreak",
+                "summary": "Start a break. Only from IN (409 otherwise; already ON_BREAK: 200, unchanged). A reminder is sent at the expected end",
+                "tags": [
+                    "Presence"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StartBreakRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PresenceStateResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/presence/break/end": {
+            "post": {
+                "operationId": "presence.endBreak",
+                "summary": "End a break. Only from ON_BREAK (409 otherwise; already IN: 200, unchanged)",
+                "tags": [
+                    "Presence"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PresenceActionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PresenceStateResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/presence/unavailable": {
+            "post": {
+                "operationId": "presence.markUnavailable",
+                "summary": "Mark yourself temporarily unavailable (TEMPORARILY_UNAVAILABLE). Only from IN (409 otherwise; already unavailable: 200, unchanged)",
+                "tags": [
+                    "Presence"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MarkUnavailableRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PresenceStateResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/presence/available": {
+            "post": {
+                "operationId": "presence.markAvailable",
+                "summary": "Become available again. Only from TEMPORARILY_UNAVAILABLE (409 otherwise; already IN: 200, unchanged)",
+                "tags": [
+                    "Presence"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PresenceActionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PresenceStateResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/clinics": {
             "get": {
                 "operationId": "publicClinics.index",
@@ -8118,6 +8709,87 @@
                                     "required": [
                                         "message"
                                     ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/presence/doctors/{doctorId}": {
+            "get": {
+                "operationId": "publicPresence.show",
+                "description": "Public. Only active, listed doctors are visible (404 otherwise). The status is indicative and\nset by the doctor or clinic staff; it is not a guarantee that the doctor can see you.",
+                "summary": "A doctor's presence right now",
+                "tags": [
+                    "PublicPresence"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctorId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicPresenceResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No active, listed doctor with this id.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
                                 }
                             }
                         }
@@ -11069,6 +11741,39 @@
                 ],
                 "title": "BroadcastAuthRequest"
             },
+            "CheckInRequest": {
+                "type": "object",
+                "properties": {
+                    "doctor_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Clinic staff only: the doctor to act for. Omit to change your own presence."
+                    },
+                    "clinic_location_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The clinic location to check in at (required: online presence is not available). Unknown fields such as location evidence are ignored."
+                    },
+                    "reason": {
+                        "anyOf": [
+                            {
+                                "description": "Why, as a fixed code (SHIFT_START, LATE_ARRIVAL, COVERING_COLLEAGUE, ADMIN_WORK, PHONE_CALL, EMERGENCY, PERSONAL, OTHER). No free text.",
+                                "$ref": "#/components/schemas/PresenceReason"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "clinic_location_id"
+                ],
+                "title": "CheckInRequest"
+            },
             "ClinicManagementResource": {
                 "type": "object",
                 "properties": {
@@ -12686,6 +13391,89 @@
                 ],
                 "title": "EndAssignmentRequest"
             },
+            "ErrorEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "enum": [
+                            false
+                        ]
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Safe to show; never personal or clinical data."
+                    },
+                    "errors": {
+                        "type": "object",
+                        "description": "Field name to a list of messages, or a state hint such as {\"status\": [\"IN\"]}.",
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "code": {
+                        "type": "string",
+                        "description": "Stable machine-readable error code.",
+                        "enum": [
+                            "BAD_REQUEST",
+                            "UNAUTHENTICATED",
+                            "MFA_REQUIRED",
+                            "STEP_UP_REQUIRED",
+                            "FORBIDDEN",
+                            "NOT_FOUND",
+                            "METHOD_NOT_ALLOWED",
+                            "SLOT_UNAVAILABLE",
+                            "INVALID_STATE_TRANSITION",
+                            "CONCURRENT_MODIFICATION",
+                            "IDEMPOTENCY_IN_PROGRESS",
+                            "ACTIVE_CONSULTATION",
+                            "QUEUE_CLOSED",
+                            "QUEUE_FULL",
+                            "VALIDATION_FAILED",
+                            "IDEMPOTENCY_KEY_REUSED",
+                            "HMO_NOT_ACCEPTED",
+                            "RECORD_FINALIZED",
+                            "RATE_LIMITED",
+                            "SERVER_ERROR",
+                            "DEPENDENCY_UNAVAILABLE"
+                        ]
+                    },
+                    "reason_code": {
+                        "type": "string",
+                        "description": "Optional finer reason inside the code, for example `no_assignment` or `open_session`. Absent when the code says it all.",
+                        "enum": [
+                            "doctor_not_active",
+                            "location_not_active",
+                            "no_assignment",
+                            "no_service_mode",
+                            "clinic_closed",
+                            "closed_holiday",
+                            "outside_hours",
+                            "open_session",
+                            "not_checked_in",
+                            "invalid_transition",
+                            "change_in_progress"
+                        ]
+                    },
+                    "request_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code",
+                    "request_id"
+                ],
+                "title": "ErrorEnvelope"
+            },
             "ForgotPasswordRequest": {
                 "type": "object",
                 "properties": {
@@ -12757,6 +13545,39 @@
                     "password"
                 ],
                 "title": "LoginRequest"
+            },
+            "MarkUnavailableRequest": {
+                "type": "object",
+                "properties": {
+                    "doctor_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Clinic staff only: the doctor to act for. Omit to change your own presence."
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Required when acting for another doctor: the location where you hold presence rights."
+                    },
+                    "reason": {
+                        "anyOf": [
+                            {
+                                "description": "Why, as a fixed code (SHIFT_START, LATE_ARRIVAL, COVERING_COLLEAGUE, ADMIN_WORK, PHONE_CALL, EMERGENCY, PERSONAL, OTHER). No free text. Kept for the clinic's records; never shown to patients.",
+                                "$ref": "#/components/schemas/PresenceReason"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "title": "MarkUnavailableRequest"
             },
             "MfaCodeRequest": {
                 "type": "object",
@@ -13165,6 +13986,106 @@
                     "ACTIVE"
                 ],
                 "title": "OnboardingStatus"
+            },
+            "PresenceActionRequest": {
+                "type": "object",
+                "description": "Base for presence writes. Fine-grained authorization (own presence, or presence.manage at the\nlocation) is decided by PresenceAccess in the controller; this is only the coarse gate.",
+                "properties": {
+                    "doctor_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Clinic staff only: the doctor to act for. Omit to change your own presence."
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Required when acting for another doctor: the location where you hold presence rights."
+                    }
+                },
+                "title": "PresenceActionRequest"
+            },
+            "PresenceReason": {
+                "type": "string",
+                "description": "Why a presence change was made: a fixed code, never free text (free text can carry personal or clinical detail and ends up in event rows and logs). Shown to the clinic's staff only; never public.\n",
+                "enum": [
+                    "SHIFT_START",
+                    "LATE_ARRIVAL",
+                    "COVERING_COLLEAGUE",
+                    "ADMIN_WORK",
+                    "PHONE_CALL",
+                    "EMERGENCY",
+                    "PERSONAL",
+                    "OTHER"
+                ],
+                "title": "PresenceReason"
+            },
+            "PresenceStateResource": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "description": "The stored status: IN, ON_BREAK or TEMPORARILY_UNAVAILABLE while a session is open, otherwise NOT_CHECKED_IN.",
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "NOT_CHECKED_IN"
+                                ]
+                            }
+                        ]
+                    },
+                    "session_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Null when there is no open session."
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "checked_in_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "UTC."
+                    },
+                    "break_expected_end_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "UTC; set only while ON_BREAK. An expectation, not a promise."
+                    },
+                    "version": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Increases with every change; clients can ignore an older hint."
+                    }
+                },
+                "required": [
+                    "status",
+                    "session_id",
+                    "clinic_location_id",
+                    "checked_in_at",
+                    "break_expected_end_at",
+                    "version"
+                ],
+                "title": "PresenceStateResource"
             },
             "PublicClinicDetailResource": {
                 "type": "object",
@@ -13814,6 +14735,31 @@
                     "practice_locations"
                 ],
                 "title": "PublicDoctorResource"
+            },
+            "PublicPresenceResource": {
+                "type": "object",
+                "properties": {
+                    "doctor_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "IN, BUSY, ON_BREAK, AWAY or NOT_IN. Indicative: it is set by the doctor or clinic staff and can lag."
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Where the doctor is checked in; null when NOT_IN."
+                    }
+                },
+                "required": [
+                    "doctor_id",
+                    "status",
+                    "clinic_location_id"
+                ],
+                "title": "PublicPresenceResource"
             },
             "RefreshRequest": {
                 "type": "object",
@@ -14606,6 +15552,45 @@
                     "doctor_count"
                 ],
                 "title": "SpecialtySuggestionResource"
+            },
+            "StartBreakRequest": {
+                "type": "object",
+                "properties": {
+                    "doctor_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Clinic staff only: the doctor to act for. Omit to change your own presence."
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Required when acting for another doctor: the location where you hold presence rights."
+                    },
+                    "expected_minutes": {
+                        "type": "integer",
+                        "description": "How long the break is expected to last, in minutes (at most the configured maximum, 240 by default).",
+                        "minimum": 1,
+                        "maximum": 240
+                    },
+                    "scheduled_break_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "One of the doctor's scheduled breaks at this location, when the break is a scheduled one."
+                    }
+                },
+                "required": [
+                    "expected_minutes"
+                ],
+                "title": "StartBreakRequest"
             },
             "StartDoctorOnboardingRequest": {
                 "type": "object",

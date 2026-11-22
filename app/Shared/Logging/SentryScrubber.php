@@ -2,6 +2,7 @@
 
 namespace App\Shared\Logging;
 
+use Illuminate\Database\QueryException;
 use Sentry\Breadcrumb;
 use Sentry\Event;
 use Sentry\EventHint;
@@ -43,8 +44,13 @@ final class SentryScrubber
             $event->setMessage(RedactSensitiveData::scrubMessage($event->getMessage()), $event->getMessageParams());
         }
 
+        // A query error is reported as SQLSTATE plus the statement with placeholders: never the bindings.
+        $query = $hint?->exception instanceof QueryException ? $hint->exception : null;
         foreach ($event->getExceptions() as $exception) {
-            $exception->setValue(RedactSensitiveData::scrubMessage($exception->getValue()));
+            $value = $query !== null && $exception->getType() === $query::class
+                ? RedactSensitiveData::scrubQueryMessage($exception->getValue(), $query->getSql())
+                : $exception->getValue();
+            $exception->setValue(RedactSensitiveData::scrubMessage($value));
         }
 
         return $event;

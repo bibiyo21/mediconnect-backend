@@ -8,6 +8,7 @@ use App\Modules\Discovery\Providers\DiscoveryServiceProvider;
 use App\Modules\Doctors\Providers\DoctorsServiceProvider;
 use App\Modules\Notifications\Providers\NotificationsServiceProvider;
 use App\Modules\Patients\Providers\PatientsServiceProvider;
+use App\Modules\Presence\Providers\PresenceServiceProvider;
 use App\Modules\Rbac\Providers\RbacServiceProvider;
 use App\Modules\Scheduling\Providers\SchedulingServiceProvider;
 use App\Modules\Specialties\Providers\SpecialtiesServiceProvider;
@@ -30,4 +31,5 @@ return [
     DoctorsServiceProvider::class,
     DiscoveryServiceProvider::class,
     SchedulingServiceProvider::class,
+    PresenceServiceProvider::class,
 ];

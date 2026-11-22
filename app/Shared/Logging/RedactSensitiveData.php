@@ -2,6 +2,7 @@
 
 namespace App\Shared\Logging;
 
+use Illuminate\Database\QueryException;
 use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
 
@@ -42,7 +43,7 @@ final class RedactSensitiveData implements ProcessorInterface
     {
         return $record->with(
             message: self::scrubMessage($record->message),
-            context: self::scrubArray($record->context),
+            context: self::scrubArray(self::flattenThrowables($record->context)),
             extra: self::scrubArray($record->extra),
         );
     }
@@ -66,8 +67,91 @@ final class RedactSensitiveData implements ProcessorInterface
         return $data;
     }
 
+    /**
+     * A QueryException message carries the SQL with its bindings inlined ("... SQL: insert ... values
+     * (jane@example.com, ...)") and PostgreSQL's DETAIL line (the offending values). Neither may reach a
+     * log or Sentry: keep the SQLSTATE and the error text, drop the connection, DETAIL and bindings.
+     * With $sql (the statement with ? placeholders, from QueryException::getSql()) the shape is
+     * "SQLSTATE[..]: ... (SQL: select ... where id = ?)".
+     */
+    public static function scrubQueryMessage(string $message, ?string $sql = null): string
+    {
+        if (! str_contains($message, 'SQLSTATE[')) {
+            return $message;
+        }
+
+        $cut = strpos($message, '(Connection:');
+        if ($cut !== false) {
+            $message = rtrim(substr($message, 0, $cut));
+        }
+        $message = preg_replace('/\R\s*(?:DETAIL|CONTEXT|HINT|LINE \d+):.*$/s', '', $message) ?? $message;
+        // "invalid input syntax for type uuid: "<user input>"" repeats the input.
+        $message = preg_replace('/(invalid input syntax for type [a-z0-9 ]+):.*$/si', '$1', $message) ?? $message;
+        // Any quoted value after a colon in the error text ("...for enum x: "value"") is user data.
+        $at = strpos($message, 'ERROR:');
+        if ($at !== false) {
+            $message = substr($message, 0, $at + 6).(preg_replace('/:\s*"[^"]*"/', ': "'.self::REDACTED.'"', substr($message, $at + 6)) ?? substr($message, $at + 6));
+        }
+        $message = rtrim($message);
+
+        return $sql === null ? $message : $message.' (SQL: '.$sql.')';
+    }
+
+    /**
+     * Replaces every Throwable in a log context (at any depth) by a scrubbed, argument-free description, because
+     * the log formatter would otherwise serialize the raw message (a QueryException has its bindings inlined) and
+     * the trace with its call arguments (phone numbers, tokens, clinical text passed to the failing function).
+     * The causes (getPrevious) are walked too, so a RuntimeException wrapping a QueryException is just as safe.
+     *
+     * @param  array<mixed>  $context
+     * @return array<mixed>
+     */
+    private static function flattenThrowables(array $context): array
+    {
+        foreach ($context as $key => $value) {
+            if ($value instanceof \Throwable) {
+                $context[$key] = self::describeThrowable($value);
+            } elseif (is_array($value)) {
+                $context[$key] = self::flattenThrowables($value);
+            }
+        }
+
+        return $context;
+    }
+
+    /** @return array<string, mixed> */
+    private static function describeThrowable(\Throwable $e, int $depth = 0): array
+    {
+        $message = $e instanceof QueryException ? self::scrubQueryMessage($e->getMessage(), $e->getSql()) : self::scrubMessage($e->getMessage());
+
+        return [
+            'class' => $e::class,
+            'message' => $message,
+            'code' => $e->getCode(),
+            'file' => $e->getFile().':'.$e->getLine(),
+            'trace' => self::traceWithoutArguments($e),
+            // A cause chain is bounded: a cycle cannot loop and a long chain cannot flood the log.
+            'previous' => $e->getPrevious() !== null && $depth < 10 ? self::describeThrowable($e->getPrevious(), $depth + 1) : null,
+        ];
+    }
+
+    /**
+     * "file:line Class::function" per frame and nothing else, as Monolog's normalizer does: never getTraceAsString,
+     * which prints argument values. (zend.exception_ignore_args=On is set in the PHP images as a second layer.)
+     */
+    private static function traceWithoutArguments(\Throwable $e): string
+    {
+        $lines = [];
+        foreach (array_slice($e->getTrace(), 0, 30) as $i => $frame) {
+            $lines[] = '#'.$i.' '.($frame['file'] ?? '[internal]').':'.($frame['line'] ?? '?').' '.($frame['class'] ?? '').($frame['type'] ?? '').$frame['function'];
+        }
+
+        return implode("\n", $lines);
+    }
+
     public static function scrubMessage(string $message): string
     {
+        $message = self::scrubQueryMessage($message);
         $message = preg_replace('/\b(Bearer|Basic)\s+[A-Za-z0-9\-\._~\+\/=|]+/i', '$1 '.self::REDACTED, $message) ?? $message;
 
         $messageKeys = array_diff(self::SENSITIVE_KEYS, self::EXACT_ONLY_KEYS);

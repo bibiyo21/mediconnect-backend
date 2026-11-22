@@ -27,14 +27,16 @@ final class ApiResponse
     /**
      * @param  array<string, list<string>>  $errors
      * @param  array<string, string>  $headers
+     * @param  string|null  $reasonCode  a finer machine-readable reason inside the error code (for example `no_assignment`); omitted when null
      */
-    public static function error(ErrorCode $code, ?string $message = null, array $errors = [], array $headers = []): JsonResponse
+    public static function error(ErrorCode $code, ?string $message = null, array $errors = [], array $headers = [], ?string $reasonCode = null): JsonResponse
     {
         return new JsonResponse([
             'success' => false,
             'message' => $message ?? $code->defaultMessage(),
             'errors' => $errors === [] ? (object) [] : $errors,
             'code' => $code->value,
+            ...($reasonCode === null ? [] : ['reason_code' => $reasonCode]),
             'request_id' => Context::get('request_id'),
         ], $code->httpStatus(), $headers);
     }

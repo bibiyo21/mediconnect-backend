@@ -40,4 +40,11 @@ return [
         'driver' => env('SMS_DRIVER', 'disabled'),
     ],
 
+    // Mobile push (plan Q11): "disabled" (the default) sends nothing; "log" records a line only and is refused in production (set it in .env for LOCAL). Real FCM and APNs delivery needs owner-provided credentials.
+    'push' => [
+        'driver' => env('PUSH_DRIVER', 'disabled'),
+        // A push claimed (SENDING) longer ago than this is taken over by the next worker: its worker died before finishing.
+        'reclaim_after_minutes' => (int) env('PUSH_RECLAIM_AFTER_MINUTES', 10),
+    ],
+
 ];

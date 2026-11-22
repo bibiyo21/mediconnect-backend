@@ -24,6 +24,12 @@ abstract class DomainException extends RuntimeException
         return [];
     }
 
+    /** A finer machine-readable reason within the error code (sent as `reason_code`); null when the code says it all. */
+    public function reasonCode(): ?string
+    {
+        return null;
+    }
+
     public function clientMessage(): string
     {
         return $this->getMessage() !== '' ? $this->getMessage() : $this->errorCode()->defaultMessage();

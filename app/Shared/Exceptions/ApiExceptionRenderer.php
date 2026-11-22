@@ -28,7 +28,7 @@ final class ApiExceptionRenderer
     public static function render(Throwable $e): JsonResponse
     {
         return match (true) {
-            $e instanceof DomainException => ApiResponse::error($e->errorCode(), $e->clientMessage(), $e->errors()),
+            $e instanceof DomainException => ApiResponse::error($e->errorCode(), $e->clientMessage(), $e->errors(), reasonCode: $e->reasonCode()),
             $e instanceof ValidationException => ApiResponse::error(ErrorCode::ValidationFailed, null, $e->errors()),
             $e instanceof AuthenticationException => ApiResponse::error(ErrorCode::Unauthenticated),
             $e instanceof AuthorizationException => ApiResponse::error(ErrorCode::Forbidden),

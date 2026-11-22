@@ -8,6 +8,7 @@ use App\Shared\Contracts\SearchEngine;
 use App\Shared\Http\Middleware\EnsureIdempotency;
 use App\Shared\Logging\ScrubbingLogManager;
 use App\Shared\Malware\ClamdScanner;
+use App\Shared\OpenApi\DocumentsErrorEnvelope;
 use App\Shared\OpenApi\MarksAuthenticatedOperations;
 use App\Shared\Search\TypesenseEngine;
 use App\Shared\Services\SystemClock;
@@ -58,6 +59,7 @@ class AppServiceProvider extends ServiceProvider
             $openApi->servers = [new Server('/api/v1')];
             $openApi->components->addSecurityScheme('bearer', SecurityScheme::http('bearer'));
             $openApi->components->addSecurityScheme('session', SecurityScheme::apiKey('cookie', 'mediconnect-session'));
+            (new DocumentsErrorEnvelope)($openApi);
         });
     }
 }
