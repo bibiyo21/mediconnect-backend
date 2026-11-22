@@ -7,7 +7,7 @@ use App\Modules\Notifications\Realtime\RealtimeEvent;
 use Carbon\CarbonImmutable;
 
 /**
- * A doctor went on break (§19 DoctorBreakStarted), on `private-clinic.{location}`. Carries the
+ * A doctor went on break (§19 DoctorBreakStarted), on `presence-clinic.{location}`. Carries the
  * expected end so the staff view can show "back at ..." (an estimate); no reason or actor.
  */
 final class DoctorBreakStarted extends RealtimeEvent

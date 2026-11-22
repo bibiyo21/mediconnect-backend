@@ -7,6 +7,7 @@ use App\Modules\Clinics\Http\Requests\AddMemberRequest;
 use App\Modules\Clinics\Http\Resources\ClinicManagementResource;
 use App\Modules\Clinics\Models\ClinicMember;
 use App\Modules\Clinics\Services\ClinicGuard;
+use App\Modules\Notifications\Contracts\TerminatesRealtimeSessions;
 use App\Modules\Rbac\Contracts\AssignsRoles;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Users\Contracts\Accounts;
@@ -32,6 +33,7 @@ final class ClinicMembersController
         private readonly Accounts $accounts,
         private readonly AssignsRoles $roles,
         private readonly RecordsAudit $audit,
+        private readonly TerminatesRealtimeSessions $realtime,
     ) {}
 
     public function store(AddMemberRequest $request, string $clinicId): JsonResponse
@@ -94,6 +96,9 @@ final class ClinicMembersController
                 $this->roles->revoke($member->user, Role::from($member->member_role));
             }
             $this->audit->record('clinic.member_removed', 'clinic_member', $member->id, ['user_id' => $member->user_id], clinicId: $clinic->id);
+            // M-3: the clinic and queue channels they joined must not outlive the membership (after commit).
+            // Any future change that narrows a membership's role or location must call this too.
+            $this->realtime->terminateForUser($member->user_id, 'membership_removed');
         });
 
         return ApiResponse::success(new ClinicManagementResource(ClinicManagementController::loaded($clinic), $this->guard->abilities($request, $clinic->id)));

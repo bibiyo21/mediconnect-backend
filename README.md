@@ -27,7 +27,7 @@ REVERB_PORT=8080
 REVERB_SCHEME=http
 ```
 
-then `docker compose --profile realtime up -d reverb` from `mediconnect-infrastructure` and restart `api` and `worker`. Clients connect to `ws://localhost:8080` and authorize private channels through `POST /api/v1/broadcasting/auth` (cookie or bearer). Only private channels exist; see `routes/channels.php`. Clinic channels are for clinic members only (global roles read clinic data through the audited REST API).
+then `docker compose --profile realtime up -d reverb` from `mediconnect-infrastructure` and restart `api` and `worker`. Clients connect to `ws://localhost:8080` and authorize presence channels (`presence-user.{id}` and so on; `private-` names are refused) through `POST /api/v1/broadcasting/auth` (cookie or bearer). Only presence channels exist, so Reverb can tie each connection to a user and terminate it when their authorization ends; see `routes/channels.php`. Clinic channels are for clinic members only (global roles read clinic data through the audited REST API).
 
 Reverb notes:
 - `REVERB_ALLOWED_ORIGINS` lists host names (default `localhost,127.0.0.1`). `*` is refused when `APP_ENV=production` with the reverb driver. A client that sends no Origin header (some native stacks) is refused by a strict list: have the proxy or the app send the first-party origin rather than loosening the list.

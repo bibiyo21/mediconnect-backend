@@ -8,6 +8,7 @@ use App\Modules\Administration\Http\Requests\UpdateUserRolesRequest;
 use App\Modules\Administration\Http\Resources\AdminUserResource;
 use App\Modules\Audit\Contracts\RecordsAudit;
 use App\Modules\Authentication\Contracts\RevokesSessions;
+use App\Modules\Notifications\Contracts\TerminatesRealtimeSessions;
 use App\Modules\Rbac\Contracts\AssignsRoles;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Users\Contracts\Accounts;
@@ -31,6 +32,7 @@ final class AdminUsersController
         private readonly AssignsRoles $roles,
         private readonly RevokesSessions $sessions,
         private readonly RecordsAudit $audit,
+        private readonly TerminatesRealtimeSessions $realtime,
     ) {}
 
     public function index(ListUsersRequest $request): JsonResponse
@@ -123,6 +125,9 @@ final class AdminUsersController
             $this->audit->record('user.roles_changed', 'user', $target->id, [
                 'from' => $held->values()->all(), 'to' => $wanted->values()->all(), 'reason' => (string) $request->input('reason'),
             ]);
+            if ($held->diff($wanted)->isNotEmpty()) {
+                $this->realtime->terminateForUser($target->id, 'role_removed'); // M-3: a lost role must not keep its channels
+            }
         });
 
         return ApiResponse::success(new AdminUserResource($this->query()->findOrFail($userId)), message: 'Roles updated.');

@@ -1,10 +1,12 @@
 <?php
 
 use App\Modules\Clinics\Models\ClinicMember;
+use App\Modules\Notifications\Http\Requests\BroadcastAuthRequest;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role as SpatieRole;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -82,7 +84,7 @@ function matrix_for(string $channel, array $headers): array
 
 it('lets each person join their own user channel and nobody else\'s', function () {
     foreach ($this->users as $name => $user) {
-        channel_auth("private-user.{$user->id}", $this->headers[$name])->assertOk()->assertJsonStructure(['auth']);
+        channel_auth("presence-user.{$user->id}", $this->headers[$name])->assertOk()->assertJsonStructure(['auth']);
     }
 
     $patientId = $this->users['patient']->id;
@@ -92,14 +94,17 @@ it('lets each person join their own user channel and nobody else\'s', function (
         default => 403,
     })->all();
 
-    expect(matrix_for("private-user.{$patientId}", $this->headers))->toBe($expected);
+    expect(matrix_for("presence-user.{$patientId}", $this->headers))->toBe($expected);
 });
 
-it('signs with the Pusher protocol, not the API envelope', function () {
-    $response = channel_auth('private-user.'.$this->users['patient']->id, $this->headers['patient'])->assertOk();
+it('signs with the Pusher protocol, not the API envelope, and the member is the user id with an empty user_info', function () {
+    $patient = $this->users['patient'];
+    $response = channel_auth('presence-user.'.$patient->id, $this->headers['patient'])->assertOk();
 
-    expect($response->json())->toHaveKey('auth')->not->toHaveKey('success')
-        ->and($response->json('auth'))->toStartWith(REALTIME_TEST_KEY.':');
+    // channel_data becomes Reverb's member for the connection (and what co-subscribers see in member_added).
+    expect($response->json())->toHaveKeys(['auth', 'channel_data'])->not->toHaveKey('success')
+        ->and($response->json('auth'))->toStartWith(REALTIME_TEST_KEY.':')
+        ->and($response->json('channel_data'))->toBe(json_encode(['user_id' => $patient->id, 'user_info' => (object) []]));
 });
 
 it('limits a doctor channel to the owner of that doctor profile', function () {
@@ -109,7 +114,7 @@ it('limits a doctor channel to the owner of that doctor profile', function () {
         default => 403, // another doctor, clinic managers and staff, finance, support and admins
     })->all();
 
-    expect(matrix_for("private-doctor.{$this->doctor->id}", $this->headers))->toBe($expected);
+    expect(matrix_for("presence-doctor.{$this->doctor->id}", $this->headers))->toBe($expected);
 });
 
 it('limits a clinic location channel to members with presence.manage at that location, never global roles', function () {
@@ -119,8 +124,8 @@ it('limits a clinic location channel to members with presence.manage at that loc
         'staff_all' => 200, 'staff_a' => 200, 'staff_b' => 403, 'manager_a' => 200];
     $atB = [...$atA, 'staff_a' => 403, 'staff_b' => 200, 'manager_a' => 403];
 
-    expect(matrix_for("private-clinic.{$this->locA}", $this->headers))->toBe($atA)
-        ->and(matrix_for("private-clinic.{$this->locB}", $this->headers))->toBe($atB);
+    expect(matrix_for("presence-clinic.{$this->locA}", $this->headers))->toBe($atA)
+        ->and(matrix_for("presence-clinic.{$this->locB}", $this->headers))->toBe($atB);
 });
 
 it('limits a queue channel to members with walkins.view at that location, never global roles', function () {
@@ -129,57 +134,69 @@ it('limits a queue channel to members with walkins.view at that location, never 
         'staff_all' => 200, 'staff_a' => 200, 'staff_b' => 403, 'manager_a' => 200];
     $atB = [...$atA, 'staff_a' => 403, 'staff_b' => 200, 'manager_a' => 403];
 
-    expect(matrix_for("private-clinic.{$this->locA}.queue", $this->headers))->toBe($atA)
-        ->and(matrix_for("private-clinic.{$this->locB}.queue", $this->headers))->toBe($atB)
-        ->and(matrix_for("private-clinic.{$this->otherLoc}.queue", $this->headers)['manager_all'])->toBe(403);
+    expect(matrix_for("presence-clinic.{$this->locA}.queue", $this->headers))->toBe($atA)
+        ->and(matrix_for("presence-clinic.{$this->locB}.queue", $this->headers))->toBe($atB)
+        ->and(matrix_for("presence-clinic.{$this->otherLoc}.queue", $this->headers)['manager_all'])->toBe(403);
 });
 
 it('refuses a member without walkins.view on the queue channel but not on the location channel', function () {
     SpatieRole::findByName('CLINIC_STAFF', 'web')->revokePermissionTo('walkins.view');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    channel_auth("private-clinic.{$this->locA}.queue", $this->headers['staff_all'])->assertForbidden();
-    channel_auth("private-clinic.{$this->locA}", $this->headers['staff_all'])->assertOk();
+    channel_auth("presence-clinic.{$this->locA}.queue", $this->headers['staff_all'])->assertForbidden();
+    channel_auth("presence-clinic.{$this->locA}", $this->headers['staff_all'])->assertOk();
 });
 
 it('refuses removed members and members of the wrong role', function () {
     [, $removedHeaders] = clinic_member($this->clinic, Role::ClinicStaff, null, 'REMOVED');
-    channel_auth("private-clinic.{$this->locA}.queue", $removedHeaders)->assertForbidden();
-    channel_auth("private-clinic.{$this->locA}", $removedHeaders)->assertForbidden();
+    channel_auth("presence-clinic.{$this->locA}.queue", $removedHeaders)->assertForbidden();
+    channel_auth("presence-clinic.{$this->locA}", $removedHeaders)->assertForbidden();
 
     // A clinic_members row is not enough without the matching role.
     $doctorWithRow = $this->users['doctor'];
     (new ClinicMember)->forceFill(['clinic_id' => $this->clinic, 'user_id' => $doctorWithRow->id, 'member_role' => 'CLINIC_STAFF', 'status' => 'ACTIVE', 'joined_at' => now()])->save();
-    channel_auth("private-clinic.{$this->locA}.queue", $this->headers['doctor'])->assertForbidden();
+    channel_auth("presence-clinic.{$this->locA}.queue", $this->headers['doctor'])->assertForbidden();
 });
 
 it('refuses malformed, unknown and unprefixed channels without a server error', function (string $channel, int $status) {
     $channel = str_replace(['LOCA', 'USER'], [$this->locA, $this->users['manager_all']->id], $channel);
     channel_auth($channel, $this->headers['manager_all'])->assertStatus($status);
 })->with([
-    'not a uuid' => ['private-clinic.not-a-uuid', 403],
-    'not a uuid on queue' => ['private-clinic.1.queue', 403],
-    'sql-ish id (rejected by validation)' => ["private-doctor.x'--", 422],
-    'a location that does not exist' => ['private-clinic.018f1c3e-7b1a-7000-8000-000000000000.queue', 403],
-    'unknown channel' => ['private-admin.secrets', 403],
-    'presence channels are not offered (a real location)' => ['presence-clinic.LOCA', 422],
-    'presence channel for a user' => ['presence-user.USER', 422],
+    'not a uuid' => ['presence-clinic.not-a-uuid', 403],
+    'not a uuid on queue' => ['presence-clinic.1.queue', 403],
+    'sql-ish id (rejected by validation)' => ["presence-doctor.x'--", 422],
+    'a location that does not exist' => ['presence-clinic.018f1c3e-7b1a-7000-8000-000000000000.queue', 403],
+    'unknown channel' => ['presence-admin.secrets', 403],
+    // M-3: a private channel would let a subscriber join without a user id, so it cannot be terminated.
+    'plain private channel for a real location' => ['private-clinic.LOCA', 422],
+    'plain private channel for the caller\'s own user' => ['private-user.USER', 422],
     'encrypted private channel for the caller\'s own user' => ['private-encrypted-user.USER', 422],
     'encrypted private channel for a clinic' => ['private-encrypted-clinic.LOCA.queue', 422],
     'public-style name (never authorized here)' => ['doctor-availability.018f1c3e-7b1a-7000-8000-000000000000', 422],
-    'a channel with a space' => ['private-user.a b', 422],
+    'a channel with a space' => ['presence-user.a b', 422],
 ]);
+
+it('anchors the handshake patterns with \\z so a trailing newline is a validation error, never a server error', function () {
+    // The TrimStrings middleware strips a newline before validation on the real route, so the rules are checked directly.
+    $rules = (new BroadcastAuthRequest)->rules();
+    $check = fn (string $socket, string $channel) => Validator::make(['socket_id' => $socket, 'channel_name' => $channel], $rules)->passes();
+
+    expect($check('1234.5678', 'presence-user.abc'))->toBeTrue()
+        ->and($check("1234.5678\n", 'presence-user.abc'))->toBeFalse()
+        ->and($check('1234.5678', "presence-user.abc\n"))->toBeFalse()
+        ->and($check('1234.5678', 'private-user.abc'))->toBeFalse();
+});
 
 it('validates the handshake body', function () {
     $headers = $this->headers['patient'];
-    $this->postJson('/api/v1/broadcasting/auth', ['channel_name' => 'private-user.x'], $headers)->assertStatus(422)->assertJsonValidationErrors('socket_id');
-    $this->postJson('/api/v1/broadcasting/auth', ['socket_id' => 'abc', 'channel_name' => 'private-user.x'], $headers)->assertStatus(422)->assertJsonValidationErrors('socket_id');
+    $this->postJson('/api/v1/broadcasting/auth', ['channel_name' => 'presence-user.x'], $headers)->assertStatus(422)->assertJsonValidationErrors('socket_id');
+    $this->postJson('/api/v1/broadcasting/auth', ['socket_id' => 'abc', 'channel_name' => 'presence-user.x'], $headers)->assertStatus(422)->assertJsonValidationErrors('socket_id');
     $this->postJson('/api/v1/broadcasting/auth', ['socket_id' => '1.2'], $headers)->assertStatus(422)->assertJsonValidationErrors('channel_name');
-    $this->postJson('/api/v1/broadcasting/auth', ['socket_id' => '1.2', 'channel_name' => ['private-user.x']], $headers)->assertStatus(422);
+    $this->postJson('/api/v1/broadcasting/auth', ['socket_id' => '1.2', 'channel_name' => ['presence-user.x']], $headers)->assertStatus(422);
 });
 
 it('answers unauthenticated callers with the 401 envelope, never a signature', function () {
-    channel_auth('private-user.'.$this->users['patient']->id)->assertUnauthorized()->assertJsonPath('code', 'UNAUTHENTICATED')->assertJsonMissingPath('auth');
+    channel_auth('presence-user.'.$this->users['patient']->id)->assertUnauthorized()->assertJsonPath('code', 'UNAUTHENTICATED')->assertJsonMissingPath('auth');
     $this->getJson('/api/v1/broadcasting/auth')->assertStatus(405); // POST only
 });
 
@@ -188,8 +205,8 @@ it('works with a first-party cookie session as well as a bearer token', function
     app('auth')->forgetGuards();
     $this->withHeader('Origin', WEB_ORIGIN)->postJson('/api/v1/auth/login', ['identifier' => $patient->email, 'password' => TEST_PASSWORD])->assertOk();
 
-    $this->withHeader('Origin', WEB_ORIGIN)->postJson('/api/v1/broadcasting/auth', ['socket_id' => '1.2', 'channel_name' => "private-user.{$patient->id}"])->assertOk()->assertJsonStructure(['auth']);
-    $this->withHeader('Origin', WEB_ORIGIN)->postJson('/api/v1/broadcasting/auth', ['socket_id' => '1.2', 'channel_name' => 'private-user.'.$this->users['doctor']->id])->assertForbidden();
+    $this->withHeader('Origin', WEB_ORIGIN)->postJson('/api/v1/broadcasting/auth', ['socket_id' => '1.2', 'channel_name' => "presence-user.{$patient->id}"])->assertOk()->assertJsonStructure(['auth']);
+    $this->withHeader('Origin', WEB_ORIGIN)->postJson('/api/v1/broadcasting/auth', ['socket_id' => '1.2', 'channel_name' => 'presence-user.'.$this->users['doctor']->id])->assertForbidden();
 });
 
 it('applies an IP limit before authentication too', function () {
@@ -201,15 +218,15 @@ it('applies an IP limit before authentication too', function () {
 
 it('refuses a sign-in that still owes MFA and a suspended account', function () {
     $limited = bearer(native_login(account(Role::Admin))->json('data.tokens.access_token')); // admin who has not enrolled MFA yet
-    channel_auth("private-clinic.{$this->locA}", $limited)->assertUnauthorized()->assertJsonPath('code', 'MFA_REQUIRED');
+    channel_auth("presence-clinic.{$this->locA}", $limited)->assertUnauthorized()->assertJsonPath('code', 'MFA_REQUIRED');
 
     User::whereKey($this->users['patient']->id)->update(['status' => 'SUSPENDED']);
-    channel_auth('private-user.'.$this->users['patient']->id, $this->headers['patient'])->assertForbidden();
+    channel_auth('presence-user.'.$this->users['patient']->id, $this->headers['patient'])->assertForbidden();
 });
 
 it('rate limits handshakes per user with the named limiter', function () {
     RateLimiter::clear('broadcast-auth:'.$this->users['patient']->id);
-    $channel = 'private-user.'.$this->users['patient']->id;
+    $channel = 'presence-user.'.$this->users['patient']->id;
 
     foreach (range(1, 60) as $i) {
         channel_auth($channel, $this->headers['patient'])->assertOk();
@@ -217,5 +234,5 @@ it('rate limits handshakes per user with the named limiter', function () {
     channel_auth($channel, $this->headers['patient'])->assertStatus(429)->assertJsonPath('code', 'RATE_LIMITED');
 
     // Another user is not affected.
-    channel_auth('private-user.'.$this->users['doctor']->id, $this->headers['doctor'])->assertOk();
+    channel_auth('presence-user.'.$this->users['doctor']->id, $this->headers['doctor'])->assertOk();
 });

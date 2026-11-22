@@ -14,6 +14,7 @@ use App\Modules\Authentication\Models\UserDevice;
 use App\Modules\Authentication\Services\DeviceRevocation;
 use App\Modules\Authentication\Services\IssuedSession;
 use App\Modules\Authentication\Services\RefreshTokenService;
+use App\Modules\Notifications\Contracts\TerminatesRealtimeSessions;
 use App\Modules\Users\Models\User;
 use App\Shared\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -59,22 +60,33 @@ final class SessionController
         return ApiResponse::success($session->toArray());
     }
 
-    public function logout(Request $request, DeviceRevocation $revocation): JsonResponse
+    public function logout(Request $request, DeviceRevocation $revocation, TerminatesRealtimeSessions $realtime): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
         $token = $user->currentAccessToken();
 
+        // Every branch cuts the user's live WebSocket connections after commit (M-3).
         if ($token instanceof PersonalAccessToken) {
-            $token->device ? $revocation->revokeDevice($token->device) : $token->delete();
+            // The token is deleted before the connections are cut, so a reconnect cannot re-authorize.
+            if ($token->device) {
+                $revocation->revokeDevice($token->device);
+            } else {
+                $token->delete();
+                $realtime->terminateForUser($user->id, 'logout');
+            }
         } else {
             $deviceId = $request->session()->get('auth.device_id');
             $device = $deviceId ? UserDevice::where('user_id', $user->id)->whereKey($deviceId)->first() : null;
-            $device && $revocation->revokeDevice($device);
+            $device && $revocation->revokeDevice($device, terminateConnections: false);
 
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
+
+            // After the session is gone: while it lives, a socket that reconnects right after being cut
+            // would authorize again with the same cookie.
+            $realtime->terminateForUser($user->id, 'logout');
         }
 
         return ApiResponse::success(message: 'Signed out.');

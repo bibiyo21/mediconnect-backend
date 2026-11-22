@@ -6,7 +6,7 @@ use App\Modules\Notifications\Realtime\Channels;
 use App\Modules\Notifications\Realtime\RealtimeEvent;
 
 /**
- * A new in-app notification exists (§19 NotificationCreated), on `private-user.{id}` only.
+ * A new in-app notification exists (§19 NotificationCreated), on `presence-user.{id}` only.
  * The client refetches it over REST; the hint carries no title or text.
  */
 final class NotificationCreated extends RealtimeEvent

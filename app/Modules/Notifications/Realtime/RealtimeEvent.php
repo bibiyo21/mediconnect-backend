@@ -3,7 +3,7 @@
 namespace App\Modules\Notifications\Realtime;
 
 use Illuminate\Broadcasting\Channel;
-use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -20,7 +20,7 @@ use LogicException;
  *   (empty by default: nothing). Values are ids, counts, queue numbers, statuses and
  *   timestamps: scalars or null. A key that looks like personal or clinical data (name, note,
  *   diagnosis, prescription, membership, token, phone, email, address) is refused even if
- *   listed. Channels must be private. A violation throws before anything is published.
+ *   listed. Channels must be presence channels (see Channels). A violation throws before anything is published.
  */
 abstract class RealtimeEvent implements ShouldBroadcast, ShouldDispatchAfterCommit
 {
@@ -41,7 +41,7 @@ abstract class RealtimeEvent implements ShouldBroadcast, ShouldDispatchAfterComm
     public array $backoff = [2, 10];
 
     /**
-     * The private channels this event goes to (from Channels).
+     * The presence channels this event goes to (from Channels).
      *
      * @return list<Channel>
      */
@@ -59,8 +59,8 @@ abstract class RealtimeEvent implements ShouldBroadcast, ShouldDispatchAfterComm
     {
         $channels = $this->channels();
         foreach ($channels as $channel) {
-            if (! $channel instanceof PrivateChannel) {
-                throw new LogicException(static::class.' must broadcast on private channels only.');
+            if (! $channel instanceof PresenceChannel) {
+                throw new LogicException(static::class.' must broadcast on presence channels only (no public or plain private channels).');
             }
         }
 

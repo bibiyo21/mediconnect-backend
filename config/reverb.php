@@ -84,7 +84,7 @@ return [
                 ],
                 // Host names (no scheme or port) the WebSocket handshake accepts: the first-party web apps'
                 // hosts. Never "*": production refuses to boot with it (RealtimeConfigGuard). The origin
-                // check is a second line of defence; a private channel cannot be joined without a
+                // check is a second line of defence; a presence channel cannot be joined without a
                 // signature from /broadcasting/auth either way.
                 'allowed_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env('REVERB_ALLOWED_ORIGINS', 'localhost,127.0.0.1'))))),
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),

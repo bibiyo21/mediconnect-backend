@@ -5,7 +5,7 @@ namespace App\Modules\Presence\Events;
 use App\Modules\Notifications\Realtime\Channels;
 use App\Modules\Notifications\Realtime\RealtimeEvent;
 
-/** A doctor came back from a break (§19 DoctorBreakEnded), on `private-clinic.{location}`; ids and the version only. */
+/** A doctor came back from a break (§19 DoctorBreakEnded), on `presence-clinic.{location}`; ids and the version only. */
 final class DoctorBreakEnded extends RealtimeEvent
 {
     public const ALLOWED_KEYS = ['doctor_profile_id', 'clinic_location_id', 'session_id', 'version'];

@@ -19,12 +19,14 @@ enum SecurityEventType: string
     case AccountDeletionCancelled = 'ACCOUNT_DELETION_CANCELLED';
     case AccountAnonymized = 'ACCOUNT_ANONYMIZED';
     case MalwareDetected = 'MALWARE_DETECTED';
+    case RealtimeSubscriptionDenied = 'REALTIME_SUBSCRIPTION_DENIED';
+    case RealtimeTerminationFailed = 'REALTIME_TERMINATION_FAILED';
 
     public function defaultSeverity(): Severity
     {
         return match ($this) {
-            self::RefreshTokenReuse, self::MalwareDetected => Severity::High,
-            self::LoginFailed, self::MfaFailed, self::OtpLocked, self::SuspendedAccountLogin, self::RecoveryCodeUsed => Severity::Warning,
+            self::RefreshTokenReuse, self::MalwareDetected, self::RealtimeTerminationFailed => Severity::High,
+            self::LoginFailed, self::MfaFailed, self::OtpLocked, self::SuspendedAccountLogin, self::RecoveryCodeUsed, self::RealtimeSubscriptionDenied => Severity::Warning,
             default => Severity::Info,
         };
     }

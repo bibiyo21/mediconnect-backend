@@ -39,14 +39,12 @@ it('never reaches another clinic\'s location, a missing one or a permission the 
         ->and($this->access->allowsAtLocation(account(Role::Patient), 'walkins.view', $this->locA))->toBeFalse();
 });
 
-it('ignores removed memberships and a location row that belongs to another clinic', function () {
+it('ignores removed memberships', function () {
     [$removed] = clinic_member($this->clinic, Role::ClinicStaff, null, 'REMOVED');
     expect($this->access->allowsAtLocation($removed, 'walkins.view', $this->locA))->toBeFalse();
 
-    // Even if a member row pointed at another clinic's location, it cannot widen reach into this clinic.
-    [$crossed] = clinic_member($this->clinic, Role::ClinicStaff, $this->otherLoc);
-    expect($this->access->allowsAtLocation($crossed, 'walkins.view', $this->otherLoc))->toBeFalse()
-        ->and($this->access->allowsAtLocation($crossed, 'walkins.view', $this->locA))->toBeFalse();
+    // A member row can no longer point at another clinic's location: the composite foreign key
+    // clinic_members_location_in_clinic_fk refuses it (Realtime/RealtimeRevocationTest, L-7).
 });
 
 it('keeps global roles global', function () {

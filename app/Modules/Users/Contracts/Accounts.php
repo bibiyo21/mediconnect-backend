@@ -64,7 +64,7 @@ interface Accounts
      */
     public function anonymize(User $user): void;
 
-    /** Blocks sign-in (status SUSPENDED). Sessions are ended separately. */
+    /** Blocks sign-in (status SUSPENDED). Sessions and live WebSocket connections are ended separately, by RevokesSessions::revokeEverything. */
     public function suspend(User $user): void;
 
     /** Lifts a suspension (status ACTIVE). */

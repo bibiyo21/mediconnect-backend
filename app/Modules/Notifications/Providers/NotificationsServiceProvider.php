@@ -6,12 +6,14 @@ use App\Modules\Notifications\Contracts\PushGateway;
 use App\Modules\Notifications\Contracts\SendsNotifications;
 use App\Modules\Notifications\Contracts\SendsOneTimeMessages;
 use App\Modules\Notifications\Contracts\SmsGateway;
+use App\Modules\Notifications\Contracts\TerminatesRealtimeSessions;
 use App\Modules\Notifications\Push\DisabledPushGateway;
 use App\Modules\Notifications\Push\LogPushGateway;
 use App\Modules\Notifications\Push\PushConfigGuard;
 use App\Modules\Notifications\Realtime\RealtimeConfigGuard;
 use App\Modules\Notifications\Services\NotificationService;
 use App\Modules\Notifications\Services\OneTimeMessageSender;
+use App\Modules\Notifications\Services\RealtimeSessions;
 use App\Modules\Notifications\Sms\DisabledSmsGateway;
 use App\Modules\Notifications\Sms\MailPreviewSmsGateway;
 use App\Shared\Services\Fingerprint;
@@ -29,6 +31,8 @@ final class NotificationsServiceProvider extends ServiceProvider
         $this->app->singleton(SendsOneTimeMessages::class, OneTimeMessageSender::class);
 
         $this->app->singleton(SendsNotifications::class, NotificationService::class);
+
+        $this->app->singleton(TerminatesRealtimeSessions::class, RealtimeSessions::class);
 
         // Push (plan Q11): only the log (LOCAL) and disabled drivers exist until the owner provides Firebase credentials.
         $this->app->singleton(PushGateway::class, fn () => match ($driver = (string) config('services.push.driver')) {

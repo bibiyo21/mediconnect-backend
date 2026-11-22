@@ -429,7 +429,7 @@ it('hides doctors who are not active and unknown ids from the public status', fu
 
 // --- real-time ---------------------------------------------------------------------------------
 
-it('queues whitelisted broadcasts on private-clinic.{location} after commit', function () {
+it('queues whitelisted broadcasts on presence-clinic.{location} after commit', function () {
     Queue::fake();
 
     checkin($this->headers, $this->loc, ['reason' => 'EMERGENCY'])->assertCreated();
@@ -445,7 +445,7 @@ it('queues whitelisted broadcasts on private-clinic.{location} after commit', fu
 
     $all = Queue::pushed(BroadcastEvent::class)->map->event->filter(fn ($e) => $e instanceof RealtimeEvent);
     foreach ($all->filter(fn ($e) => str_starts_with($e::class, 'App\\Modules\\Presence')) as $event) {
-        expect(collect($event->broadcastOn())->map->name->all())->toBe(["private-clinic.{$this->loc}"])
+        expect(collect($event->broadcastOn())->map->name->all())->toBe(["presence-clinic.{$this->loc}"])
             ->and($event->broadcastQueue())->toBe('notifications')
             ->and(json_encode($event->broadcastWith()))->not->toContain('EMERGENCY');
     }
@@ -475,7 +475,7 @@ it('keeps each presence broadcast to its whitelist of ids, status and version', 
     foreach ($events as $event) {
         expect(array_keys($event->broadcastWith()))->toEqualCanonicalizing($event::ALLOWED_KEYS)
             ->and($event->broadcastOn())->toHaveCount(1)
-            ->and($event->broadcastOn()[0]->name)->toBe("private-clinic.{$ids['location']}");
+            ->and($event->broadcastOn()[0]->name)->toBe("presence-clinic.{$ids['location']}");
     }
     expect($events[1]->broadcastWith()['status'])->toBe('ON_BREAK')
         ->and($events[2]->broadcastWith()['break_expected_end_at'])->toBe($end->toIso8601ZuluString());

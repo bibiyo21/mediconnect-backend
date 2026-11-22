@@ -19,7 +19,7 @@ use Mockery\MockInterface;
 
 /*
  * Increment 5.3, notification foundation (phase 5 plan Q11, Q12): an in-app row written in the
- * caller's transaction, a NotificationCreated hint on private-user after commit, and a push through
+ * caller's transaction, a NotificationCreated hint on presence-user after commit, and a push through
  * the log driver with generic text only. Real FCM and APNs wait for owner-provided credentials.
  */
 
@@ -44,14 +44,14 @@ it('stores an in-app notification with generic text and the delivery rows', func
         ->and(DB::table('notification_deliveries')->where('notification_id', $id)->orderBy('id')->get(['channel', 'status'])->map(fn ($d) => $d->channel.':'.$d->status)->all())->toBe(['IN_APP:SENT', 'PUSH:QUEUED']);
 });
 
-it('broadcasts NotificationCreated on private-user only, with ids and no text, and pushes on the notifications queue', function () {
+it('broadcasts NotificationCreated on presence-user only, with ids and no text, and pushes on the notifications queue', function () {
     Queue::fake();
 
     $id = ($this->notify)();
 
     $events = Queue::pushed(BroadcastEvent::class, fn ($job) => $job->event instanceof NotificationCreated)->map->event;
     expect($events)->toHaveCount(1)
-        ->and(collect($events[0]->broadcastOn())->map->name->all())->toBe(["private-user.{$this->user->id}"])
+        ->and(collect($events[0]->broadcastOn())->map->name->all())->toBe(["presence-user.{$this->user->id}"])
         ->and($events[0]->broadcastWith())->toBe(['notification_id' => $id, 'type' => 'presence.break_ended'])
         ->and($events[0]->broadcastQueue())->toBe('notifications');
     Queue::assertPushedOn('notifications', SendPushNotification::class, fn ($job) => $job->notificationId === $id && $job->afterCommit === true);

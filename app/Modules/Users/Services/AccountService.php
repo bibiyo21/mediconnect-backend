@@ -5,6 +5,7 @@ namespace App\Modules\Users\Services;
 use App\Modules\Audit\Contracts\RecordsSecurityEvents;
 use App\Modules\Audit\Enums\SecurityEventType;
 use App\Modules\Notifications\Contracts\SendsOneTimeMessages;
+use App\Modules\Notifications\Contracts\TerminatesRealtimeSessions;
 use App\Modules\Users\Contracts\Accounts;
 use App\Modules\Users\Enums\UserStatus;
 use App\Modules\Users\Models\User;
@@ -18,6 +19,7 @@ final class AccountService implements Accounts
     public function __construct(
         private readonly RecordsSecurityEvents $securityEvents,
         private readonly SendsOneTimeMessages $messages,
+        private readonly TerminatesRealtimeSessions $realtime,
     ) {}
 
     public function findByEmail(string $email): ?User
@@ -140,6 +142,7 @@ final class AccountService implements Accounts
             ]);
             $user->addresses()->delete();
             $user->delete(); // soft delete; the row stays for referential integrity
+            $this->realtime->terminateForUser($user->id, 'account_deactivated'); // M-3, after commit
         });
     }
 

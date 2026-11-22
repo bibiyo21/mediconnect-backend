@@ -8,7 +8,7 @@ use App\Modules\Presence\Enums\PresenceStatus;
 
 /**
  * A doctor's stored presence status changed (§19 DoctorPresenceUpdated).
- * A hint for the location's staff on `private-clinic.{location}`: ids, the stored status and the
+ * A hint for the location's staff on `presence-clinic.{location}`: ids, the stored status and the
  * session version only. No reason, actor, device or time of day (phase 5 plan Q13, CLAUDE.md §19).
  */
 final class DoctorPresenceUpdated extends RealtimeEvent

@@ -5,6 +5,7 @@ use App\Modules\Notifications\Realtime\RealtimeConfigGuard;
 use App\Modules\Notifications\Realtime\RealtimeEvent;
 use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -12,7 +13,7 @@ use Tests\Support\TestRealtimeEvent;
 
 /*
  * Increment 5.2: broadcasts are hints, queued after commit on the notifications
- * queue (phase 5 plan Q12), on private channels only, with a whitelisted payload.
+ * queue (phase 5 plan Q12), on presence channels only, with a whitelisted payload.
  */
 
 const EVENT_LOCATION = '018f1c3e-7b1a-7000-8000-000000000001';
@@ -42,14 +43,14 @@ it('publishes only after the surrounding transaction commits and never when it r
     Queue::assertPushed(BroadcastEvent::class, 1);
 });
 
-it('names the event for clients, carries only the whitelisted payload and uses private channels', function () {
+it('names the event for clients, carries only the whitelisted payload and uses presence channels', function () {
     $event = new TestRealtimeEvent(EVENT_LOCATION, 4);
 
     expect($event->broadcastAs())->toBe('TestRealtimeEvent')
         ->and($event->broadcastWith())->toBe(['location_id' => EVENT_LOCATION, 'waiting' => 4])
         ->and($event->broadcastQueue())->toBe('notifications')
         ->and($event->tries)->toBe(3)
-        ->and(collect($event->broadcastOn())->every(fn ($channel) => $channel instanceof PrivateChannel))->toBeTrue();
+        ->and(collect($event->broadcastOn())->every(fn ($channel) => $channel instanceof PresenceChannel))->toBeTrue();
 });
 
 it('sends nothing unless a key is in ALLOWED_KEYS (the default list is empty)', function () {
@@ -124,12 +125,14 @@ it('allows ids, counts and queue numbers, and refuses non-scalar values', functi
     expect(fn () => $bad->broadcastWith())->toThrow(LogicException::class, 'must be a scalar or null');
 });
 
-it('refuses public channels', function () {
-    $event = new class extends RealtimeEvent
+it('refuses public channels and plain private channels (a private subscriber has no user id and cannot be terminated)', function (Channel $channel) {
+    $event = new class($channel) extends RealtimeEvent
     {
+        public function __construct(private Channel $channel) {}
+
         protected function channels(): array
         {
-            return [new Channel('doctor-availability.x')];
+            return [$this->channel];
         }
 
         protected function payload(): array
@@ -138,8 +141,11 @@ it('refuses public channels', function () {
         }
     };
 
-    expect(fn () => $event->broadcastOn())->toThrow(LogicException::class, 'private channels only');
-});
+    expect(fn () => $event->broadcastOn())->toThrow(LogicException::class, 'presence channels only');
+})->with([
+    'public' => fn () => new Channel('doctor-availability.x'),
+    'plain private' => fn () => new PrivateChannel('user.018f1c3e-7b1a-7000-8000-000000000001'),
+]);
 
 it('does not let a subclass override the safety checks', function () {
     $broadcastOn = new ReflectionMethod(RealtimeEvent::class, 'broadcastOn');
@@ -161,10 +167,10 @@ it('refuses a wildcard origin list in production with the reverb driver only', f
 it('spells channel names in one place', function () {
     $id = EVENT_LOCATION;
 
-    expect(Channels::user($id)->name)->toBe("private-user.{$id}")
-        ->and(Channels::doctor($id)->name)->toBe("private-doctor.{$id}")
-        ->and(Channels::clinic($id)->name)->toBe("private-clinic.{$id}")
-        ->and(Channels::clinicQueue($id)->name)->toBe("private-clinic.{$id}.queue");
+    expect(Channels::user($id)->name)->toBe("presence-user.{$id}")
+        ->and(Channels::doctor($id)->name)->toBe("presence-doctor.{$id}")
+        ->and(Channels::clinic($id)->name)->toBe("presence-clinic.{$id}")
+        ->and(Channels::clinicQueue($id)->name)->toBe("presence-clinic.{$id}.queue");
 });
 
 it('reports realtime as unavailable instead of approving everything when no signing broadcaster is configured', function (string $driver) {
@@ -172,5 +178,5 @@ it('reports realtime as unavailable instead of approving everything when no sign
     config(['broadcasting.default' => $driver]);
     $user = patient_account();
 
-    channel_auth("private-user.{$user->id}", signed_in($user))->assertStatus(503)->assertJsonPath('code', 'DEPENDENCY_UNAVAILABLE');
+    channel_auth("presence-user.{$user->id}", signed_in($user))->assertStatus(503)->assertJsonPath('code', 'DEPENDENCY_UNAVAILABLE');
 })->with(['null', 'log']);
