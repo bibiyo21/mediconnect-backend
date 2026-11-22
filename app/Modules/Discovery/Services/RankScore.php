@@ -5,11 +5,12 @@ namespace App\Modules\Discovery\Services;
 /**
  * Precomputed ranking signal (architecture.md §12.4): used after text match,
  * and as the main order when browsing without text. Never takes paid placement
- * as an input. Weights are tuned in increment 3.5; availability joins in Phase 4.
+ * as an input. Weights are tuned in increment 3.5; availability joined in 4.8.
  */
 final class RankScore
 {
-    public static function of(int $profileCompleteness, ?float $rating, int $reviewCount): float
+    /** @param int|null $secondsToNext seconds from indexing to the next open time; null when none is open */
+    public static function of(int $profileCompleteness, ?float $rating, int $reviewCount, ?int $secondsToNext = null): float
     {
         $w = (array) config('search.ranking.rank_score');
         $prior = (float) ($w['rating_prior'] ?? 3.5);
@@ -18,7 +19,11 @@ final class RankScore
         // No reviews yet: the prior, so new doctors are neither boosted nor buried.
         $damped = $rating === null ? $prior / 5 : ($rating * $reviewCount + $prior * $priorWeight) / ($reviewCount + $priorWeight) / 5;
         $completeness = max(0, min(100, $profileCompleteness)) / 100;
+        // Availability: 1 when open within a day, falling linearly to 0 at the horizon; 0 when nothing is open.
+        $horizon = max(1, (int) ($w['availability_horizon_days'] ?? 14)) * 86400;
+        $soon = $secondsToNext === null ? 0.0 : max(0.0, 1 - max(0, $secondsToNext - 86400) / $horizon);
 
-        return round((float) ($w['profile_completeness'] ?? 0.67) * $completeness + (float) ($w['rating'] ?? 0.33) * $damped, 4);
+        return round((float) ($w['profile_completeness'] ?? 0.57) * $completeness + (float) ($w['rating'] ?? 0.28) * $damped
+            + (float) ($w['availability'] ?? 0.15) * $soon, 4);
     }
 }

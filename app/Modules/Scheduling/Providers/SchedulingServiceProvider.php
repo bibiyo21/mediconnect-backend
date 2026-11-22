@@ -7,9 +7,11 @@ use App\Modules\Doctors\Events\DoctorDirectoryChanged;
 use App\Modules\Doctors\Events\DoctorServiceReplaced;
 use App\Modules\Doctors\Events\DoctorServicesEnded;
 use App\Modules\Scheduling\Console\GenerateAvailabilityCommand;
+use App\Modules\Scheduling\Contracts\AvailabilitySummaries;
 use App\Modules\Scheduling\Events\SchedulingChanged;
 use App\Modules\Scheduling\Listeners\FollowServiceChanges;
 use App\Modules\Scheduling\Listeners\QueueAvailabilityRefresh;
+use App\Modules\Scheduling\Services\AvailabilitySummaryService;
 use App\Shared\Services\Fingerprint;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -21,6 +23,11 @@ use Illuminate\Support\ServiceProvider;
 /** Scheduling (Phase 4, architecture.md §8). */
 final class SchedulingServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->singleton(AvailabilitySummaries::class, AvailabilitySummaryService::class);
+    }
+
     public function boot(): void
     {
         // Holds lock scarce times: 10 a minute per user (Phase 4 plan Q11).

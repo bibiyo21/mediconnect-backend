@@ -6,6 +6,8 @@ use App\Modules\Clinics\Models\DoctorClinicAssignment;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Doctors\Models\DoctorService;
 use App\Modules\Doctors\Models\DoctorSpecialty;
+use App\Modules\Scheduling\Contracts\AvailabilitySummaries;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,6 +18,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class DoctorDocuments
 {
+    public function __construct(private readonly AvailabilitySummaries $availability) {}
+
     /** @return list<array<string, mixed>> */
     public function forDoctor(string $doctorId): array
     {
@@ -47,6 +51,7 @@ final class DoctorDocuments
             'updated_at' => now()->getTimestamp(),
         ];
 
+        $open = $this->availability->openStartTimes($doctor->id, (int) config('search.availability_days', 30));
         $documents = [];
         $locations = $doctor->activeAssignments->filter(fn (DoctorClinicAssignment $a) => $a->location->status === 'ACTIVE' && $a->location->clinic?->status === 'ACTIVE');
         foreach ($locations as $a) {
@@ -67,6 +72,7 @@ final class DoctorDocuments
                 'consultation_modes' => ['IN_PERSON'],
                 'fee_min' => $here->min('fee_amount'),
                 'fee_max' => $here->max('fee_amount'),
+                ...self::availability($open[$l->id] ?? [], $doctor->profile_completeness),
             ]);
         }
 
@@ -79,6 +85,7 @@ final class DoctorDocuments
                 'consultation_modes' => ['ONLINE'],
                 'fee_min' => $online->min('fee_amount'),
                 'fee_max' => $online->max('fee_amount'),
+                ...self::availability($open['online'] ?? [], $doctor->profile_completeness),
             ]);
         }
 
@@ -87,6 +94,39 @@ final class DoctorDocuments
         }
 
         return $documents;
+    }
+
+    /**
+     * Availability fields for one document (4.8), in Philippine time: the dates
+     * and day-and-minute keys of open start times, the next open
+     * time, and the rank score with its availability term.
+     *
+     * @param  list<int>  $starts  unix timestamps, ascending
+     * @return array<string, mixed>
+     */
+    public static function availability(array $starts, int $profileCompleteness): array
+    {
+        $tz = (string) config('mediconnect.timezone');
+        $next = $starts[0] ?? null;
+        $fields = ['rank_score' => RankScore::of($profileCompleteness, null, 0, $next === null ? null : max(0, $next - now()->getTimestamp()))];
+        if ($next === null) {
+            return $fields;
+        }
+        $dates = $keys = [];
+        foreach ($starts as $ts) {
+            $local = CarbonImmutable::createFromTimestamp($ts, $tz);
+            $minute = $local->hour * 60 + $local->minute;
+            $dates[$local->toDateString()] = true;
+            $keys[self::slotKey($local->toDateString(), $minute)] = true;
+        }
+
+        return [...$fields, 'available_dates' => array_keys($dates), 'available_slot_keys' => array_keys($keys), 'next_available_at' => $next];
+    }
+
+    /** Day number of a local date times 1440, plus the minute of day: one integer per local start time. */
+    public static function slotKey(string $localDate, int $minute): int
+    {
+        return intdiv(CarbonImmutable::parse($localDate, 'UTC')->getTimestamp(), 86400) * 1440 + $minute;
     }
 
     /**

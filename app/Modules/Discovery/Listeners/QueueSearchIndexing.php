@@ -10,6 +10,7 @@ use App\Modules\Discovery\Jobs\IndexDoctorSearchDocument;
 use App\Modules\Discovery\Jobs\IndexSpecialtySearchDocument;
 use App\Modules\Doctors\Events\DoctorDirectoryChanged;
 use App\Modules\Doctors\Models\DoctorSpecialty;
+use App\Modules\Scheduling\Events\AvailabilityUpdated;
 use App\Modules\Specialties\Events\SpecialtyCatalogChanged;
 
 /**
@@ -29,6 +30,12 @@ final class QueueSearchIndexing
         foreach (DoctorSpecialty::where('doctor_profile_id', $event->id)->pluck('specialty_id')->unique() as $specialtyId) {
             IndexSpecialtySearchDocument::dispatch((string) $specialtyId);
         }
+    }
+
+    /** The projection was rebuilt (4.8): the doctor's availability fields and rank score change. */
+    public function handleAvailability(AvailabilityUpdated $event): void
+    {
+        IndexDoctorSearchDocument::dispatch($event->id);
     }
 
     public function handleClinic(ClinicDirectoryChanged $event): void

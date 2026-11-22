@@ -5,6 +5,7 @@ namespace App\Modules\Discovery\Services;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Shared\Contracts\SearchEngine;
 use App\Shared\Search\SearchUnavailable;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -118,7 +119,11 @@ final class DoctorSearch
                 ->whereColumn('doctor_clinic_assignments.doctor_profile_id', 'doctor_profiles.id')->where('doctor_clinic_assignments.status', 'ACTIVE')->whereRaw('lower(clinic_locations.city) = lower(?)', [$criteria['city']])))
             ->when(isset($criteria['consultation_type']), fn (Builder $b) => $b->whereExists(fn ($s) => $s->from('doctor_services')->whereColumn('doctor_services.doctor_profile_id', 'doctor_profiles.id')->where('doctor_services.status', 'ACTIVE')->where('consultation_type', $criteria['consultation_type'])));
 
+        $this->availabilityFromDatabase($query, $criteria);
         $found = (clone $query)->count();
+        if (($criteria['sort'] ?? null) === 'next_available') {
+            $query->orderByRaw("(SELECT min(starts_at) FROM doctor_availability_slots a WHERE a.doctor_profile_id = doctor_profiles.id AND a.slot_kind = 'APPOINTMENT' AND a.status = 'OPEN' AND a.starts_at > now()) ASC NULLS LAST");
+        }
         $ids = $query->orderByDesc('profile_completeness')->orderBy('display_name')->forPage($page, $perPage)->pluck('id');
         $results = [];
         foreach ($ids as $id) {
@@ -129,6 +134,36 @@ final class DoctorSearch
         }
 
         return ['results' => $results, 'found' => $found, 'page' => $page, 'per_page' => $perPage, 'facets' => []];
+    }
+
+    /**
+     * Degraded-mode availability filter on the projection (4.8): open appointment
+     * slots in the asked window, Philippine time. The booking policy is not applied
+     * here; results are flagged degraded and a hold revalidates.
+     *
+     * @param  Builder<DoctorProfile>  $query
+     * @param  array<string, mixed>  $c
+     */
+    private function availabilityFromDatabase(Builder $query, array $c): void
+    {
+        $date = $c['available_date'] ?? null;
+        if ($date === null && ! isset($c['available_time_from']) && ! isset($c['available_time_to'])) {
+            return;
+        }
+        $tz = (string) config('mediconnect.timezone');
+        $from = (string) ($c['available_time_from'] ?? '00:00');
+        $to = (string) ($c['available_time_to'] ?? '24:00');
+        $query->whereExists(function ($s) use ($date, $from, $to, $tz) {
+            $s->from('doctor_availability_slots as a')->whereColumn('a.doctor_profile_id', 'doctor_profiles.id')
+                ->where('a.slot_kind', 'APPOINTMENT')->where('a.status', 'OPEN')->where('a.starts_at', '>', now());
+            if ($date !== null) {
+                $s->where('a.local_date', $date);
+            }
+            $s->whereRaw('(a.starts_at AT TIME ZONE ?)::time >= ?::time', [$tz, $from]);
+            if ($to !== '24:00') {
+                $s->whereRaw('(a.starts_at AT TIME ZONE ?)::time < ?::time', [$tz, $to]);
+            }
+        });
     }
 
     /** @param array<string, mixed> $c */
@@ -172,11 +207,52 @@ final class DoctorSearch
         if (($c['verified'] ?? false) === true) {
             $parts[] = 'is_verified:=true';
         }
+        if (($availability = self::availabilityFilter($c)) !== null) {
+            $parts[] = $availability;
+        }
         if (isset($c['lat'], $c['lng'])) {
             $parts[] = sprintf('location:(%F, %F, %F km)', (float) $c['lat'], (float) $c['lng'], (float) ($c['radius_km'] ?? 10));
         }
 
         return implode(' && ', $parts);
+    }
+
+    /**
+     * The availability filter (4.8) in Philippine time, or null when none was asked
+     * for. A date alone matches the day; times alone match any indexed day; both
+     * match one window. Today never matches times that have already passed.
+     *
+     * @param  array<string, mixed>  $c
+     */
+    private static function availabilityFilter(array $c): ?string
+    {
+        $date = $c['available_date'] ?? null;
+        $hasTime = isset($c['available_time_from']) || isset($c['available_time_to']);
+        if ($date === null && ! $hasTime) {
+            return null;
+        }
+        $minute = fn (string $hm) => (int) substr($hm, 0, 2) * 60 + (int) substr($hm, 3, 2);
+        $from = isset($c['available_time_from']) ? $minute((string) $c['available_time_from']) : 0;
+        $to = isset($c['available_time_to']) ? $minute((string) $c['available_time_to']) : 1440;
+        $now = now((string) config('mediconnect.timezone'));
+        $today = $now->toDateString();
+        if ($date !== null && $date !== $today && ! $hasTime) {
+            return 'available_dates:='.QueryNormalizer::filterValue((string) $date);
+        }
+
+        // One key range per day: the asked day, or every indexed day for times alone. Today starts after the current minute.
+        $days = $date !== null ? [(string) $date] : array_map(fn (int $i) => $now->addDays($i)->toDateString(), range(0, max(0, (int) config('search.availability_days', 30) - 1)));
+        $ranges = [];
+        foreach ($days as $day) {
+            $lo = $day === $today ? max($from, $now->hour * 60 + $now->minute + 1) : $from;
+            if ($lo <= $to - 1) {
+                $key = DoctorDocuments::slotKey($day, 0);
+                $ranges[] = ($key + $lo).'..'.($key + $to - 1);
+            }
+        }
+
+        // No key is negative, so an empty window matches nothing.
+        return $ranges === [] ? 'available_slot_keys:<0' : 'available_slot_keys:['.implode(', ', $ranges).']';
     }
 
     /** @param array<string, mixed> $c */
@@ -186,8 +262,18 @@ final class DoctorSearch
             'fee' => 'fee_min(missing_values: last):asc,_text_match:desc',
             'distance' => isset($c['lat'], $c['lng']) ? sprintf('location(%F, %F):asc,_text_match:desc', (float) $c['lat'], (float) $c['lng']) : '_text_match:desc,rank_score:desc',
             'rating' => 'rating(missing_values: last):desc,rank_score:desc',
+            'next_available' => 'next_available_at(missing_values: last):asc,rank_score:desc',
             default => $browse ? 'rank_score:desc' : '_text_match:desc,rank_score:desc',
         };
+    }
+
+    /** @param list<array<string, mixed>> $docs */
+    private static function nextAvailable(array $docs): ?string
+    {
+        $now = now()->getTimestamp();
+        $times = array_filter(array_map(fn (array $d) => isset($d['next_available_at']) ? (int) $d['next_available_at'] : null, $docs), fn (?int $t) => $t !== null && $t > $now);
+
+        return $times === [] ? null : CarbonImmutable::createFromTimestamp(min($times))->toIso8601ZuluString();
     }
 
     /**
@@ -212,6 +298,8 @@ final class DoctorSearch
             'years_experience' => $first['years_experience'] ?? null,
             'is_verified' => (bool) ($first['is_verified'] ?? false),
             'offers_online' => array_filter($docs, fn (array $d) => in_array('ONLINE', (array) ($d['consultation_modes'] ?? []), true)) !== [],
+            // Advisory (§11.6). An index time that has already passed is left out rather than shown.
+            'next_available_at' => self::nextAvailable($docs),
             'fee_from' => $from === null ? null : ['amount' => (int) $from, 'currency' => 'PHP', 'formatted' => '₱'.number_format($from / 100, 2)],
             'locations' => array_map(fn (array $d) => [
                 'clinic_id' => (string) $d['clinic_id'],
@@ -221,6 +309,7 @@ final class DoctorSearch
                 'city' => (string) ($d['city'] ?? ''),
                 'fee_min' => $d['fee_min'] ?? null,
                 'fee_max' => $d['fee_max'] ?? null,
+                'next_available_at' => self::nextAvailable([$d]),
                 'distance_km' => isset($d['geo_distance_meters']) ? round($d['geo_distance_meters'] / 1000, 1) : null,
             ], $locations),
         ];

@@ -2,9 +2,11 @@
 
 namespace App\Modules\Scheduling\Services;
 
+use App\Modules\Scheduling\Events\AvailabilityUpdated;
 use App\Modules\Scheduling\Slots\AvailabilityInputs;
 use App\Modules\Scheduling\Slots\GeneratedSlot;
 use App\Modules\Scheduling\Slots\SlotGenerator;
+use App\Shared\Services\Outbox;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,7 +23,7 @@ final class AvailabilityProjector
 {
     private const LIVE_APPOINTMENT = ['PENDING_PAYMENT', 'PENDING_CONFIRMATION', 'CONFIRMED', 'CHECKED_IN'];
 
-    public function __construct(private readonly AvailabilityInputs $inputs, private readonly SlotGenerator $generator, private readonly SchedulingPolicies $policies) {}
+    public function __construct(private readonly AvailabilityInputs $inputs, private readonly SlotGenerator $generator, private readonly SchedulingPolicies $policies, private readonly Outbox $outbox) {}
 
     /** @return array{generated: int, removed: int, flagged: int} */
     public function refresh(string $doctorId, ?string $from = null, ?string $to = null): array
@@ -61,10 +63,12 @@ final class AvailabilityProjector
             $inRange()->where('generation', $generation)->whereNotExists($liveAppointment)->whereExists($activeHold)->update(['status' => 'HELD']);
             $inRange()->where('generation', $generation)->whereNotExists($liveAppointment)->whereNotExists($activeHold)->where('status', '<>', 'OPEN')->update(['status' => 'OPEN']);
 
+            // Search re-indexes from the committed projection (4.8); the bump runs first so nothing reads a stale cache.
+            DB::afterCommit(fn () => AvailabilityCache::bump($doctorId));
+            $this->outbox->record(new AvailabilityUpdated($doctorId));
+
             return ['generated' => count($slots), 'removed' => $removed, 'flagged' => $flaggedSlots->count()];
         });
-
-        AvailabilityCache::bump($doctorId);
 
         return $result;
     }

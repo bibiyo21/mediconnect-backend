@@ -35,9 +35,11 @@ final class DoctorSearchResultResource extends JsonResource
             'is_verified' => $r['is_verified'],
             /** @var bool */
             'offers_online' => $r['offers_online'],
+            /** @var string|null The next open time anywhere, UTC (4.8). Advisory: booking revalidates; null when nothing is open or the indexed time has passed. */
+            'next_available_at' => $r['next_available_at'],
             /** @var array{amount: int, currency: string, formatted: string}|null lowest fee among the matching services */
             'fee_from' => $r['fee_from'],
-            /** @var list<array{clinic_id: string, clinic_name: string, clinic_location_id: string, location_name: string, city: string, fee_min: int|null, fee_max: int|null, distance_km: float|null}> */
+            /** @var list<array{clinic_id: string, clinic_name: string, clinic_location_id: string, location_name: string, city: string, fee_min: int|null, fee_max: int|null, next_available_at: string|null, distance_km: float|null}> */
             'locations' => $r['locations'],
         ];
     }

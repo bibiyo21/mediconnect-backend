@@ -9014,6 +9014,31 @@
                         }
                     },
                     {
+                        "name": "available_date",
+                        "in": "query",
+                        "description": "A Philippine date, today or within the next 30 days: doctors with an open time that day. Advisory; booking revalidates.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "available_time_from",
+                        "in": "query",
+                        "description": "Philippine time, `HH:MM`: an open time starting at or after this.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "available_time_to",
+                        "in": "query",
+                        "description": "Philippine time, `HH:MM`: an open time starting before this.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "sort",
                         "in": "query",
                         "schema": {
@@ -9022,7 +9047,8 @@
                                 "relevance",
                                 "distance",
                                 "fee",
-                                "rating"
+                                "rating",
+                                "next_available"
                             ]
                         }
                     },
@@ -12145,6 +12171,13 @@
                     "offers_online": {
                         "type": "boolean"
                     },
+                    "next_available_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The next open time anywhere, UTC (4.8). Advisory: booking revalidates; null when nothing is open or the indexed time has passed."
+                    },
                     "fee_from": {
                         "type": [
                             "object",
@@ -12200,6 +12233,12 @@
                                         "null"
                                     ]
                                 },
+                                "next_available_at": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
                                 "distance_km": {
                                     "type": [
                                         "number",
@@ -12215,6 +12254,7 @@
                                 "city",
                                 "fee_min",
                                 "fee_max",
+                                "next_available_at",
                                 "distance_km"
                             ]
                         }
@@ -12229,6 +12269,7 @@
                     "years_experience",
                     "is_verified",
                     "offers_online",
+                    "next_available_at",
                     "fee_from",
                     "locations"
                 ],

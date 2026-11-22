@@ -7,7 +7,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * GET /search/doctors (api-specification.md §2.6). Public. HMO and
- * availability filters arrive in Phases 7B and 4. Coordinates are used for
+ * availability filters arrive in Phases 7B and 4 (availability: 4.8). Coordinates are used for
  * this one search only and never stored (D-43).
  */
 final class SearchDoctorsRequest extends FormRequest
@@ -41,7 +41,13 @@ final class SearchDoctorsRequest extends FormRequest
             'lat' => ['required_with:lng', 'numeric', 'between:4,22'],
             'lng' => ['required_with:lat', 'numeric', 'between:116,127'],
             'radius_km' => ['sometimes', 'numeric', 'min:1', 'max:100'],
-            'sort' => ['sometimes', Rule::in(['relevance', 'distance', 'fee', 'rating'])],
+            /** A Philippine date, today or within the next 30 days: doctors with an open time that day. Advisory; booking revalidates. */
+            'available_date' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:'.now('Asia/Manila')->toDateString(), 'before:'.now('Asia/Manila')->addDays((int) config('search.availability_days', 30))->toDateString()],
+            /** Philippine time, `HH:MM`: an open time starting at or after this. */
+            'available_time_from' => ['sometimes', 'date_format:H:i'],
+            /** Philippine time, `HH:MM`: an open time starting before this. */
+            'available_time_to' => $this->filled('available_time_from') ? ['sometimes', 'date_format:H:i', 'after:available_time_from'] : ['sometimes', 'date_format:H:i'],
+            'sort' => ['sometimes', Rule::in(['relevance', 'distance', 'fee', 'rating', 'next_available'])],
             /** Opaque, from `meta.next_cursor`. */
             'cursor' => ['sometimes', 'string', 'max:200'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],

@@ -128,7 +128,7 @@ final class InMemorySearchEngine implements SearchEngine
         return $this->aliases[$name] ?? $name;
     }
 
-    /** Supports `:=` (also on arrays), `:!=[...]`, `:>=`, `:<=` joined with &&; geo clauses are ignored. */
+    /** Supports `:=` (also on arrays), `:!=[...]`, `:>=`, `:<=`, `:[a..b, c..d]`, `:<n` joined with &&; geo clauses are ignored. */
     private function matches(array $doc, string $filter): bool
     {
         foreach (explode('&&', $filter) as $clause) {
@@ -139,6 +139,16 @@ final class InMemorySearchEngine implements SearchEngine
             if (preg_match('/^(\w+):!=\[(.*)\]$/', $clause, $m) === 1) {
                 $excluded = array_map(fn ($v) => trim(trim($v), '`'), explode(',', $m[2]));
                 if (in_array((string) ($doc[$m[1]] ?? ''), $excluded, true)) {
+                    return false;
+                }
+
+                continue;
+            }
+            // Numeric range `field:[a..b]` and `field:<n`: on an array, any element may match (as Typesense).
+            if (preg_match('/^(\w+):\[(-?\d+\.\.-?\d+(?:, *-?\d+\.\.-?\d+)*)\]$/', $clause, $m) === 1 || preg_match('/^(\w+):<(-?\d+)$/', $clause, $m) === 1) {
+                $ranges = str_contains($m[2], '..') ? array_map(fn ($r) => array_map('intval', explode('..', trim($r))), explode(',', $m[2])) : [[PHP_INT_MIN, (int) $m[2] - 1]];
+                $values = (array) ($doc[$m[1]] ?? []);
+                if (array_filter($values, fn ($v) => array_filter($ranges, fn ($r) => (int) $v >= $r[0] && (int) $v <= $r[1]) !== []) === []) {
                     return false;
                 }
 

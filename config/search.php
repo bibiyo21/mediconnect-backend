@@ -41,8 +41,11 @@ return [
         'num_typos' => 2,
         // rank_score: secondary sort after text match, primary order when browsing.
         'rank_score' => [
-            'profile_completeness' => 0.67,
-            'rating' => 0.33,
+            // 4.8: availability takes the §11.4 15 %; the 3.5 ratio of completeness to rating (2:1) is kept.
+            'profile_completeness' => 0.57,
+            'rating' => 0.28,
+            'availability' => 0.15,
+            'availability_horizon_days' => 14,
             // Bayesian damping: a new doctor's rating starts at the prior and moves with reviews.
             'rating_prior' => 3.5,
             'rating_prior_weight' => 10,
@@ -50,6 +53,9 @@ return [
     ],
 
     // Search API (3.3, architecture.md §12.5-12.6)
+    // Availability in doctor documents (4.8): open times this many days ahead. Times are Philippine time.
+    'availability_days' => (int) env('SEARCH_AVAILABILITY_DAYS', 30),
+
     'cache_ttl_seconds' => (int) env('SEARCH_CACHE_TTL_SECONDS', 300),
     // After a failure, skip the engine (PostgreSQL fallback) for this long.
     'breaker_open_seconds' => (int) env('SEARCH_BREAKER_OPEN_SECONDS', 30),
@@ -62,7 +68,7 @@ return [
      */
     'collections' => [
         'doctors' => [
-            'version' => 2, // v2 (3.3): subspecialty_ids for the subspecialty filter
+            'version' => 3, // v2 (3.3): subspecialty_ids; v3 (4.8): availability fields
             'schema' => [
                 'fields' => [
                     ['name' => 'doctor_id', 'type' => 'string', 'facet' => true],
@@ -92,6 +98,10 @@ return [
                     ['name' => 'profile_completeness', 'type' => 'int32'],
                     ['name' => 'rating', 'type' => 'float', 'optional' => true],
                     ['name' => 'review_count', 'type' => 'int32'],
+                    // Availability (4.8), advisory: local dates, and day*1440+minute keys of start times for time filters.
+                    ['name' => 'available_dates', 'type' => 'string[]', 'optional' => true],
+                    ['name' => 'available_slot_keys', 'type' => 'int64[]', 'optional' => true],
+                    ['name' => 'next_available_at', 'type' => 'int64', 'optional' => true],
                     ['name' => 'rank_score', 'type' => 'float'],
                     ['name' => 'updated_at', 'type' => 'int64'],
                 ],

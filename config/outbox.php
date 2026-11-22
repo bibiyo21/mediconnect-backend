@@ -2,6 +2,7 @@
 
 use App\Modules\Clinics\Events\ClinicDirectoryChanged;
 use App\Modules\Doctors\Events\DoctorDirectoryChanged;
+use App\Modules\Scheduling\Events\AvailabilityUpdated;
 use App\Modules\Scheduling\Events\SchedulingChanged;
 use App\Modules\Specialties\Events\SpecialtyCatalogChanged;
 
@@ -21,5 +22,7 @@ return [
         'specialties.catalog_changed' => SpecialtyCatalogChanged::class,
         // Availability refresh (Phase 4, architecture.md §8.2)
         'scheduling.inputs_changed' => SchedulingChanged::class,
+        // Search re-indexing after a projection rebuild (4.8)
+        'scheduling.availability_updated' => AvailabilityUpdated::class,
     ],
 ];

@@ -12,6 +12,7 @@ use App\Modules\Discovery\Console\SearchAnalyticsPartitionsCommand;
 use App\Modules\Discovery\Console\SearchStatusCommand;
 use App\Modules\Discovery\Listeners\QueueSearchIndexing;
 use App\Modules\Doctors\Events\DoctorDirectoryChanged;
+use App\Modules\Scheduling\Events\AvailabilityUpdated;
 use App\Modules\Specialties\Events\SpecialtyCatalogChanged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,7 @@ final class DiscoveryServiceProvider extends ServiceProvider
         Event::listen(DoctorDirectoryChanged::class, [QueueSearchIndexing::class, 'handleDoctor']);
         Event::listen(ClinicDirectoryChanged::class, [QueueSearchIndexing::class, 'handleClinic']);
         Event::listen(SpecialtyCatalogChanged::class, [QueueSearchIndexing::class, 'handleSpecialty']);
+        Event::listen(AvailabilityUpdated::class, [QueueSearchIndexing::class, 'handleAvailability']);
 
         Route::middleware('api')->prefix('api/v1')->group(__DIR__.'/../Routes/api.php');
 
