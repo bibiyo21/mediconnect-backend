@@ -8091,8 +8091,10 @@
                     {
                         "name": "clinic_id",
                         "in": "query",
+                        "description": "A clinic you manage: its doctors' entries at its locations. Without it, your own.",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "uuid"
                         }
                     }
                 ],
@@ -8332,15 +8334,19 @@
                     {
                         "name": "clinic_id",
                         "in": "query",
+                        "description": "A clinic you manage: its doctors' entries at its locations. Without it, your own.",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "uuid"
                         }
                     },
                     {
                         "name": "doctor_profile_id",
                         "in": "query",
+                        "description": "With clinic_id: one doctor only.",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "uuid"
                         }
                     }
                 ],

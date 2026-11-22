@@ -11,6 +11,7 @@ use App\Modules\Scheduling\Services\ScheduleAccess;
 use App\Modules\Scheduling\Services\ScheduleExceptions;
 use App\Modules\Users\Models\User;
 use App\Shared\Http\ApiResponse;
+use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -20,6 +21,7 @@ final class ScheduleExceptionsController
 {
     public function __construct(private readonly ScheduleExceptions $exceptions, private readonly ScheduleAccess $access, private readonly ClinicAccess $clinics) {}
 
+    #[QueryParameter('clinic_id', description: 'A clinic you manage: its doctors\' entries at its locations. Without it, your own.', type: 'string', format: 'uuid')]
     public function index(Request $request): JsonResponse
     {
         $user = $this->user($request);

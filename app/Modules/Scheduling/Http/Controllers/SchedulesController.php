@@ -12,6 +12,7 @@ use App\Modules\Scheduling\Services\ScheduleAccess;
 use App\Modules\Scheduling\Services\Schedules;
 use App\Modules\Users\Models\User;
 use App\Shared\Http\ApiResponse;
+use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -25,6 +26,8 @@ final class SchedulesController
 {
     public function __construct(private readonly Schedules $schedules, private readonly ScheduleAccess $access, private readonly ClinicAccess $clinics) {}
 
+    #[QueryParameter('clinic_id', description: 'A clinic you manage: its doctors\' entries at its locations. Without it, your own.', type: 'string', format: 'uuid')]
+    #[QueryParameter('doctor_profile_id', description: 'With clinic_id: one doctor only.', type: 'string', format: 'uuid')]
     public function index(Request $request): JsonResponse
     {
         $user = $this->user($request);
