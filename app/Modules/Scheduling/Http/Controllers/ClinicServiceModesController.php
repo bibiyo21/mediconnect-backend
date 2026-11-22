@@ -40,9 +40,7 @@ final class ClinicServiceModesController
     {
         $clinic = $this->clinic($request, 'schedules.update', $clinicId);
         $service = $this->services($clinic)->whereKey($serviceId)->firstOrFail();
-        /** @var User $actor */
-        $actor = $request->user();
-        $mode = $this->modes->set($service, ServiceMode::from((string) $request->validated('service_mode')), $actor, $clinic->id);
+        $mode = $this->modes->set($service, ServiceMode::from((string) $request->validated('service_mode')), $clinic->id);
 
         return ApiResponse::success(new ServiceModeResource(['service' => $service, 'mode' => $mode]));
     }

@@ -10,6 +10,8 @@ use Illuminate\Validation\ValidationException;
  * Public availability reads (increment 4.6). Reads the projection only and
  * never generates slots; applies the booking policy (notice, same day,
  * advance limit) per service mode. Advisory: holds revalidate (§11.6).
+ *
+ * @phpstan-type AvailabilitySlot array{slot_id: string, starts_at: string, ends_at: string, local_date: string, timezone: string, clinic_location_id: string|null, doctor_service_id: string, service_name: string, consultation_type: string}
  */
 final class AvailabilityReader
 {
@@ -19,7 +21,7 @@ final class AvailabilityReader
 
     /**
      * @param  array{from?: string, to?: string, clinic_location_id?: string, doctor_service_id?: string, consultation_type?: string}  $filters
-     * @return list<array<string, mixed>>
+     * @return list<AvailabilitySlot>
      */
     public function forDoctor(string $doctorId, array $filters): array
     {
@@ -38,7 +40,7 @@ final class AvailabilityReader
      * Also behind the AvailabilitySummaries contract used by search (4.8).
      *
      * @param  array{clinic_location_id?: string, doctor_service_id?: string, consultation_type?: string}  $filters
-     * @return list<array<string, mixed>>
+     * @return list<AvailabilitySlot>
      */
     public function load(string $doctorId, string $from, string $to, array $filters = []): array
     {

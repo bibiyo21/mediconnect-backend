@@ -2969,7 +2969,10 @@
                                             "type": "boolean"
                                         },
                                         "data": {
-                                            "type": "string"
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AvailabilitySlotResource"
+                                            }
                                         },
                                         "meta": {
                                             "anyOf": [
@@ -3076,7 +3079,63 @@
                                             "type": "boolean"
                                         },
                                         "data": {
-                                            "type": "string"
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "slot_id": {
+                                                                    "type": "string"
+                                                                },
+                                                                "starts_at": {
+                                                                    "type": "string"
+                                                                },
+                                                                "ends_at": {
+                                                                    "type": "string"
+                                                                },
+                                                                "local_date": {
+                                                                    "type": "string"
+                                                                },
+                                                                "timezone": {
+                                                                    "type": "string"
+                                                                },
+                                                                "clinic_location_id": {
+                                                                    "type": [
+                                                                        "string",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "doctor_service_id": {
+                                                                    "type": "string"
+                                                                },
+                                                                "service_name": {
+                                                                    "type": "string"
+                                                                },
+                                                                "consultation_type": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "slot_id",
+                                                                "starts_at",
+                                                                "ends_at",
+                                                                "local_date",
+                                                                "timezone",
+                                                                "clinic_location_id",
+                                                                "doctor_service_id",
+                                                                "service_name",
+                                                                "consultation_type"
+                                                            ]
+                                                        }
+                                                    }
+                                                }
+                                            ]
                                         },
                                         "meta": {
                                             "anyOf": [
@@ -10776,6 +10835,60 @@
                     "prc_license_number"
                 ],
                 "title": "AssignDoctorRequest"
+            },
+            "AvailabilitySlotResource": {
+                "type": "object",
+                "properties": {
+                    "slot_id": {
+                        "type": "string",
+                        "description": "Projection slot id; pass it to POST /holds."
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "description": "UTC, ISO 8601."
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "description": "UTC, ISO 8601."
+                    },
+                    "local_date": {
+                        "type": "string",
+                        "description": "Calendar date in the clinic time zone (YYYY-MM-DD)."
+                    },
+                    "timezone": {
+                        "type": "string",
+                        "description": "IANA time zone used to show this time, e.g. Asia/Manila."
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Null for online consultations."
+                    },
+                    "doctor_service_id": {
+                        "type": "string"
+                    },
+                    "service_name": {
+                        "type": "string"
+                    },
+                    "consultation_type": {
+                        "type": "string",
+                        "description": "ONLINE or IN_PERSON."
+                    }
+                },
+                "required": [
+                    "slot_id",
+                    "starts_at",
+                    "ends_at",
+                    "local_date",
+                    "timezone",
+                    "clinic_location_id",
+                    "doctor_service_id",
+                    "service_name",
+                    "consultation_type"
+                ],
+                "title": "AvailabilitySlotResource"
             },
             "ClinicManagementResource": {
                 "type": "object",

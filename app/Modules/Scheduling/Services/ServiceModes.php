@@ -7,7 +7,6 @@ use App\Modules\Doctors\Models\DoctorService;
 use App\Modules\Scheduling\Enums\ServiceMode;
 use App\Modules\Scheduling\Events\SchedulingChanged;
 use App\Modules\Scheduling\Models\DoctorServiceMode;
-use App\Modules\Users\Models\User;
 use App\Shared\Services\Outbox;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +34,7 @@ final class ServiceModes
         return DoctorServiceMode::whereIn('doctor_service_id', $ids)->where('status', 'ACTIVE')->get()->keyBy('doctor_service_id')->all();
     }
 
-    public function set(DoctorService $service, ServiceMode $mode, User $actor, ?string $clinicId = null): DoctorServiceMode
+    public function set(DoctorService $service, ServiceMode $mode, ?string $clinicId = null): DoctorServiceMode
     {
         $online = $service->clinic_location_id === null;
         if ($online && $mode !== ServiceMode::Appointment) {

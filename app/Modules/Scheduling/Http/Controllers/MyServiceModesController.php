@@ -31,9 +31,7 @@ final class MyServiceModesController
     {
         $profile = $this->profile($request, 'schedules.update');
         $service = DoctorService::with('location')->where('doctor_profile_id', $profile->id)->where('status', 'ACTIVE')->whereKey($serviceId)->firstOrFail();
-        /** @var User $actor */
-        $actor = $request->user();
-        $mode = $this->modes->set($service, ServiceMode::from((string) $request->validated('service_mode')), $actor);
+        $mode = $this->modes->set($service, ServiceMode::from((string) $request->validated('service_mode')));
 
         return ApiResponse::success(new ServiceModeResource(['service' => $service, 'mode' => $mode]));
     }

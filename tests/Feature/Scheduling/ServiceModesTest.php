@@ -40,7 +40,9 @@ it('lists services without a mode, then sets one per service; online is appointm
 
     expect(DB::table('doctor_service_modes')->where('status', 'ACTIVE')->count())->toBe(2)
         ->and(DB::table('outbox_events')->where('event_type', 'scheduling.inputs_changed')->where('aggregate_id', $this->doctor->id)->exists())->toBeTrue()
-        ->and(DB::table('audit_logs')->where('action', 'scheduling.service_mode_set')->count())->toBe(2);
+        ->and(DB::table('audit_logs')->where('action', 'scheduling.service_mode_set')->count())->toBe(2)
+        // The audit logger records the signed-in doctor as the actor (ServiceModes::set takes no actor).
+        ->and(DB::table('audit_logs')->where('action', 'scheduling.service_mode_set')->distinct()->pluck('actor_user_id')->all())->toBe([$this->doctor->user_id]);
 });
 
 it('keeps the mode when the fee changes, and drops it when the service ends', function () {

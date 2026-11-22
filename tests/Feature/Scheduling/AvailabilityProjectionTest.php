@@ -44,7 +44,7 @@ it('projects a new schedule into public, advisory availability', function () {
     expect($slots)->toHaveCount(7)
         ->and($slots[0])->toMatchArray(['local_date' => $this->monday, 'timezone' => 'Asia/Manila', 'clinic_location_id' => $this->locationId, 'doctor_service_id' => $this->service, 'consultation_type' => 'IN_PERSON', 'service_name' => 'Consultation'])
         ->and(CarbonImmutable::parse($slots[0]['starts_at'])->setTimezone('Asia/Manila')->format('H:i'))->toBe('09:00')
-        ->and(array_keys($slots[0]))->not->toContain('status');
+        ->and(array_keys($slots[0]))->toBe(['slot_id', 'starts_at', 'ends_at', 'local_date', 'timezone', 'clinic_location_id', 'doctor_service_id', 'service_name', 'consultation_type']);
     // Sixty days ahead (the platform horizon) were generated.
     expect(DB::table('doctor_availability_slots')->max('local_date') >= CarbonImmutable::now('Asia/Manila')->addDays(52)->toDateString())->toBeTrue();
 });
@@ -116,4 +116,12 @@ it('refreshes every scheduled doctor from the nightly command', function () {
     DB::table('doctor_availability_slots')->delete();
     $this->artisan('availability:generate --sync')->expectsOutputToContain('Refreshed 1 doctors')->assertSuccessful();
     expect(monday_slots($this->doctor->id, $this->monday))->toHaveCount(7);
+});
+
+it('answers the multi-doctor endpoint with an object keyed by doctor id, and {} when none match', function () {
+    $hit = test()->getJson("/api/v1/availability?doctor_ids[]={$this->doctor->id}&date={$this->monday}")->assertOk();
+    expect(array_keys($hit->json('data')))->toBe([$this->doctor->id])->and($hit->json("data.{$this->doctor->id}"))->toHaveCount(7);
+
+    $none = test()->getJson('/api/v1/availability?doctor_ids[]='.Str::uuid()."&date={$this->monday}")->assertOk();
+    expect($none->getContent())->toContain('"data":{}');
 });
