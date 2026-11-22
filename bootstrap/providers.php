@@ -13,6 +13,7 @@ use App\Modules\Rbac\Providers\RbacServiceProvider;
 use App\Modules\Scheduling\Providers\SchedulingServiceProvider;
 use App\Modules\Specialties\Providers\SpecialtiesServiceProvider;
 use App\Modules\Users\Providers\UsersServiceProvider;
+use App\Modules\WalkIns\Providers\WalkInsServiceProvider;
 use App\Providers\AppServiceProvider;
 
 // Module providers are added as each module is implemented (C-3: nothing is
@@ -32,4 +33,5 @@ return [
     DiscoveryServiceProvider::class,
     SchedulingServiceProvider::class,
     PresenceServiceProvider::class,
+    WalkInsServiceProvider::class,
 ];
