@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Scheduling\Jobs\ExpireSlotReservations;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -17,3 +18,5 @@ Schedule::command('search:rebuild specialties')->dailyAt('03:00')->withoutOverla
 Schedule::command('search:rebuild clinics')->dailyAt('03:10')->withoutOverlapping();
 // Availability horizon (Phase 4, §24 GenerateAvailabilitySlots): every scheduled doctor, nightly.
 Schedule::command('availability:generate')->dailyAt('02:30')->withoutOverlapping();
+// Expired holds back to open slots (Phase 4, §24 ExpireSlotReservations).
+Schedule::job(new ExpireSlotReservations)->everyMinute();

@@ -5474,6 +5474,191 @@
                 }
             }
         },
+        "/availability/holds": {
+            "post": {
+                "operationId": "holds.store",
+                "tags": [
+                    "Holds"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateHoldRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "reservation_id": {
+                                                    "type": "string"
+                                                },
+                                                "slot_id": {
+                                                    "type": "string"
+                                                },
+                                                "starts_at": {
+                                                    "type": "string"
+                                                },
+                                                "ends_at": {
+                                                    "type": "string"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string",
+                                                    "description": "The time is kept for you until then; it is released automatically afterwards."
+                                                }
+                                            },
+                                            "required": [
+                                                "reservation_id",
+                                                "slot_id",
+                                                "starts_at",
+                                                "ends_at",
+                                                "expires_at"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/availability/holds/{reservationId}": {
+            "delete": {
+                "operationId": "holds.destroy",
+                "tags": [
+                    "Holds"
+                ],
+                "parameters": [
+                    {
+                        "name": "reservationId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "reservation_id": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "const": "RELEASED"
+                                                }
+                                            },
+                                            "required": [
+                                                "reservation_id",
+                                                "status"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/mfa/totp/setup": {
             "post": {
                 "operationId": "mfa.setup",
@@ -11302,6 +11487,24 @@
                     "fee_amount"
                 ],
                 "title": "CreateDoctorServiceRequest"
+            },
+            "CreateHoldRequest": {
+                "type": "object",
+                "properties": {
+                    "slot_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "patient_profile_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Your own patient profile (default) or a dependant you are authorized for."
+                    }
+                },
+                "required": [
+                    "slot_id"
+                ],
+                "title": "CreateHoldRequest"
             },
             "CreateHolidayRequest": {
                 "type": "object",

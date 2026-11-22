@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Patients\Models\PatientProfile;
+use Carbon\CarbonImmutable;
 use Database\Seeders\SchedulingPolicySeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -89,4 +90,12 @@ it('cancels an exception once, keeping the record', function () {
     expect(DB::table('doctor_schedule_exceptions')->where('id', $id)->value('cancelled_by'))->toBe($this->doctor->user_id)
         ->and(DB::table('audit_logs')->where('action', 'scheduling.exception_cancelled')->count())->toBe(1)
         ->and($this->getJson('/api/v1/schedule-exceptions', $this->doctorHeaders)->json('data'))->toBe([]);
+});
+
+it('stores times given with a Manila offset at the right instant', function () {
+    $day = now('Asia/Manila')->addDays(10)->toDateString();
+    $this->postJson('/api/v1/schedule-exceptions', leave(['starts_at' => $day.'T09:00:00+08:00', 'ends_at' => $day.'T10:00:00+08:00']), $this->doctorHeaders)
+        ->assertCreated()->assertJsonPath('data.starts_at', $day.'T01:00:00Z');
+
+    expect(CarbonImmutable::parse((string) DB::table('doctor_schedule_exceptions')->value('starts_at'))->utc()->format('H:i'))->toBe('01:00');
 });

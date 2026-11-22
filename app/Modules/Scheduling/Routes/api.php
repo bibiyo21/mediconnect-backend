@@ -2,6 +2,7 @@
 
 use App\Modules\Scheduling\Http\Controllers\AvailabilityController;
 use App\Modules\Scheduling\Http\Controllers\ClinicServiceModesController;
+use App\Modules\Scheduling\Http\Controllers\HoldsController;
 use App\Modules\Scheduling\Http\Controllers\MyServiceModesController;
 use App\Modules\Scheduling\Http\Controllers\PublicSchedulesController;
 use App\Modules\Scheduling\Http\Controllers\ScheduleExceptionsController;
@@ -36,4 +37,8 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(func
     Route::get('schedule-exceptions', [ScheduleExceptionsController::class, 'index']);
     Route::post('schedule-exceptions', [ScheduleExceptionsController::class, 'store']);
     Route::delete('schedule-exceptions/{exceptionId}', [ScheduleExceptionsController::class, 'destroy'])->whereUuid('exceptionId');
+
+    // Holds (4.7): Idempotency-Key required; 10 a minute per user (Phase 4 plan Q11).
+    Route::post('availability/holds', [HoldsController::class, 'store'])->middleware(['idempotent', 'throttle:holds']);
+    Route::delete('availability/holds/{reservationId}', [HoldsController::class, 'destroy'])->whereUuid('reservationId');
 });

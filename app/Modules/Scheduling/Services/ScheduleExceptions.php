@@ -64,8 +64,9 @@ final class ScheduleExceptions
             $modeId = $mode->id;
         }
         $priority = self::PRIORITY[$type] ?? ($effect === 'ADD_HOURS' ? 4 : 3);
-        $startsAt = CarbonImmutable::parse((string) $data['starts_at']);
-        $endsAt = CarbonImmutable::parse((string) $data['ends_at']);
+        // UTC before Eloquent stores it: the datetime cast drops the offset, so +08:00 input would land 8 hours late.
+        $startsAt = CarbonImmutable::parse((string) $data['starts_at'])->utc();
+        $endsAt = CarbonImmutable::parse((string) $data['ends_at'])->utc();
 
         return DB::transaction(function () use ($doctorProfileId, $locationId, $modeId, $type, $effect, $priority, $startsAt, $endsAt, $data, $actor, $clinicId) {
             $exception = new DoctorScheduleException;

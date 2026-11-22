@@ -3,7 +3,6 @@
 use App\Modules\Users\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
@@ -12,13 +11,6 @@ use Spatie\Permission\Models\Role;
  * does not use the per-test transaction of RefreshDatabase. Each test starts
  * and ends with a clean, freshly migrated test database.
  */
-
-function fresh_test_database(): void
-{
-    expect(config('database.connections.pgsql.database'))->toEndWith('_test');
-    Artisan::call('migrate:fresh', ['--database' => 'pgsql_owner', '--force' => true]);
-    DB::purge('pgsql_second');
-}
 
 beforeEach(function () {
     config(['database.connections.pgsql_second' => config('database.connections.pgsql')]);

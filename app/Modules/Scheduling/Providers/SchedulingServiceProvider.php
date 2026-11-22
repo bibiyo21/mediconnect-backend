@@ -10,7 +10,11 @@ use App\Modules\Scheduling\Console\GenerateAvailabilityCommand;
 use App\Modules\Scheduling\Events\SchedulingChanged;
 use App\Modules\Scheduling\Listeners\FollowServiceChanges;
 use App\Modules\Scheduling\Listeners\QueueAvailabilityRefresh;
+use App\Shared\Services\Fingerprint;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -19,6 +23,9 @@ final class SchedulingServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        // Holds lock scarce times: 10 a minute per user (Phase 4 plan Q11).
+        RateLimiter::for('holds', fn (Request $request) => Limit::perMinute(10)->by('holds:'.($request->user()?->getAuthIdentifier() ?? Fingerprint::ip($request->ip()))));
+
         Event::listen(DoctorServiceReplaced::class, [FollowServiceChanges::class, 'replaced']);
         Event::listen(DoctorServicesEnded::class, [FollowServiceChanges::class, 'ended']);
 
