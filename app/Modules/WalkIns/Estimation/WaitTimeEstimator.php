@@ -7,6 +7,7 @@ use App\Modules\Scheduling\Slots\Intervals;
 use App\Modules\WalkIns\Enums\EntryStatus;
 use App\Shared\Contracts\Clock;
 use Carbon\CarbonImmutable;
+use InvalidArgumentException;
 
 /**
  * The pure walk-in wait-time estimator (increment 5.4, architecture.md §10.4, CLAUDE.md §9.4).
@@ -17,9 +18,21 @@ use Carbon\CarbonImmutable;
  * intervals: protected appointments and holds, scheduled breaks, gaps between shifts and, when the doctor
  * is on a break, unavailable or not yet checked in, the time until they are back. Blocked intervals are
  * merged first, so a break that overlaps an appointment is counted once. The queue is served in
- * call-next order (called first, then highest triage priority, then lowest number); each consultation
- * starts at the earliest moment it fits entirely before the next blocked interval, mirroring the
- * call-next refusal in 5.6 (APPOINTMENT_WINDOW_PROTECTED).
+ * call-next order (B5: called first; then arrived patients by triage priority, arrival time (sortAt), number;
+ * patients not yet arrived last, by number); each consultation starts at the earliest moment it fits entirely
+ * before the next blocked interval, mirroring the call-next refusal in 5.6 (APPOINTMENT_WINDOW_PROTECTED).
+ *
+ * Patients who registered from the app and have not arrived (REGISTERED, E4) cannot be called yet, so they are
+ * counted ahead of a later unarrived patient with more uncertainty, never ahead of an arrived one (they sort
+ * last). Ahead-sets therefore differ per pass for an unarrived target: the low pass counts only the arrived
+ * patients (the unarrived ones ahead may not show up), the high pass also counts every unarrived patient with a
+ * lower number. An arrived target has no unarrived patient ahead in either pass.
+ * Consequence to know about: the low pass of a later unarrived patient does not wait for an earlier unarrived one, so
+ * its minimum can fall inside the earlier one's range, and can even be lower than the earlier one's minimum when the
+ * earlier patient's low case does not fit before a blocked interval and the later (shorter) one does. With one arrived
+ * patient and two unarrived ones (10 minute visits, now 10:00): the first unarrived patient is 7 to 13 minutes, the
+ * second 7 to 25. With an appointment 10:20 to 11:00 and a 30 then a 5 minute unarrived visit: 60 to 65, then 7 to 98.
+ * Maximums never fall with position; minimums can (decision 231). There is no clamp: each range is honest about its own case.
  *
  * Two kinds of uncertainty. A consultation's length is uncertain: the replay runs twice, with every
  * duration shortened and lengthened by the spread. A fixed return time (break end, announced return,
@@ -56,16 +69,34 @@ final class WaitTimeEstimator
 
         $out = [];
         foreach ($ordered as $i => $entry) {
-            $out[$entry->id] = $this->build($ordered, $i, $inputs, $context, $now, $lo[$i] ?? null, $hi[$i] ?? null);
+            $startLo = null;
+            if ($lo !== null) {
+                // E4: an unarrived patient's low case starts once the arrived patients are done, not after the other unarrived ones.
+                $startLo = $entry->isUnarrived()
+                    ? $this->place($lo['blocked'], $lo['arrivedCursor'], $this->length($entry, 1 - $this->spread()))
+                    : $lo['starts'][$i];
+            }
+            $out[$entry->id] = $this->build($ordered, $i, $inputs, $context, $now, $startLo, $hi['starts'][$i] ?? null);
         }
 
         return $out;
     }
 
-    /** The estimate a patient would see if they joined the queue now with the given triage priority (0 = ordinary). */
-    public function estimateForNewEntry(EstimateInputs $inputs, int $expectedDurationSeconds, DurationSource $source, int $triagePriority = 0): WaitEstimate
+    /**
+     * The estimate a patient would see if they joined the queue now: a staff-registered guest is WAITING with
+     * sortAt = now, a patient who registered from the app is REGISTERED with sortAt null. $triagePriority 0 = ordinary.
+     */
+    public function estimateForNewEntry(EstimateInputs $inputs, int $expectedDurationSeconds, DurationSource $source, EntryStatus $status, ?CarbonImmutable $sortAt, int $triagePriority = 0): WaitEstimate
     {
-        $candidate = new QueueEntryInput(self::NEW_ENTRY_ID, PHP_INT_MAX, $triagePriority, EntryStatus::Waiting, $expectedDurationSeconds, $source);
+        if (! in_array($status, [EntryStatus::Registered, EntryStatus::Waiting], true)) {
+            throw new InvalidArgumentException('A new entry is REGISTERED or WAITING.');
+        }
+        if ($status === EntryStatus::Registered && $triagePriority > 0) {
+            // Priority is set by staff at the desk, never by a patient registering from the app.
+            throw new InvalidArgumentException('A remote (REGISTERED) entry cannot carry a triage priority.');
+        }
+        // Last of its kind: the highest number, so it never outranks an earlier entry of equal rank.
+        $candidate = new QueueEntryInput(self::NEW_ENTRY_ID, PHP_INT_MAX, $triagePriority, $status, $expectedDurationSeconds, $source, $sortAt);
         $withCandidate = new EstimateInputs([...$inputs->entries, $candidate], $inputs->current, $inputs->blockedIntervals, $inputs->presence, $inputs->closesAt, $inputs->timezone, $inputs->localDate);
 
         return $this->estimate($withCandidate)[self::NEW_ENTRY_ID];
@@ -77,7 +108,9 @@ final class WaitTimeEstimator
     }
 
     /**
-     * Call-next order. A called patient is already on the way in; then triage, then arrival order.
+     * Call-next order (B5). A called patient is already on the way in, so called entries come first (by triage, then
+     * number). Then patients who have arrived: triage descending, arrival (sortAt) ascending, number, id. Patients
+     * who have not arrived come last, by number: they cannot be called, so they never outrank an arrived patient.
      *
      * @param  list<QueueEntryInput>  $entries
      * @return list<QueueEntryInput>
@@ -85,8 +118,12 @@ final class WaitTimeEstimator
     private function order(array $entries): array
     {
         $ahead = array_values(array_filter($entries, fn (QueueEntryInput $e) => $e->isAhead()));
-        usort($ahead, fn (QueueEntryInput $a, QueueEntryInput $b) => [$a->status === EntryStatus::Called ? 0 : 1, -$a->triagePriority, $a->queueNumber, $a->id]
-            <=> [$b->status === EntryStatus::Called ? 0 : 1, -$b->triagePriority, $b->queueNumber, $b->id]);
+        $key = fn (QueueEntryInput $e): array => match (true) {
+            $e->status === EntryStatus::Called => [0, -$e->triagePriority, 0, $e->queueNumber, $e->id],
+            $e->isUnarrived() => [2, 0, 0, $e->queueNumber, $e->id],
+            default => [1, -$e->triagePriority, $e->sortAt === null ? 0 : $e->sortAt->getTimestamp() * 1_000_000 + (int) $e->sortAt->format('u'), $e->queueNumber, $e->id],
+        };
+        usort($ahead, fn (QueueEntryInput $a, QueueEntryInput $b) => $key($a) <=> $key($b));
 
         return $ahead;
     }
@@ -152,7 +189,8 @@ final class WaitTimeEstimator
      *
      * @param  list<QueueEntryInput>  $ordered
      * @param  array{unknown: bool, basis: list<WaitBasis>, resumeAt: int|null, resumeOverrun: bool, currentOverrun: bool}  $context
-     * @return list<int> the second each entry's consultation would start, by queue position
+     * @return array{starts: list<int>, blocked: list<array{int, int}>, arrivedCursor: int} the second each entry's consultation would
+     *                                                                                      start (by queue position), the merged blocked set, and the moment the last arrived patient is done
      */
     private function replay(array $ordered, EstimateInputs $inputs, array $context, int $now, float $factor): array
     {
@@ -181,19 +219,39 @@ final class WaitTimeEstimator
         }
 
         $starts = [];
+        $arrivedCursor = $cursor;
         foreach ($ordered as $entry) {
-            $length = max(1, (int) round($entry->expectedDurationSeconds * $factor));
-            $start = $cursor;
-            foreach ($blocked as [$from, $to]) {
-                if ($from < $start + $length && $to > $start) {
-                    $start = $to;
-                }
-            }
+            $start = $this->place($blocked, $cursor, $this->length($entry, $factor));
             $starts[] = $start;
-            $cursor = $start + $length;
+            $cursor = $start + $this->length($entry, $factor);
+            if (! $entry->isUnarrived()) {
+                $arrivedCursor = $cursor;
+            }
         }
 
-        return $starts;
+        return ['starts' => $starts, 'blocked' => $blocked, 'arrivedCursor' => $arrivedCursor];
+    }
+
+    private function length(QueueEntryInput $entry, float $factor): int
+    {
+        return max(1, (int) round($entry->expectedDurationSeconds * $factor));
+    }
+
+    /**
+     * The earliest second at or after $cursor when a consultation of $length seconds fits entirely before the next blocked interval.
+     *
+     * @param  list<array{int, int}>  $blocked  merged and sorted
+     */
+    private function place(array $blocked, int $cursor, int $length): int
+    {
+        $start = $cursor;
+        foreach ($blocked as [$from, $to]) {
+            if ($from < $start + $length && $to > $start) {
+                $start = $to;
+            }
+        }
+
+        return $start;
     }
 
     /** How late a doctor with a fixed return time may be: spread of the time away, within the configured bounds. */
@@ -285,16 +343,36 @@ final class WaitTimeEstimator
                 $basis[] = $b->kind->basis();
             }
         }
-        foreach ($ordered as $j => $other) {
-            // Someone ahead who joined later but outranks this patient, or this patient outranks someone who joined earlier.
-            if (($j < $i && $other->triagePriority > $entry->triagePriority && $other->queueNumber > $entry->queueNumber)
-                || ($j > $i && $entry->triagePriority > $other->triagePriority && $other->queueNumber < $entry->queueNumber)) {
-                $basis[] = WaitBasis::TriageReordered;
-                break;
-            }
+        if ($this->triageReordered($ordered, $i)) {
+            $basis[] = WaitBasis::TriageReordered;
         }
 
         return $basis;
+    }
+
+    /**
+     * Whether triage changes this patient's place: someone ahead arrived later but outranks them, or they outrank someone
+     * who arrived earlier. Compared by sortAt; a patient who has not arrived has no arrival to compare, so is never reordered by triage.
+     *
+     * @param  list<QueueEntryInput>  $ordered
+     */
+    private function triageReordered(array $ordered, int $i): bool
+    {
+        $entry = $ordered[$i];
+        if ($entry->sortAt === null) {
+            return false;
+        }
+        foreach ($ordered as $j => $other) {
+            if ($j === $i || $other->sortAt === null) {
+                continue;
+            }
+            if (($j < $i && $other->triagePriority > $entry->triagePriority && $other->sortAt > $entry->sortAt)
+                || ($j > $i && $entry->triagePriority > $other->triagePriority && $other->sortAt < $entry->sortAt)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function durationBasis(DurationSource $source): WaitBasis

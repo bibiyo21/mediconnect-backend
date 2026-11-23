@@ -22,6 +22,8 @@ use Carbon\CarbonImmutable;
  * start) is never counted earlier and the high end allows lateness of 25% of the time away, between 5 and 30
  * minutes; no estimate is narrower than 5 minutes (even a patient who is next in line: 0 to 5).
  * 2026-12-07 is a Monday; Manila is UTC+8 all year. Entries default to a 10 minute consultation.
+ * Increment 5.5a-1: call-next order is B5 (called, then arrived by triage, arrival time and number, then unarrived), so
+ * entries carry an arrival time: by default 09:00 plus their number in minutes, in the same order as their numbers.
  */
 
 function est_local(string $time, string $date = '2026-12-07', string $zone = 'Asia/Manila'): CarbonImmutable
@@ -29,9 +31,12 @@ function est_local(string $time, string $date = '2026-12-07', string $zone = 'As
     return CarbonImmutable::parse("{$date} {$time}", $zone)->utc();
 }
 
-function est_entry(int $number, int $triage = 0, EntryStatus $status = EntryStatus::Waiting, int $minutes = 10, DurationSource $source = DurationSource::Service): QueueEntryInput
+/** $arrived is a local time, null for "not arrived", 'auto' for 09:00 plus the number in minutes (none for a REGISTERED entry). */
+function est_entry(int $number, int $triage = 0, EntryStatus $status = EntryStatus::Waiting, int $minutes = 10, DurationSource $source = DurationSource::Service, ?string $arrived = 'auto'): QueueEntryInput
 {
-    return new QueueEntryInput("e{$number}", $number, $triage, $status, $minutes * 60, $source);
+    $sortAt = $arrived === 'auto' ? ($status === EntryStatus::Registered ? null : est_local('09:00')->addMinutes($number)) : ($arrived === null ? null : est_local($arrived));
+
+    return new QueueEntryInput("e{$number}", $number, $triage, $status, $minutes * 60, $source, $sortAt);
 }
 
 function est_block(BlockKind $kind, string $from, string $to): BlockedInterval
@@ -78,7 +83,7 @@ it('gives a patient who joins an empty queue a short range, never a bare zero, s
 
     expect($estimator->estimate(est_inputs()))->toBe([]);
 
-    $e = $estimator->estimateForNewEntry(est_inputs(), 600, DurationSource::Service);
+    $e = $estimator->estimateForNewEntry(est_inputs(), 600, DurationSource::Service, EntryStatus::Waiting, est_local('10:00'));
     expect([...est_range($e), $e->mayNotBeServedToday, $e->position])->toBe([0, 5, false, 1])
         ->and($e->toArray()['is_estimate'])->toBeTrue()
         ->and(est_codes($e))->toBe(['next_in_line', 'duration_service']);
@@ -88,8 +93,8 @@ it('puts a new entry with higher triage priority ahead of the ordinary queue', f
     $estimator = new WaitTimeEstimator(new PinnedClock(est_local('10:00')));
     $queue = est_inputs([est_entry(1), est_entry(2)]);
 
-    $urgent = $estimator->estimateForNewEntry($queue, 600, DurationSource::Rolling, triagePriority: 5);
-    $ordinary = $estimator->estimateForNewEntry($queue, 600, DurationSource::Rolling);
+    $urgent = $estimator->estimateForNewEntry($queue, 600, DurationSource::Rolling, EntryStatus::Waiting, est_local('10:00'), triagePriority: 5);
+    $ordinary = $estimator->estimateForNewEntry($queue, 600, DurationSource::Rolling, EntryStatus::Waiting, est_local('10:00'));
 
     expect([$urgent->position, ...est_range($urgent)])->toBe([1, 0, 5])
         ->and(est_codes($urgent))->toContain('next_in_line', 'triage_reordered')
@@ -141,12 +146,161 @@ it('ignores entries that are not waiting any more and flags unarrived ones that 
     $r = est_run(est_inputs([
         est_entry(1, status: EntryStatus::Completed), est_entry(2, status: EntryStatus::NoShow), est_entry(3, status: EntryStatus::Skipped),
         est_entry(4, status: EntryStatus::InConsultation), est_entry(5, status: EntryStatus::Cancelled),
-        est_entry(6, status: EntryStatus::Registered), est_entry(7),
+        est_entry(6, status: EntryStatus::Registered), est_entry(7), est_entry(8, status: EntryStatus::Registered),
     ]));
 
-    expect(array_keys($r))->toBe(['e6', 'e7'])
-        ->and(est_codes($r['e7']))->toContain('unarrived_counted')
-        ->and(est_codes($r['e6']))->not->toContain('unarrived_counted');
+    // The arrived patient is called first; the unarrived ones follow by number, the later one flagged.
+    expect(array_keys($r))->toBe(['e7', 'e6', 'e8'])
+        ->and(est_codes($r['e8']))->toContain('unarrived_counted')
+        ->and(est_codes($r['e6']))->not->toContain('unarrived_counted')
+        ->and(est_codes($r['e7']))->not->toContain('unarrived_counted');
+});
+
+it('calls arrived patients by triage, then arrival time, then number, with unarrived patients last (B5)', function () {
+    $r = est_run(est_inputs([
+        est_entry(1, arrived: '09:50'),
+        est_entry(2, arrived: '09:40'),
+        est_entry(3, status: EntryStatus::Registered),
+        est_entry(4, triage: 5, arrived: '09:55'),
+        est_entry(5, arrived: '09:40'),            // same arrival as e2: the lower number first
+        est_entry(6, triage: 9, status: EntryStatus::Called, arrived: '09:59'),
+    ]));
+
+    // Called first; then triage 5; then arrival 09:40 (e2 before e5 on number), then 09:50; the unarrived e3 last.
+    expect(array_keys($r))->toBe(['e6', 'e4', 'e2', 'e5', 'e1', 'e3'])
+        ->and(array_map(fn ($e) => $e->position, $r))->toBe(['e6' => 1, 'e4' => 2, 'e2' => 3, 'e5' => 4, 'e1' => 5, 'e3' => 6]);
+});
+
+it('orders by arrival time, not by queue number, among patients of equal triage', function () {
+    // e1 has the lower number but arrived later than e2: e2 is called first.
+    $r = est_run(est_inputs([est_entry(1, arrived: '09:50'), est_entry(2, arrived: '09:40')]));
+
+    expect(array_keys($r))->toBe(['e2', 'e1'])
+        ->and(est_range($r['e2']))->toBe([0, 5])
+        ->and(est_range($r['e1']))->toBe([7, 13])
+        ->and(est_codes($r['e1']))->not->toContain('triage_reordered');
+});
+
+it('breaks an arrival tie by number, then by id', function () {
+    $same = est_local('09:30');
+    $mk = fn (string $id, int $number) => new QueueEntryInput($id, $number, 0, EntryStatus::Waiting, 600, DurationSource::Service, $same);
+
+    expect(array_keys(est_run(est_inputs([$mk('b', 2), $mk('a', 1)]))))->toBe(['a', 'b'])
+        ->and(array_keys(est_run(est_inputs([$mk('z', 1), $mk('a', 1)]))))->toBe(['a', 'z']);
+});
+
+it('orders two arrivals in the same second by their microseconds, before the queue number', function () {
+    $second = est_local('09:30');
+    $mk = fn (int $number, string $micro) => new QueueEntryInput("e{$number}", $number, 0, EntryStatus::Waiting, 600, DurationSource::Service, $second->setMicrosecond((int) $micro));
+
+    // e1 has the lower number but arrived 400 ms after e2, inside the same second.
+    expect(array_keys(est_run(est_inputs([$mk(1, '500000'), $mk(2, '100000')]))))->toBe(['e2', 'e1'])
+        ->and(array_keys(est_run(est_inputs([$mk(1, '100000'), $mk(2, '500000')]))))->toBe(['e1', 'e2'])
+        // One microsecond apart still counts; equal to the microsecond falls back to the number.
+        ->and(array_keys(est_run(est_inputs([$mk(1, '000002'), $mk(2, '000001')]))))->toBe(['e2', 'e1'])
+        ->and(array_keys(est_run(est_inputs([$mk(2, '000007'), $mk(1, '000007')]))))->toBe(['e1', 'e2']);
+});
+
+it('flags triage reordering by arrival time, not by queue number', function () {
+    // e1 has the lower number and the higher triage but arrived later than e2: triage moves e1 ahead of a patient who was there first.
+    $late = est_run(est_inputs([est_entry(1, triage: 5, arrived: '09:50'), est_entry(2, arrived: '09:40')]));
+    expect(array_keys($late))->toBe(['e1', 'e2'])
+        ->and(est_codes($late['e1']))->toContain('triage_reordered')
+        ->and(est_codes($late['e2']))->toContain('triage_reordered');
+
+    // Same triage gap, but the higher-triage patient arrived first: nobody is overtaken.
+    $first = est_run(est_inputs([est_entry(1, triage: 5, arrived: '09:30'), est_entry(2, arrived: '09:40')]));
+    expect(array_keys($first))->toBe(['e1', 'e2'])
+        ->and(est_codes($first['e1']))->not->toContain('triage_reordered')
+        ->and(est_codes($first['e2']))->not->toContain('triage_reordered');
+
+    // A patient who has not arrived has no arrival to be overtaken in.
+    $unarrived = est_run(est_inputs([est_entry(1, triage: 5, arrived: '09:50'), est_entry(2, status: EntryStatus::Registered)]));
+    expect(est_codes($unarrived['e2']))->not->toContain('triage_reordered');
+});
+
+it('widens the range of an unarrived patient: the low case skips other unarrived patients, the high case counts the lower numbers (E4)', function () {
+    // Now 10:00, 10 minute visits (7.5 short, 12.5 long). e1 has arrived; e2 and e3 registered from the app.
+    $r = est_run(est_inputs([est_entry(1), est_entry(2, status: EntryStatus::Registered), est_entry(3, status: EntryStatus::Registered)]));
+
+    expect(est_range($r['e1']))->toBe([0, 5])
+        // e2: low = after e1 (7.5), high = after e1 (12.5): nobody unarrived ahead, so no widening.
+        ->and(est_range($r['e2']))->toBe([7, 13])
+        // e3: low = after e1 only (7.5), high = after e1 and e2 (25). Counting e2 in both passes would give 15 to 25.
+        ->and(est_range($r['e3']))->toBe([7, 25])
+        ->and(est_codes($r['e3']))->toContain('unarrived_counted', 'queue_ahead')
+        ->and(est_codes($r['e2']))->not->toContain('unarrived_counted');
+});
+
+it('lets a later unarrived patient\'s minimum fall inside an earlier one\'s range, and clamps nothing', function () {
+    // One arrived patient, two unarrived, 10 minute visits, now 10:00. e2 is 7 to 13 minutes; e3 is 7 to 25: its low
+    // case does not wait for e2 (who may not come), its high case does. Maximums never fall with position.
+    $r = est_run(est_inputs([est_entry(1), est_entry(2, status: EntryStatus::Registered), est_entry(3, status: EntryStatus::Registered)]));
+
+    expect($r['e3']->minMinutes)->toBeLessThan($r['e2']->maxMinutes)    // inside the earlier range
+        ->and($r['e3']->maxMinutes)->toBeGreaterThan($r['e2']->maxMinutes)
+        ->and([$r['e2']->minMinutes, $r['e2']->maxMinutes, $r['e3']->minMinutes, $r['e3']->maxMinutes])->toBe([7, 13, 7, 25]);
+});
+
+it('can give a later unarrived patient a lower minimum than an earlier one when the earlier low case does not fit before a block (decision 231)', function () {
+    // Now 10:00, appointment 10:20 to 11:00. e1 has arrived (10 minutes: 0 to 5). e2 is unarrived and long (30 minutes):
+    // its low case ends 10:30 at best, into the appointment, so it waits until 11:00. e3 is unarrived and short (5 minutes):
+    // its low case still fits before 10:20 (it does not wait for e2), its high case runs after e2.
+    $r = est_run(est_inputs([est_entry(1), est_entry(2, status: EntryStatus::Registered, minutes: 30), est_entry(3, status: EntryStatus::Registered, minutes: 5)],
+        ['blocked' => [est_block(BlockKind::Appointment, '10:20', '11:00')]]));
+
+    expect(est_range($r['e1']))->toBe([0, 5])
+        ->and(est_range($r['e2']))->toBe([60, 65])
+        ->and(est_range($r['e3']))->toBe([7, 98])
+        // The minimum goes down with position here; the maximum does not.
+        ->and($r['e3']->minMinutes)->toBeLessThan($r['e2']->minMinutes)
+        ->and($r['e3']->maxMinutes)->toBeGreaterThan($r['e2']->maxMinutes);
+});
+
+it('never counts an unarrived patient ahead of an arrived one, even with a lower number', function () {
+    // e1 registered first but has not arrived; e2 and e3 are at the clinic. They are called before e1.
+    $r = est_run(est_inputs([est_entry(1, status: EntryStatus::Registered), est_entry(2), est_entry(3)]));
+
+    expect(array_keys($r))->toBe(['e2', 'e3', 'e1'])
+        ->and(est_range($r['e2']))->toBe([0, 5])
+        ->and(est_range($r['e3']))->toBe([7, 13])         // one arrived patient ahead, never e1
+        ->and(est_codes($r['e3']))->not->toContain('unarrived_counted')
+        ->and(est_range($r['e1']))->toBe([15, 25])        // both arrived patients ahead in both passes
+        ->and(est_codes($r['e1']))->not->toContain('unarrived_counted');
+});
+
+it('widens the unarrived range around a protected appointment, per pass', function () {
+    // Appointment 10:20 to 10:40. e1 arrived; e2, e3 unarrived. Visits are 10 minutes (7.5 / 12.5).
+    $r = est_run(est_inputs([est_entry(1), est_entry(2, status: EntryStatus::Registered), est_entry(3, status: EntryStatus::Registered)],
+        ['blocked' => [est_block(BlockKind::Appointment, '10:20', '10:40')]]));
+
+    // e3 low: e1 ends 7.5, e3 runs 7.5 to 15 (before 10:20): starts at 7.5 minutes -> 7.
+    // e3 high: e1 12.5, e2 25 .. 12.5 + 12.5 = 25 > 20 so e2 starts after 10:40 (40), then e3 starts at 52.5 -> 53.
+    expect(est_range($r['e3']))->toBe([7, 53])
+        ->and(est_codes($r['e3']))->toContain('protected_appointment', 'unarrived_counted');
+});
+
+it('estimates a new staff-registered entry as waiting now, ahead of unarrived patients, and a new remote one as unarrived (E4)', function () {
+    $estimator = new WaitTimeEstimator(new PinnedClock(est_local('10:00')));
+    $queue = est_inputs([est_entry(1, arrived: '09:30'), est_entry(2, status: EntryStatus::Registered)]);
+
+    $staff = $estimator->estimateForNewEntry($queue, 600, DurationSource::Service, EntryStatus::Waiting, est_local('10:00'));
+    expect([$staff->position, ...est_range($staff)])->toBe([2, 7, 13])
+        ->and(est_codes($staff))->not->toContain('unarrived_counted');
+
+    $remote = $estimator->estimateForNewEntry($queue, 600, DurationSource::Service, EntryStatus::Registered, null);
+    expect([$remote->position, ...est_range($remote)])->toBe([3, 7, 25])
+        ->and(est_codes($remote))->toContain('unarrived_counted');
+
+    // A new staff entry arrived "now" queues behind someone who arrived earlier, and a higher triage one outranks them.
+    $urgent = $estimator->estimateForNewEntry($queue, 600, DurationSource::Service, EntryStatus::Waiting, est_local('10:00'), triagePriority: 9);
+    expect([$urgent->position, ...est_range($urgent)])->toBe([1, 0, 5])
+        ->and(est_codes($urgent))->toContain('triage_reordered');
+
+    expect(fn () => $estimator->estimateForNewEntry($queue, 600, DurationSource::Service, EntryStatus::Called, est_local('10:00')))->toThrow(InvalidArgumentException::class);
+
+    // A patient registering from the app cannot carry a triage priority; staff can set one on a waiting entry.
+    expect(fn () => $estimator->estimateForNewEntry($queue, 600, DurationSource::Service, EntryStatus::Registered, null, triagePriority: 5))->toThrow(InvalidArgumentException::class);
 });
 
 it('never counts a break end earlier than announced, and allows lateness only on the high end', function () {
@@ -419,11 +573,17 @@ it('never collapses a wait into a single number, not even a zero wait', function
 });
 
 it('rejects out-of-range inputs and settings', function () {
-    expect(fn () => new QueueEntryInput('x', 1, 10, EntryStatus::Waiting, 600, DurationSource::Default))->toThrow(InvalidArgumentException::class)
-        ->and(fn () => new QueueEntryInput('x', 0, 0, EntryStatus::Waiting, 600, DurationSource::Default))->toThrow(InvalidArgumentException::class)
-        ->and(fn () => new QueueEntryInput('x', 1, 0, EntryStatus::Waiting, 0, DurationSource::Default))->toThrow(InvalidArgumentException::class)
-        ->and(fn () => new QueueEntryInput('x', 1, 0, EntryStatus::Waiting, 86401, DurationSource::Default))->toThrow(InvalidArgumentException::class)
-        ->and((new QueueEntryInput('x', 1, 0, EntryStatus::Waiting, 86400, DurationSource::Default))->expectedDurationSeconds)->toBe(86400)
+    $at = est_local('09:00');
+    expect(fn () => new QueueEntryInput('x', 1, 10, EntryStatus::Waiting, 600, DurationSource::Default, $at))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => new QueueEntryInput('x', 0, 0, EntryStatus::Waiting, 600, DurationSource::Default, $at))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => new QueueEntryInput('x', 1, 0, EntryStatus::Waiting, 0, DurationSource::Default, $at))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => new QueueEntryInput('x', 1, 0, EntryStatus::Waiting, 86401, DurationSource::Default, $at))->toThrow(InvalidArgumentException::class)
+        ->and((new QueueEntryInput('x', 1, 0, EntryStatus::Waiting, 86400, DurationSource::Default, $at))->expectedDurationSeconds)->toBe(86400)
+        // Arrival must agree with the status: a waiting entry has arrived, a registered one has not.
+        ->and(fn () => new QueueEntryInput('x', 1, 0, EntryStatus::Waiting, 600, DurationSource::Default, null))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => new QueueEntryInput('x', 1, 0, EntryStatus::Registered, 600, DurationSource::Default, $at))->toThrow(InvalidArgumentException::class)
+        ->and((new QueueEntryInput('x', 1, 0, EntryStatus::Registered, 600, DurationSource::Default, null))->isUnarrived())->toBeTrue()
+        ->and((new QueueEntryInput('x', 1, 0, EntryStatus::Called, 600, DurationSource::Default, null))->isUnarrived())->toBeFalse()
         ->and(fn () => new CurrentConsultationInput(est_local('10:00'), 86401, DurationSource::Default))->toThrow(InvalidArgumentException::class)
         ->and(fn () => est_block(BlockKind::Hold, '10:00', '10:00'))->toThrow(InvalidArgumentException::class)
         ->and(fn () => new EstimatorSettings(0))->toThrow(InvalidArgumentException::class)

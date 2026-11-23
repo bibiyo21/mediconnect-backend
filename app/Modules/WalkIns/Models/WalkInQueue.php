@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $cutoff_at
  * @property int $last_number
  * @property string|null $number_prefix
- * @property bool $allow_pre_checkin_registration
+ * @property bool $allow_pre_checkin_registration reserved and unused: remote registration before check-in is refused (B2)
  * @property CarbonImmutable|null $opened_at
  * @property CarbonImmutable|null $closed_at
  * @property string|null $closed_by

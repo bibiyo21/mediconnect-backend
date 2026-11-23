@@ -3,6 +3,10 @@
 namespace App\Modules\WalkIns\Models;
 
 use App\Modules\WalkIns\Enums\EntryStatus;
+use App\Modules\WalkIns\Enums\PayerType;
+use App\Modules\WalkIns\Enums\PriorityLevel;
+use App\Modules\WalkIns\Enums\PriorityReason;
+use App\Modules\WalkIns\Enums\RegistrationChannel;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One patient visit in a walk-in queue (database-schema.md §8). A guest (no patient profile)
- * has an encrypted name and optional phone; those never appear in responses, logs or Sentry.
+ * has an encrypted name and optional phone; those never appear in responses, logs or Sentry. The same goes for
+ * the encrypted priority note and the HMO card name as typed (unverified); a purge clears all four for a guest.
  *
  * @property string $id
  * @property string $walkin_queue_id
@@ -21,11 +26,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $guest_phone_hash
  * @property CarbonImmutable|null $guest_pii_purged_at
  * @property string $registered_by_user_id
- * @property string $registration_channel
+ * @property RegistrationChannel $registration_channel
  * @property EntryStatus $status
- * @property int $triage_priority
+ * @property PriorityLevel $triage_priority
+ * @property PriorityReason|null $triage_reason_code
+ * @property string|null $triage_note_encrypted
+ * @property string $doctor_service_id
  * @property string|null $assigned_doctor_profile_id
- * @property string $payer_type
+ * @property PayerType $payer_type
+ * @property string|null $hmo_card_name_encrypted
+ * @property string|null $privacy_notice_version
+ * @property string|null $privacy_notice_shown_by_user_id
+ * @property CarbonImmutable|null $privacy_notice_shown_at
  * @property string|null $hmo_membership_id
  * @property int $recall_count
  * @property CarbonImmutable|null $estimated_call_at_min
@@ -48,18 +60,24 @@ class WalkInQueueEntry extends Model
     protected $attributes = ['triage_priority' => 0, 'recall_count' => 0];
 
     /** @var list<string> */
-    protected $hidden = ['guest_name_encrypted', 'guest_phone_encrypted', 'guest_phone_hash', 'idempotency_key'];
+    protected $hidden = ['guest_name_encrypted', 'guest_phone_encrypted', 'guest_phone_hash', 'triage_note_encrypted', 'hmo_card_name_encrypted', 'idempotency_key'];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
             'status' => EntryStatus::class,
+            'registration_channel' => RegistrationChannel::class,
+            'payer_type' => PayerType::class,
             'guest_name_encrypted' => 'encrypted',
             'guest_phone_encrypted' => 'encrypted',
             'guest_pii_purged_at' => 'immutable_datetime',
             'queue_number' => 'integer',
-            'triage_priority' => 'integer',
+            'triage_priority' => PriorityLevel::class,
+            'triage_reason_code' => PriorityReason::class,
+            'triage_note_encrypted' => 'encrypted',
+            'hmo_card_name_encrypted' => 'encrypted',
+            'privacy_notice_shown_at' => 'immutable_datetime',
             'recall_count' => 'integer',
             'estimated_call_at_min' => 'immutable_datetime',
             'estimated_call_at_max' => 'immutable_datetime',

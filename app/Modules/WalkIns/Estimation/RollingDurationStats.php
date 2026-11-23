@@ -19,11 +19,8 @@ use Illuminate\Support\Facades\DB;
  * A consultation counts toward a service when:
  *  - its appointment was booked for any row of the service's replaces_id chain, so a fee change (which ends
  *    the row and starts a replacement) does not lose the history; or
- *  - it was a walk-in queued at the location of any row of the chain, for that row's clinic service.
- *    Approximation: a queue has a clinic service but no doctor service, so a queue with no clinic service
- *    (a doctor-wide queue) matches every doctor service at that location that has no clinic service either.
- *    A doctor with two such services at one location shares walk-in history between them until walk-in
- *    entries record the doctor service they were registered for.
+ *  - it was a walk-in registered for any row of the chain (walkin_queue_entries.doctor_service_id), which
+ *    follows the same replaces_id chain, so the walk-in history of a service is exactly its own.
  */
 final class RollingDurationStats
 {
@@ -111,22 +108,10 @@ final class RollingDurationStats
 
         if ($service !== null) {
             $chain = $this->chain($service);
-            $query->where(function (Builder $match) use ($chain) {
-                $match->whereIn('appointment_id', Appointment::query()->whereIn('doctor_service_id', array_map(fn (DoctorService $s) => $s->id, $chain))->select('id'));
-                // Distinct (location, clinic service) pairs of the chain; online services have no location and no walk-ins.
-                $pairs = [];
-                foreach ($chain as $s) {
-                    if ($s->clinic_location_id !== null) {
-                        $pairs[$s->clinic_location_id.'|'.$s->clinic_service_id] = [$s->clinic_location_id, $s->clinic_service_id];
-                    }
-                }
-                foreach ($pairs as [$location, $clinicService]) {
-                    $match->orWhereIn('walkin_queue_entry_id', WalkInQueueEntry::query()
-                        ->join('walkin_queues', 'walkin_queues.id', '=', 'walkin_queue_entries.walkin_queue_id')
-                        ->where('walkin_queues.clinic_location_id', $location)
-                        ->whereRaw('walkin_queues.clinic_service_id IS NOT DISTINCT FROM ?', [$clinicService])
-                        ->select('walkin_queue_entries.id'));
-                }
+            $ids = array_map(fn (DoctorService $s) => $s->id, $chain);
+            $query->where(function (Builder $match) use ($ids) {
+                $match->whereIn('appointment_id', Appointment::query()->whereIn('doctor_service_id', $ids)->select('id'))
+                    ->orWhereIn('walkin_queue_entry_id', WalkInQueueEntry::query()->whereIn('doctor_service_id', $ids)->select('id'));
             });
         }
 

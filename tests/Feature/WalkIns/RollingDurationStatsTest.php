@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 /*
  * Increment 5.4: RollingDurationStats reads completed consultations. None are created by the product yet
  * (5.6 and Phase 6), so rows are inserted directly; the fallbacks are what runs until then.
+ * Increment 5.5a-1: walk-in history is matched by the entry's doctor_service_id (and its replaces_id chain).
  */
 
 beforeEach(function () {
@@ -23,17 +24,30 @@ beforeEach(function () {
     $this->patientProfile = DB::table('patient_profiles')->where('user_id', $this->staff->id)->value('id');
     $this->day = 0;
 
-    /** A completed walk-in consultation of $seconds that ended $daysAgo days ago, one queue per day. */
-    $this->visit = function (string $doctorId, string $locationId, int $seconds, int $daysAgo, string $status = 'COMPLETED', ?string $clinicService = null) {
+    /**
+     * A completed walk-in consultation of $seconds that ended $daysAgo days ago, one queue per day. The entry is registered
+     * for $serviceId (the doctor service of the entry, default: the world's service), which is what the history matches on.
+     */
+    $this->visit = function (string $doctorId, string $locationId, int $seconds, int $daysAgo, string $status = 'COMPLETED', ?string $clinicService = null, ?string $serviceId = null) {
         $ended = CarbonImmutable::now('UTC')->subDays($daysAgo);
         $queue = (string) Str::uuid();
         $entry = (string) Str::uuid();
         DB::table('walkin_queues')->insert(['id' => $queue, 'clinic_location_id' => $locationId, 'doctor_profile_id' => $doctorId, 'clinic_service_id' => $clinicService,
             'local_date' => $ended->subDays(++$this->day)->toDateString(), 'status' => 'OPEN', 'last_number' => 1]);
         DB::table('walkin_queue_entries')->insert(['id' => $entry, 'walkin_queue_id' => $queue, 'queue_number' => 1, 'guest_name_encrypted' => 'x', 'registered_by_user_id' => $this->staff->id,
-            'registration_channel' => 'STAFF_CONSOLE', 'status' => 'COMPLETED', 'assigned_doctor_profile_id' => $doctorId, 'payer_type' => 'SELF_PAY', 'completed_at' => $ended]);
+            'registration_channel' => 'STAFF_CONSOLE', 'status' => 'COMPLETED', 'assigned_doctor_profile_id' => $doctorId, 'payer_type' => 'SELF_PAY', 'completed_at' => $ended,
+            'doctor_service_id' => $serviceId ?? $this->service->id, 'privacy_notice_version' => '2026-11', 'privacy_notice_shown_by_user_id' => $this->staff->id, 'privacy_notice_shown_at' => $ended]);
         DB::table('consultations')->insert(['id' => (string) Str::uuid(), 'walkin_queue_entry_id' => $entry, 'doctor_profile_id' => $doctorId, 'clinic_location_id' => $locationId, 'consultation_type' => 'IN_PERSON',
             'status' => $status, 'started_at' => $ended->subSeconds($seconds), 'ended_at' => $ended, 'duration_seconds' => $seconds]);
+    };
+
+    /** Another in-person service of a doctor at a location (not the world's service). Returns its id. */
+    $this->otherService = function (string $doctorId, string $locationId, string $name = 'Follow-up', ?string $clinicService = null) {
+        $id = (string) Str::uuid();
+        DB::table('doctor_services')->insert(['id' => $id, 'doctor_profile_id' => $doctorId, 'clinic_location_id' => $locationId, 'clinic_service_id' => $clinicService, 'name' => $name,
+            'consultation_type' => 'IN_PERSON', 'duration_minutes' => 10, 'fee_amount' => 30000, 'currency' => 'PHP', 'status' => 'ACTIVE', 'effective_from' => now(), 'created_by' => $this->staff->id]);
+
+        return $id;
     };
 
     /** A completed consultation of an appointment booked for the given doctor service. */
@@ -129,19 +143,21 @@ it('ignores consultations older than the configured age', function () {
     expect(($this->stats)()->source)->toBe(DurationSource::Service);
 });
 
-it('ignores other doctors, other locations, unfinished consultations and zero-length ones', function () {
+it('ignores other doctors, other services of the doctor, unfinished consultations and zero-length ones', function () {
     [$other] = verified_doctor('0765432');
     $second = add_location($this->w['clinic'], $this->w['manager']);
+    $otherDoctorService = ($this->otherService)($other->id, $this->w['location']);
+    $secondLocationService = ($this->otherService)($this->doctor->id, $second, 'Second location');
     foreach ([1, 2, 3] as $i) {
-        ($this->visit)($other->id, $this->w['location'], 99, $i);
-        ($this->visit)($this->doctor->id, $second, 99, $i);
+        ($this->visit)($other->id, $this->w['location'], 99, $i, serviceId: $otherDoctorService);
+        ($this->visit)($this->doctor->id, $second, 99, $i, serviceId: $secondLocationService);
     }
     ($this->visit)($this->doctor->id, $this->w['location'], 99, 4, 'CANCELLED');
     ($this->visit)($this->doctor->id, $this->w['location'], 0, 5);
 
     expect(($this->stats)()->source)->toBe(DurationSource::Service);
 
-    // With no service given, all of the doctor's own completed consultations count.
+    // With no service given, all of the doctor's own completed consultations count (every service, every location).
     expect(($this->stats)(serviceId: null)->seconds)->toBe(99);
 });
 
@@ -181,23 +197,54 @@ it('does not count appointments of a different service', function () {
         ->and(($this->stats)(serviceId: $otherId)->source)->toBe(DurationSource::Rolling);
 });
 
-it('matches walk-ins by clinic service: another clinic service is excluded, and a doctor-wide queue matches a service with none', function () {
-    $clinicService = (string) Str::uuid();
-    DB::table('clinic_services')->insert(['id' => $clinicService, 'clinic_location_id' => $this->w['location'], 'name' => 'Vaccination']);
+it('matches walk-ins by the doctor service the entry was registered for, not by clinic service or location', function () {
+    $followUp = ($this->otherService)($this->doctor->id, $this->w['location']);
     foreach ([1, 2, 3] as $i) {
-        ($this->visit)($this->doctor->id, $this->w['location'], 99, $i, clinicService: $clinicService);
+        ($this->visit)($this->doctor->id, $this->w['location'], 99, $i, serviceId: $followUp);
     }
 
-    // Our service has no clinic service, so queues of the Vaccination service are not its history.
+    // Same doctor, same location, same (null) clinic service: the follow-up visits are not the first service's history.
     expect(($this->stats)()->source)->toBe(DurationSource::Service);
 
-    // A doctor-wide queue (no clinic service) is history for a service with none: the documented approximation.
     foreach ([4, 5, 6] as $i) {
         ($this->visit)($this->doctor->id, $this->w['location'], 700, $i);
     }
-    expect(($this->stats)()->seconds)->toBe(700);
+    $own = ($this->stats)();
+    $other = ($this->stats)(serviceId: $followUp);
+    expect([$own->seconds, $own->source, $own->samples])->toBe([700, DurationSource::Rolling, 3])
+        ->and([$other->seconds, $other->source, $other->samples])->toBe([99, DurationSource::Rolling, 3]);
 
-    // A service that does have the clinic service sees only the Vaccination queues.
-    DB::table('doctor_services')->where('id', $this->service->id)->update(['clinic_service_id' => $clinicService]);
-    expect(($this->stats)()->seconds)->toBe(99);
+    // The queue's clinic service does not decide history either: a Vaccination-queue service has its own entries, counted for it alone.
+    $clinicService = (string) Str::uuid();
+    DB::table('clinic_services')->insert(['id' => $clinicService, 'clinic_location_id' => $this->w['location'], 'name' => 'Vaccination']);
+    $vaccination = ($this->otherService)($this->doctor->id, $this->w['location'], 'Vaccination', $clinicService);
+    foreach ([7, 8, 9] as $i) {
+        ($this->visit)($this->doctor->id, $this->w['location'], 300, $i, clinicService: $clinicService, serviceId: $vaccination);
+    }
+    expect(($this->stats)(serviceId: $vaccination)->seconds)->toBe(300)
+        ->and(($this->stats)(serviceId: $followUp)->samples)->toBe(3)
+        ->and(($this->stats)()->samples)->toBe(3);
+});
+
+it('keeps walk-in history across a fee change, from either end of the replaces_id chain', function () {
+    // Days ago are spread out: each visit gets its own queue day (the helper subtracts a running counter too).
+    ($this->visit)($this->doctor->id, $this->w['location'], 500, 5);
+    $second = ($this->replace)($this->service->id);
+    ($this->visit)($this->doctor->id, $this->w['location'], 500, 3, serviceId: $second);
+    $third = ($this->replace)($second);
+    ($this->visit)($this->doctor->id, $this->w['location'], 500, 1, serviceId: $third);
+
+    foreach ([$third, $second, $this->service->id] as $id) {
+        $d = ($this->stats)(serviceId: $id);
+        expect([$d->seconds, $d->source, $d->samples])->toBe([500, DurationSource::Rolling, 3]);
+    }
+});
+
+it('counts appointment and walk-in consultations of the same service together', function () {
+    ($this->appointment)($this->service->id, 400, 1);
+    ($this->visit)($this->doctor->id, $this->w['location'], 600, 2);
+    ($this->visit)($this->doctor->id, $this->w['location'], 800, 3);
+    $d = ($this->stats)();
+
+    expect([$d->seconds, $d->source, $d->samples])->toBe([600, DurationSource::Rolling, 3]);
 });

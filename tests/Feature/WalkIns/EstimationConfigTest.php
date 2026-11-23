@@ -22,7 +22,7 @@ it('hands the configured settings to an estimator resolved from the container', 
     $now = CarbonImmutable::parse('2026-12-07 10:00', 'Asia/Manila')->utc();
     app()->instance(Clock::class, new PinnedClock($now));
     $inputs = new EstimateInputs(
-        [new QueueEntryInput('a', 1, 0, EntryStatus::Waiting, 600, DurationSource::Service), new QueueEntryInput('b', 2, 0, EntryStatus::Waiting, 600, DurationSource::Service)],
+        [new QueueEntryInput('a', 1, 0, EntryStatus::Waiting, 600, DurationSource::Service, $now->subMinutes(30)), new QueueEntryInput('b', 2, 0, EntryStatus::Waiting, 600, DurationSource::Service, $now->subMinutes(20))],
         null, [], new PresenceInput(PresenceStatus::In), null, 'Asia/Manila', '2026-12-07',
     );
 

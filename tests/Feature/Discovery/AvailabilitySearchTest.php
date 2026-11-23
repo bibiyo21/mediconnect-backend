@@ -20,6 +20,11 @@ use Illuminate\Support\Str;
  */
 
 beforeEach(function () {
+    // Pin the clock: the doctor works Mondays from 09:00 and the index applies the booking notice, so on a
+    // Monday morning the first OPEN slot in the table is not the first bookable one. The next Friday at 10:00,
+    // computed from the real time, keeps this suite independent of when it runs, and the application clock
+    // never trails the database's (a fixed past date would).
+    $this->travelTo(CarbonImmutable::now('Asia/Manila')->next(CarbonImmutable::FRIDAY)->setTime(10, 0));
     seed_roles();
     $this->seed(SpecialtySeeder::class);
     $this->seed(SchedulingPolicySeeder::class);
@@ -131,6 +136,27 @@ it('filters and sorts by availability in the degraded fallback', function () {
     expect($response->json('meta.degraded'))->toBeTrue()
         ->and($response->json('data.*.doctor_id'))->toBe([$this->doctor->id]);
     expect($this->getJson('/api/v1/search/doctors?sort=next_available')->json('data.0.doctor_id'))->toBe($this->doctor->id);
+});
+
+it('sorts the degraded fallback by the first bookable slot on the application clock, not by name', function () {
+    // Dr. Ben Reyes (after Dr. Ana Santos by name) works Mondays 08:00-09:00, so his first slot is the earlier one.
+    $service = DB::table('doctor_services')->where('doctor_profile_id', $this->other->id)->where('consultation_type', 'IN_PERSON')->value('id');
+    $mode = (string) Str::uuid7();
+    DB::table('doctor_service_modes')->insert(['id' => $mode, 'doctor_profile_id' => $this->other->id, 'clinic_location_id' => $this->location->id, 'doctor_service_id' => $service, 'consultation_type' => 'IN_PERSON', 'service_mode' => 'APPOINTMENT', 'effective_from' => '2026-01-01']);
+    $schedule = (string) Str::uuid7();
+    DB::table('doctor_schedules')->insert(['id' => $schedule, 'doctor_profile_id' => $this->other->id, 'name' => 'Early Mondays', 'effective_from' => '2026-01-01', 'status' => 'ACTIVE', 'created_by' => $this->other->user_id]);
+    DB::table('doctor_schedule_shifts')->insert(['id' => (string) Str::uuid7(), 'doctor_schedule_id' => $schedule, 'day_of_week' => 1, 'clinic_location_id' => $this->location->id, 'doctor_service_mode_id' => $mode, 'starts_at_local' => '08:00', 'ends_at_local' => '09:00', 'timezone' => 'Asia/Manila', 'slot_duration_minutes' => 20, 'buffer_minutes' => 5]);
+    app(AvailabilityProjector::class)->refresh($this->other->id);
+    $this->engine->down = true;
+
+    // On Friday both have open Mondays; Dr. Reyes' 08:00 is the first, against name order.
+    expect($this->getJson('/api/v1/search/doctors?sort=next_available')->assertOk()->json('data.*.doctor_id'))->toBe([$this->other->id, $this->doctor->id]);
+
+    // On the application clock, Monday 08:30 has passed Dr. Reyes' 08:00 (the database's own now() is still earlier than that Monday,
+    // so a PostgreSQL now() would keep counting it): his first slot is a week later, and Dr. Santos' 09:00 comes first.
+    $this->travelTo(CarbonImmutable::parse($this->monday.' 08:30', 'Asia/Manila'));
+    SearchCache::bump('doctors');
+    expect($this->getJson('/api/v1/search/doctors?sort=next_available')->assertOk()->json('data.*.doctor_id'))->toBe([$this->doctor->id, $this->other->id]);
 });
 
 it('filters and sorts by availability on live Typesense', function () {

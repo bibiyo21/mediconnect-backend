@@ -122,7 +122,8 @@ final class DoctorSearch
         $this->availabilityFromDatabase($query, $criteria);
         $found = (clone $query)->count();
         if (($criteria['sort'] ?? null) === 'next_available') {
-            $query->orderByRaw("(SELECT min(starts_at) FROM doctor_availability_slots a WHERE a.doctor_profile_id = doctor_profiles.id AND a.slot_kind = 'APPOINTMENT' AND a.status = 'OPEN' AND a.starts_at > now()) ASC NULLS LAST");
+            // The application clock, bound like the availability filter, so both agree on "now" (not PostgreSQL's now()).
+            $query->orderByRaw("(SELECT min(starts_at) FROM doctor_availability_slots a WHERE a.doctor_profile_id = doctor_profiles.id AND a.slot_kind = 'APPOINTMENT' AND a.status = 'OPEN' AND a.starts_at > ?) ASC NULLS LAST", [now()]);
         }
         $ids = $query->orderByDesc('profile_completeness')->orderBy('display_name')->forPage($page, $perPage)->pluck('id');
         $results = [];
