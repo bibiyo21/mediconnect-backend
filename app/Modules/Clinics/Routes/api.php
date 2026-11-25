@@ -8,6 +8,7 @@ use App\Modules\Clinics\Http\Controllers\ClinicManagementController;
 use App\Modules\Clinics\Http\Controllers\ClinicMembersController;
 use App\Modules\Clinics\Http\Controllers\MyAssignmentsController;
 use App\Modules\Clinics\Http\Controllers\PublicClinicsController;
+use App\Modules\Clinics\Http\Controllers\WalkInPolicyController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -49,6 +50,10 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(func
         Route::get('doctor-assignments', [ClinicDoctorAssignmentsController::class, 'index']);
         Route::post('doctors', [ClinicDoctorAssignmentsController::class, 'store']);
         Route::post('doctor-assignments/{assignmentId}/end', [ClinicDoctorAssignmentsController::class, 'end'])->whereUuid('assignmentId');
+
+        // Walk-in settings of a doctor at a location (5.5a): remote registration switch, cutoff, number prefix, capacity mode.
+        Route::get('doctor-assignments/{assignmentId}/walkin-policy', [WalkInPolicyController::class, 'show'])->whereUuid('assignmentId')->middleware('throttle:walkin-read');
+        Route::patch('doctor-assignments/{assignmentId}/walkin-policy', [WalkInPolicyController::class, 'update'])->whereUuid('assignmentId')->middleware('throttle:walkin-write');
 
         Route::post('members', [ClinicMembersController::class, 'store']);
         Route::delete('members/{memberId}', [ClinicMembersController::class, 'destroy'])->whereUuid('memberId');

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $effective_from
  * @property CarbonImmutable|null $effective_until
  * @property string|null $end_reason
+ * @property array<string, mixed>|null $walkin_policy
  * @property CarbonImmutable $created_at
  * @property-read DoctorProfile $doctorProfile
  * @property-read ClinicLocation $location

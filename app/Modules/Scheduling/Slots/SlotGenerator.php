@@ -117,7 +117,7 @@ final class SlotGenerator
      * @param  list<HolidayInput>  $holidays
      * @return list<array{int, int}>
      */
-    private function openWindows(string $locationId, string $date, int $dow, string $tz, array $openingHours, array $holidays): array
+    public function openWindows(string $locationId, string $date, int $dow, string $tz, array $openingHours, array $holidays): array
     {
         foreach ($holidays as $h) {
             if ($h->locationId === $locationId && $h->date === $date) {

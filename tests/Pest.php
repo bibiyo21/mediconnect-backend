@@ -7,6 +7,7 @@ require_once __DIR__.'/Support/directory.php';
 require_once __DIR__.'/Support/presence.php';
 require_once __DIR__.'/Support/realtime.php';
 require_once __DIR__.'/Support/search.php';
+require_once __DIR__.'/Support/walkins.php';
 
 use Tests\Concerns\RefreshDatabaseAsOwner;
 use Tests\TestCase;

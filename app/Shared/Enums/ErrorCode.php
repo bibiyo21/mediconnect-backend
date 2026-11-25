@@ -22,6 +22,12 @@ enum ErrorCode: string
     case ActiveConsultation = 'ACTIVE_CONSULTATION';
     case QueueClosed = 'QUEUE_CLOSED';
     case QueueFull = 'QUEUE_FULL';
+    case QueueNotStarted = 'QUEUE_NOT_STARTED';
+    case RegistrationNotAllowed = 'REGISTRATION_NOT_ALLOWED';
+    case CapacityOverrideRequired = 'CAPACITY_OVERRIDE_REQUIRED';
+    case EntryAlreadyLive = 'ENTRY_ALREADY_LIVE';
+    case DailyLimitReached = 'DAILY_LIMIT_REACHED';
+    case LateRiskAckRequired = 'LATE_RISK_ACK_REQUIRED';
     case ValidationFailed = 'VALIDATION_FAILED';
     case IdempotencyKeyReused = 'IDEMPOTENCY_KEY_REUSED';
     case HmoNotAccepted = 'HMO_NOT_ACCEPTED';
@@ -39,7 +45,9 @@ enum ErrorCode: string
             self::NotFound => 404,
             self::MethodNotAllowed => 405,
             self::SlotUnavailable, self::InvalidStateTransition, self::ConcurrentModification,
-            self::IdempotencyInProgress, self::ActiveConsultation, self::QueueClosed, self::QueueFull => 409,
+            self::IdempotencyInProgress, self::ActiveConsultation, self::QueueClosed, self::QueueFull,
+            self::QueueNotStarted, self::RegistrationNotAllowed, self::CapacityOverrideRequired, self::EntryAlreadyLive,
+            self::DailyLimitReached, self::LateRiskAckRequired => 409,
             self::ValidationFailed, self::IdempotencyKeyReused, self::HmoNotAccepted => 422,
             self::RecordFinalized => 423,
             self::RateLimited => 429,
@@ -69,6 +77,12 @@ enum ErrorCode: string
             self::ActiveConsultation => 'End the active consultation first.',
             self::QueueClosed => 'This queue is closed.',
             self::QueueFull => 'This queue is full.',
+            self::QueueNotStarted => 'This queue has not started yet. The doctor has not checked in at this clinic.',
+            self::RegistrationNotAllowed => 'Registration is not available for this queue right now.',
+            self::CapacityOverrideRequired => 'This queue is over its planned capacity. Confirm to add the patient anyway.',
+            self::EntryAlreadyLive => 'This patient already has a place in this queue.',
+            self::DailyLimitReached => 'The daily limit for joining walk-in queues from the app has been reached.',
+            self::LateRiskAckRequired => 'The clinic may not be able to see you today. Confirm that you understand before joining.',
             self::ValidationFailed => 'Validation failed.',
             self::IdempotencyKeyReused => 'This idempotency key was already used with a different request.',
             self::HmoNotAccepted => 'This HMO is not accepted for this service.',

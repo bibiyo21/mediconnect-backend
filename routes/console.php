@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Scheduling\Jobs\ExpireSlotReservations;
+use App\Modules\WalkIns\Jobs\PurgeGuestWalkInPii;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -20,3 +21,5 @@ Schedule::command('search:rebuild clinics')->dailyAt('03:10')->withoutOverlappin
 Schedule::command('availability:generate')->dailyAt('02:30')->withoutOverlapping();
 // Expired holds back to open slots (Phase 4, §24 ExpireSlotReservations).
 Schedule::job(new ExpireSlotReservations)->everyMinute();
+// Guest walk-in data (A5, plan Q6): names, phones, typed HMO names and priority notes are cleared after the retention period.
+Schedule::job(new PurgeGuestWalkInPii)->dailyAt('03:30');

@@ -22,7 +22,7 @@ use Throwable;
  * - Same key, same request: the stored response is replayed (Idempotency-Replayed: true).
  * - Same key, different request: 422 IDEMPOTENCY_KEY_REUSED.
  * - Same key while the first is still running: 409 IDEMPOTENCY_IN_PROGRESS.
- * - A 5xx or an exception releases the key so the client can retry.
+ * - A 5xx, an exception, or a 409 CONCURRENT_MODIFICATION releases the key so the client can retry.
  * - A key left IN_PROGRESS by a crashed request is taken over by a retry after
  *   ABANDONED_AFTER_MINUTES, instead of blocking the key for 48 hours.
  *
@@ -85,7 +85,8 @@ final class EnsureIdempotency
             throw $e;
         }
 
-        if ($response->getStatusCode() >= 500) {
+        // A 5xx, or a 409 that only says "another change is in progress, retry" (CONCURRENT_MODIFICATION), is not an answer to replay for 48 hours.
+        if ($response->getStatusCode() >= 500 || $this->isRetryable($response)) {
             DB::table('idempotency_keys')->where('id', $id)->delete();
 
             return $response;
@@ -99,6 +100,16 @@ final class EnsureIdempotency
         ]);
 
         return $response;
+    }
+
+    private function isRetryable(Response $response): bool
+    {
+        if ($response->getStatusCode() !== 409) {
+            return false;
+        }
+        $body = json_decode((string) $response->getContent(), true);
+
+        return is_array($body) && ($body['code'] ?? null) === 'CONCURRENT_MODIFICATION';
     }
 
     /** @return Response|string a response to return, or the id of an abandoned key now owned by this request */

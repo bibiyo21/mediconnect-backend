@@ -8,10 +8,12 @@ use App\Modules\Doctors\Events\DoctorServiceReplaced;
 use App\Modules\Doctors\Events\DoctorServicesEnded;
 use App\Modules\Scheduling\Console\GenerateAvailabilityCommand;
 use App\Modules\Scheduling\Contracts\AvailabilitySummaries;
+use App\Modules\Scheduling\Contracts\WalkInDay;
 use App\Modules\Scheduling\Events\SchedulingChanged;
 use App\Modules\Scheduling\Listeners\FollowServiceChanges;
 use App\Modules\Scheduling\Listeners\QueueAvailabilityRefresh;
 use App\Modules\Scheduling\Services\AvailabilitySummaryService;
+use App\Modules\Scheduling\Services\WalkInDayService;
 use App\Shared\Services\Fingerprint;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -26,6 +28,7 @@ final class SchedulingServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(AvailabilitySummaries::class, AvailabilitySummaryService::class);
+        $this->app->bind(WalkInDay::class, WalkInDayService::class);
     }
 
     public function boot(): void

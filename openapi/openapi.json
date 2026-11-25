@@ -8883,6 +8883,214 @@
                 }
             }
         },
+        "/walk-ins/queues/{id}/pause": {
+            "post": {
+                "operationId": "queueControl.pause",
+                "summary": "Pause a queue: no new registrations (QUEUE_CLOSED, reason_code `paused`); entries already in it are untouched. OPEN only (409 otherwise). Needs `walkins.manage_queue` at the location",
+                "tags": [
+                    "QueueControl"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/QueueResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: only an OPEN queue can be paused (errors.status), or CONCURRENT_MODIFICATION (retry).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/queues/{id}/open": {
+            "post": {
+                "operationId": "queueControl.open",
+                "summary": "Reopen a paused queue. PAUSED only (409 otherwise; a closed queue stays closed). Needs `walkins.manage_queue` at the location",
+                "tags": [
+                    "QueueControl"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/QueueResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: only a PAUSED queue can be reopened; a closed queue stays closed (errors.status), or CONCURRENT_MODIFICATION (retry).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/register": {
             "post": {
                 "operationId": "authentication.registration",
@@ -11074,6 +11282,1063 @@
                     }
                 ]
             }
+        },
+        "/clinics/{clinicId}/doctor-assignments/{assignmentId}/walkin-policy": {
+            "get": {
+                "operationId": "walkInPolicy.show",
+                "description": "Shows the stored settings (defaults for any key never set) and the capacity today's schedule derives for this doctor here.",
+                "summary": "The walk-in settings",
+                "tags": [
+                    "WalkInPolicy"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "assignmentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInPolicyResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: clinics.update is needed at the assignment's location.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "walkInPolicy.update",
+                "summary": "Changes the settings sent (partial). Unknown keys are refused (422). The change is audited with the keys and their old and new values",
+                "tags": [
+                    "WalkInPolicy"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "assignmentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateWalkInPolicyRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInPolicyResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: the assignment has ended.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins": {
+            "post": {
+                "operationId": "walkIns.store",
+                "description": "Needs an `Idempotency-Key` (a retry with the same key and body returns the same entry). Send `patient_profile_id` for yourself or a\ndependant you manage (patient path), or `guest` for a person the clinic registers at the desk (staff or doctor path). The server decides\nthe channel, the queue, the number and the fee. Patient-app registration is off until the clinic turns it on, needs your verified mobile\nnumber and the doctor to be checked in, and is limited per day. `409` codes: QUEUE_NOT_STARTED, REGISTRATION_NOT_ALLOWED (reason_code),\nQUEUE_CLOSED (reason_code), QUEUE_FULL, CAPACITY_OVERRIDE_REQUIRED, ENTRY_ALREADY_LIVE (errors.entry_id), DAILY_LIMIT_REACHED (reason_code),\nLATE_RISK_ACK_REQUIRED, CONCURRENT_MODIFICATION (retry). The estimate is a range or nothing, never a promise.",
+                "summary": "Register for a walk-in queue",
+                "tags": [
+                    "WalkIns"
+                ],
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterWalkInRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "409": {
+                        "description": "QUEUE_NOT_STARTED (the doctor has not checked in; patient app only), REGISTRATION_NOT_ALLOWED (reason_code: remote_registration_off, mobile_not_verified, doctor_unavailable, doctor_checked_out, no_walkin_hours_today, doctor_not_active, location_not_active), QUEUE_CLOSED (reason_code: paused, closed, cutoff_passed, clinic_closed_today), QUEUE_FULL (patient app), CAPACITY_OVERRIDE_REQUIRED (staff and doctor: errors.current and errors.capacity; resend with capacity_override), ENTRY_ALREADY_LIVE (errors.entry_id), DAILY_LIMIT_REACHED (reason_code: live_entries_per_patient or patients_per_account_per_day; errors.limit), LATE_RISK_ACK_REQUIRED (send acknowledge_late_risk), CONCURRENT_MODIFICATION (retry with the same key: it is released). Reuse the Idempotency-Key only for a retry of the same body: any other 4xx is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/queue": {
+            "get": {
+                "operationId": "walkIns.queue",
+                "description": "With `clinic_location_id`: the board of that location for the date, for its staff and for the queue's doctor (names; minutes for the next\nwaiting entries only); global-scope readers get a restricted view without names, and every such read is audited. Without it: your own\nentries for the date and no one else's.",
+                "summary": "The walk-in board, or your own places",
+                "tags": [
+                    "WalkIns"
+                ],
+                "parameters": [
+                    {
+                        "name": "clinic_location_id",
+                        "in": "query",
+                        "description": "The location whose board to show (staff and doctors). Omit it to list your own walk-in places.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "doctor_id",
+                        "in": "query",
+                        "description": "Limits the board to one doctor's queues.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "description": "The queue's local date (Y-m-d); today at the location by default.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean"
+                                                },
+                                                "data": {
+                                                    "$ref": "#/components/schemas/QueueBoardResource"
+                                                },
+                                                "meta": {
+                                                    "type": "string"
+                                                },
+                                                "message": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "success",
+                                                "data",
+                                                "meta",
+                                                "message"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean"
+                                                },
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/WalkInEntryResource"
+                                                    }
+                                                },
+                                                "meta": {
+                                                    "type": "string"
+                                                },
+                                                "message": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "success",
+                                                "data",
+                                                "meta",
+                                                "message"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/join-preview": {
+            "get": {
+                "operationId": "walkIns.joinPreview",
+                "description": "No counts and no remaining places. The estimate is a range or nothing and is withheld when it would be a guess about a guess.",
+                "summary": "Before joining: queue state, whether the app can register you, the listed fee and an estimate",
+                "tags": [
+                    "WalkIns"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctor_service_id",
+                        "in": "query",
+                        "required": true,
+                        "description": "The in-person doctor service the patient is thinking of joining.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/JoinPreviewResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/search": {
+            "post": {
+                "operationId": "walkIns.search",
+                "description": "By queue number, exact phone or part of a name. Names are matched in memory over at most 500 entries. A phone is never returned.\nThe search is audited by type and result count only.",
+                "summary": "Staff dedupe search over a location's live entries today",
+                "tags": [
+                    "WalkIns"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SearchWalkInsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/WalkInEntryResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "match_type": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "number",
+                                                                "name",
+                                                                "phone"
+                                                            ]
+                                                        },
+                                                        "truncated": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "match_type",
+                                                        "truncated"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}": {
+            "get": {
+                "operationId": "walkIns.show",
+                "description": "Your own entry (you registered it, or it is yours or a dependant's), or, for the location's staff, the detail with the guest's name and\nphone (audited). Anyone else gets 404.",
+                "summary": "One entry",
+                "tags": [
+                    "WalkIns"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/arrive": {
+            "post": {
+                "operationId": "walkIns.arrive",
+                "summary": "Mark an entry as arrived (REGISTERED to WAITING). Needs `walkins.manage_queue` at the location. Needs an `Idempotency-Key`",
+                "tags": [
+                    "WalkIns"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: the entry is not REGISTERED (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/cancel": {
+            "post": {
+                "operationId": "walkIns.cancel",
+                "description": "By its owner, or by staff or the doctor with `walkins.manage_queue`. Staff cancelling a guest must confirm `patient_informed_in_person`.\nNeeds an `Idempotency-Key`.",
+                "summary": "Cancel an entry that is REGISTERED or WAITING",
+                "tags": [
+                    "WalkIns"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CancelWalkInRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: only a REGISTERED or WAITING entry can be cancelled (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -11741,6 +13006,44 @@
                     "channel_name"
                 ],
                 "title": "BroadcastAuthRequest"
+            },
+            "CancelReason": {
+                "type": "string",
+                "description": "Why an entry was cancelled (decision 52). Only the code is ever stored on the event, audit row or notice.\n",
+                "enum": [
+                    "PATIENT_REQUEST",
+                    "PATIENT_LEFT",
+                    "DUPLICATE_ENTRY",
+                    "OTHER"
+                ],
+                "title": "CancelReason"
+            },
+            "CancelWalkInRequest": {
+                "type": "object",
+                "description": "POST /walk-ins/{id}/cancel",
+                "properties": {
+                    "reason_code": {
+                        "description": "PATIENT_REQUEST, PATIENT_LEFT, DUPLICATE_ENTRY or OTHER. A fixed code: no free text.",
+                        "$ref": "#/components/schemas/CancelReason"
+                    },
+                    "patient_informed_in_person": {
+                        "type": "boolean",
+                        "description": "Staff cancelling a guest's entry must confirm they told the patient in person."
+                    }
+                },
+                "required": [
+                    "reason_code"
+                ],
+                "title": "CancelWalkInRequest"
+            },
+            "CapacityMode": {
+                "type": "string",
+                "description": "How a doctor's walk-in queue capacity at a location is decided (B9): from the schedule, or no cap with the cutoff only.\n| |\n|---|\n| `DERIVED` <br/> Capacity comes from the schedule (walkin_capacity, else window minutes over slot length). |\n| `UNLIMITED` <br/> No cap: only the cutoff stops registrations. Stored on the queue as a null capacity. |",
+                "enum": [
+                    "DERIVED",
+                    "UNLIMITED"
+                ],
+                "title": "CapacityMode"
             },
             "CheckInRequest": {
                 "type": "object",
@@ -13433,6 +14736,12 @@
                             "ACTIVE_CONSULTATION",
                             "QUEUE_CLOSED",
                             "QUEUE_FULL",
+                            "QUEUE_NOT_STARTED",
+                            "REGISTRATION_NOT_ALLOWED",
+                            "CAPACITY_OVERRIDE_REQUIRED",
+                            "ENTRY_ALREADY_LIVE",
+                            "DAILY_LIMIT_REACHED",
+                            "LATE_RISK_ACK_REQUIRED",
                             "VALIDATION_FAILED",
                             "IDEMPOTENCY_KEY_REUSED",
                             "HMO_NOT_ACCEPTED",
@@ -13456,7 +14765,20 @@
                             "open_session",
                             "not_checked_in",
                             "invalid_transition",
-                            "change_in_progress"
+                            "change_in_progress",
+                            "doctor_not_active",
+                            "location_not_active",
+                            "remote_registration_off",
+                            "mobile_not_verified",
+                            "doctor_unavailable",
+                            "doctor_checked_out",
+                            "no_walkin_hours_today",
+                            "paused",
+                            "closed",
+                            "cutoff_passed",
+                            "clinic_closed_today",
+                            "live_entries_per_patient",
+                            "patients_per_account_per_day"
                         ]
                     },
                     "request_id": {
@@ -13495,6 +14817,135 @@
                     }
                 },
                 "title": "ForgotPasswordRequest"
+            },
+            "JoinPreviewResource": {
+                "type": "object",
+                "properties": {
+                    "doctor_service_id": {
+                        "type": "string"
+                    },
+                    "service_name": {
+                        "type": "string"
+                    },
+                    "doctor_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "clinic_location_id": {
+                        "type": "string"
+                    },
+                    "location_name": {
+                        "type": "string"
+                    },
+                    "timezone": {
+                        "type": "string"
+                    },
+                    "local_date": {
+                        "type": "string",
+                        "description": "The location's local date (Y-m-d)."
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "NOT_STARTED (the doctor has not checked in), OPEN, PAUSED or CLOSED. Drives the Join button (E8)."
+                    },
+                    "state_reason_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why the state is PAUSED or CLOSED; null when OPEN or NOT_STARTED.",
+                        "enum": [
+                            "paused",
+                            "closed",
+                            "cutoff_passed",
+                            "clinic_closed_today",
+                            "no_walkin_hours_today",
+                            "doctor_unavailable",
+                            "doctor_checked_out",
+                            "doctor_not_active",
+                            "location_not_active",
+                            null
+                        ]
+                    },
+                    "accepts_remote_registration": {
+                        "type": "boolean",
+                        "description": "Whether the app can register this patient now."
+                    },
+                    "remote_refusal_reason_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why not: doctor_not_active, location_not_active, remote_registration_off, mobile_not_verified, queue_not_started, doctor_unavailable, doctor_checked_out, paused, closed, cutoff_passed, clinic_closed_today or no_walkin_hours_today."
+                    },
+                    "fee": {
+                        "type": "string",
+                        "description": "The listed fee in minor units. Nothing is charged here."
+                    },
+                    "estimate": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "Present only when the app can register you now. No place in line: that would count the queue.",
+                        "properties": {
+                            "min_minutes": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "max_minutes": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "is_estimate": {
+                                "type": "boolean"
+                            },
+                            "may_not_be_served_today": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "wait_status": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "min_minutes",
+                            "max_minutes",
+                            "is_estimate",
+                            "may_not_be_served_today",
+                            "wait_status"
+                        ]
+                    },
+                    "requires_late_risk_acknowledgement": {
+                        "type": "boolean",
+                        "description": "True when the range reaches closing time: joining then needs `acknowledge_late_risk` (E1)."
+                    }
+                },
+                "required": [
+                    "doctor_service_id",
+                    "service_name",
+                    "doctor_name",
+                    "clinic_location_id",
+                    "location_name",
+                    "timezone",
+                    "local_date",
+                    "state",
+                    "state_reason_code",
+                    "accepts_remote_registration",
+                    "remote_refusal_reason_code",
+                    "fee",
+                    "estimate",
+                    "requires_late_risk_acknowledgement"
+                ],
+                "title": "JoinPreviewResource"
             },
             "LoginRequest": {
                 "type": "object",
@@ -13988,6 +15439,15 @@
                 ],
                 "title": "OnboardingStatus"
             },
+            "PayerType": {
+                "type": "string",
+                "description": "Who the patient says will pay. HMO here is a claim, never a verified coverage (principle 12): until Phase 7A the entry holds only the card name as typed.\n",
+                "enum": [
+                    "SELF_PAY",
+                    "HMO"
+                ],
+                "title": "PayerType"
+            },
             "PresenceActionRequest": {
                 "type": "object",
                 "description": "Base for presence writes. Fine-grained authorization (own presence, or presence.manage at the\nlocation) is decided by PresenceAccess in the controller; this is only the coarse gate.",
@@ -14087,6 +15547,18 @@
                     "version"
                 ],
                 "title": "PresenceStateResource"
+            },
+            "PriorityReason": {
+                "type": "string",
+                "description": "Why an entry has a triage level above normal (decisions 88 to 91). Only the code is ever stored on events, audit rows and broadcasts; the free-text note is encrypted on the entry and goes nowhere else.\n",
+                "enum": [
+                    "SENIOR_PWD",
+                    "PREGNANT",
+                    "DOCTOR_REQUEST",
+                    "STAFF_CONCERN",
+                    "OTHER"
+                ],
+                "title": "PriorityReason"
             },
             "PublicClinicDetailResource": {
                 "type": "object",
@@ -14762,6 +16234,98 @@
                 ],
                 "title": "PublicPresenceResource"
             },
+            "QueueBoardResource": {
+                "type": "object",
+                "properties": {
+                    "clinic_location_id": {
+                        "type": "string"
+                    },
+                    "timezone": {
+                        "type": "string"
+                    },
+                    "local_date": {
+                        "type": "string",
+                        "description": "The queue's local date (Y-m-d)."
+                    },
+                    "restricted": {
+                        "type": "string",
+                        "description": "True when any queue is shown in the restricted view (no names, phones, HMO text or notes)."
+                    },
+                    "queues": {
+                        "type": "array",
+                        "items": {}
+                    }
+                },
+                "required": [
+                    "clinic_location_id",
+                    "timezone",
+                    "local_date",
+                    "restricted",
+                    "queues"
+                ],
+                "title": "QueueBoardResource"
+            },
+            "QueueResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "clinic_location_id": {
+                        "type": "string"
+                    },
+                    "doctor_profile_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "local_date": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "OPEN, PAUSED or CLOSED.",
+                        "enum": [
+                            "OPEN",
+                            "PAUSED",
+                            "CLOSED"
+                        ]
+                    },
+                    "number_prefix": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The queue number prefix (for example `A`)."
+                    },
+                    "capacity": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Null means no cap (only the cutoff stops registrations)."
+                    },
+                    "cutoff_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "UTC."
+                    }
+                },
+                "required": [
+                    "id",
+                    "clinic_location_id",
+                    "doctor_profile_id",
+                    "local_date",
+                    "status",
+                    "number_prefix",
+                    "capacity",
+                    "cutoff_at"
+                ],
+                "title": "QueueResource"
+            },
             "RefreshRequest": {
                 "type": "object",
                 "properties": {
@@ -14895,6 +16459,103 @@
                     "password_confirmation"
                 ],
                 "title": "RegisterRequest"
+            },
+            "RegisterWalkInRequest": {
+                "type": "object",
+                "description": "POST /walk-ins. The path is chosen by the body: `guest` is the staff or doctor path (a guest the clinic registers at the desk);\n`patient_profile_id` is the patient path (yourself or a dependant you are authorized for). Prices, channels, queue numbers, the HMO\nmembership id and the clinic service are never accepted: the server derives them (422 when sent).",
+                "properties": {
+                    "doctor_service_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The in-person doctor service the patient registers for. The server derives the doctor, location and queue from it."
+                    },
+                    "patient_profile_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The patient path: your own patient profile, or a dependant you are authorized to manage. Exclusive with `guest`."
+                    },
+                    "guest": {
+                        "type": "object",
+                        "description": "The staff or doctor path: a guest the clinic registers at the desk. Exclusive with `patient_profile_id`.",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 2,
+                                "maxLength": 120
+                            },
+                            "phone": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "The guest's contact number, optional (a Philippine mobile number).",
+                                "maxLength": 32
+                            }
+                        }
+                    },
+                    "payer_type": {
+                        "$ref": "#/components/schemas/PayerType"
+                    },
+                    "hmo_card_name_text": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "What the patient says their HMO is called, as printed on the card. Required for HMO, refused for SELF_PAY. Never verified.",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "priority_level": {
+                        "type": "string",
+                        "description": "Staff and doctor only. NORMAL (default), PRIORITY or URGENT.",
+                        "enum": [
+                            "NORMAL",
+                            "PRIORITY",
+                            "URGENT"
+                        ]
+                    },
+                    "priority_reason_code": {
+                        "anyOf": [
+                            {
+                                "description": "Required for PRIORITY and URGENT. Staff and doctor only.",
+                                "$ref": "#/components/schemas/PriorityReason"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "priority_note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "An optional short note for a priority: no symptoms or diagnosis. At most 140 characters. Staff and doctor only.",
+                        "maxLength": 140
+                    },
+                    "privacy_notice_version": {
+                        "type": "string",
+                        "description": "The version of the privacy notice that was shown to the guest: one of the published versions. Required with `guest`.",
+                        "pattern": "^[A-Za-z0-9._-]+$",
+                        "enum": [
+                            "v1"
+                        ],
+                        "maxLength": 16
+                    },
+                    "capacity_override": {
+                        "type": "boolean",
+                        "description": "Staff and doctor only: add the guest although the queue is over its planned capacity. Audited."
+                    },
+                    "acknowledge_late_risk": {
+                        "type": "boolean",
+                        "description": "Patient path: confirm that the clinic may not be able to see you today (the server asks when the range reaches closing time)."
+                    }
+                },
+                "required": [
+                    "doctor_service_id",
+                    "payer_type"
+                ],
+                "title": "RegisterWalkInRequest"
             },
             "RejectDoctorRequest": {
                 "type": "object",
@@ -15418,6 +17079,27 @@
                     "shifts"
                 ],
                 "title": "ScheduleResource"
+            },
+            "SearchWalkInsRequest": {
+                "type": "object",
+                "description": "GET /walk-ins/search: the staff dedupe search over one location's live entries today.",
+                "properties": {
+                    "clinic_location_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "term": {
+                        "type": "string",
+                        "description": "A queue number (`A-07`, `7`), an exact phone number, or part of a name (at least 2 characters). Never logged or audited.",
+                        "minLength": 1,
+                        "maxLength": 120
+                    }
+                },
+                "required": [
+                    "clinic_location_id",
+                    "term"
+                ],
+                "title": "SearchWalkInsRequest"
             },
             "ServiceMode": {
                 "type": "string",
@@ -16320,6 +18002,35 @@
                 ],
                 "title": "UpdateUserRolesRequest"
             },
+            "UpdateWalkInPolicyRequest": {
+                "type": "object",
+                "description": "PATCH /clinics/{clinicId}/doctor-assignments/{assignmentId}/walkin-policy: only the keys sent change. Unknown keys are refused.",
+                "properties": {
+                    "allow_patient_app_registration": {
+                        "type": "boolean",
+                        "description": "Whether patients may join this doctor's walk-in queue from the app. Off by default; the patient also needs a verified mobile number."
+                    },
+                    "cutoff_minutes_before_close": {
+                        "type": "integer",
+                        "description": "Minutes before closing (or the last walk-in window's end) after which nobody new is admitted. 0 to 240, default 30.",
+                        "minimum": 0,
+                        "maximum": 240
+                    },
+                    "number_prefix": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The queue-number prefix for this doctor's queues at the location, 1 to 4 capital letters; a free letter is used when it is taken or null.",
+                        "pattern": "^[A-Z]{1,4}$"
+                    },
+                    "capacity_mode": {
+                        "description": "DERIVED takes the capacity from the schedule; UNLIMITED admits until the cutoff.\n\n| |\n|---|\n| `DERIVED` <br/> Capacity comes from the schedule (walkin_capacity, else window minutes over slot length). |\n| `UNLIMITED` <br/> No cap: only the cutoff stops registrations. Stored on the queue as a null capacity. |",
+                        "$ref": "#/components/schemas/CapacityMode"
+                    }
+                },
+                "title": "UpdateWalkInPolicyRequest"
+            },
             "UploadCredentialRequest": {
                 "type": "object",
                 "description": "POST /doctors/me/credentials (multipart/form-data).",
@@ -16387,6 +18098,642 @@
                     "code"
                 ],
                 "title": "VerifyOtpRequest"
+            },
+            "WalkInEntryResource": {
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string",
+                                "description": "The number the patient is told, for example `A-07`: a place in this queue, not an appointment."
+                            },
+                            "queue_number": {
+                                "type": "integer"
+                            },
+                            "status": {
+                                "type": "string",
+                                "description": "REGISTERED (joined from the app, not arrived), WAITING, CALLED, IN_CONSULTATION, COMPLETED, SKIPPED, NO_SHOW, CANCELLED.",
+                                "enum": [
+                                    "REGISTERED",
+                                    "WAITING",
+                                    "CALLED",
+                                    "IN_CONSULTATION",
+                                    "COMPLETED",
+                                    "SKIPPED",
+                                    "NO_SHOW",
+                                    "CANCELLED"
+                                ]
+                            },
+                            "queue_id": {
+                                "type": "string"
+                            },
+                            "local_date": {
+                                "type": "string",
+                                "description": "The queue's local date at the location (Y-m-d)."
+                            },
+                            "timezone": {
+                                "type": "string"
+                            },
+                            "clinic_location_id": {
+                                "type": "string"
+                            },
+                            "location_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_profile_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_service_id": {
+                                "type": "string"
+                            },
+                            "service_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "fee": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "description": "The listed consultation fee in minor units. Nothing is charged: the fee is paid at the clinic and the final charge is the clinic's to set.",
+                                "properties": {
+                                    "amount": {
+                                        "type": "integer"
+                                    },
+                                    "currency": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "amount",
+                                    "currency"
+                                ]
+                            },
+                            "payer_type": {
+                                "type": "string",
+                                "enum": [
+                                    "SELF_PAY",
+                                    "HMO"
+                                ]
+                            },
+                            "registered_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "arrived_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "registration_channel": {
+                                "type": "string",
+                                "enum": [
+                                    "PATIENT_APP",
+                                    "STAFF_CONSOLE",
+                                    "KIOSK",
+                                    "DOCTOR_APP"
+                                ]
+                            },
+                            "is_guest": {
+                                "type": "boolean"
+                            },
+                            "name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "The patient's or guest's name; null once a guest's data has been purged."
+                            },
+                            "priority_level": {
+                                "type": "string"
+                            },
+                            "priority_reason_code": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "enum": [
+                                    "SENIOR_PWD",
+                                    "PREGNANT",
+                                    "DOCTOR_REQUEST",
+                                    "STAFF_CONCERN",
+                                    "OTHER",
+                                    null
+                                ]
+                            },
+                            "hmo_claim": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "description": "What the patient says their HMO is called: as typed, not verified. Never a coverage statement.",
+                                "properties": {
+                                    "label": {
+                                        "type": "string",
+                                        "const": "Patient says HMO: not verified"
+                                    },
+                                    "card_name_text": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "label",
+                                    "card_name_text"
+                                ]
+                            },
+                            "estimate": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "description": "Staff estimate with the basis codes. Minutes appear for the next waiting entries only.",
+                                "properties": {
+                                    "position": {
+                                        "type": "integer"
+                                    },
+                                    "min_minutes": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    },
+                                    "max_minutes": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    },
+                                    "is_estimate": {
+                                        "type": "boolean"
+                                    },
+                                    "may_not_be_served_today": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "wait_status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "NOT_AVAILABLE_YET",
+                                            "ESTIMATED",
+                                            "UNKNOWN"
+                                        ]
+                                    },
+                                    "basis": {
+                                        "type": "array",
+                                        "items": {}
+                                    }
+                                },
+                                "required": [
+                                    "position",
+                                    "min_minutes",
+                                    "max_minutes",
+                                    "is_estimate",
+                                    "may_not_be_served_today",
+                                    "wait_status",
+                                    "basis"
+                                ]
+                            },
+                            "guest_phone": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "priority_note": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "label",
+                            "queue_number",
+                            "status",
+                            "queue_id",
+                            "local_date",
+                            "timezone",
+                            "clinic_location_id",
+                            "location_name",
+                            "doctor_profile_id",
+                            "doctor_name",
+                            "doctor_service_id",
+                            "service_name",
+                            "fee",
+                            "payer_type",
+                            "registered_at",
+                            "arrived_at",
+                            "registration_channel",
+                            "is_guest",
+                            "name",
+                            "priority_level",
+                            "priority_reason_code",
+                            "hmo_claim",
+                            "estimate",
+                            "guest_phone",
+                            "priority_note"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string",
+                                "description": "The number the patient is told, for example `A-07`: a place in this queue, not an appointment."
+                            },
+                            "queue_number": {
+                                "type": "integer"
+                            },
+                            "status": {
+                                "type": "string",
+                                "description": "REGISTERED (joined from the app, not arrived), WAITING, CALLED, IN_CONSULTATION, COMPLETED, SKIPPED, NO_SHOW, CANCELLED.",
+                                "enum": [
+                                    "REGISTERED",
+                                    "WAITING",
+                                    "CALLED",
+                                    "IN_CONSULTATION",
+                                    "COMPLETED",
+                                    "SKIPPED",
+                                    "NO_SHOW",
+                                    "CANCELLED"
+                                ]
+                            },
+                            "queue_id": {
+                                "type": "string"
+                            },
+                            "local_date": {
+                                "type": "string",
+                                "description": "The queue's local date at the location (Y-m-d)."
+                            },
+                            "timezone": {
+                                "type": "string"
+                            },
+                            "clinic_location_id": {
+                                "type": "string"
+                            },
+                            "location_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_profile_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_service_id": {
+                                "type": "string"
+                            },
+                            "service_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "fee": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "description": "The listed consultation fee in minor units. Nothing is charged: the fee is paid at the clinic and the final charge is the clinic's to set.",
+                                "properties": {
+                                    "amount": {
+                                        "type": "integer"
+                                    },
+                                    "currency": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "amount",
+                                    "currency"
+                                ]
+                            },
+                            "payer_type": {
+                                "type": "string",
+                                "enum": [
+                                    "SELF_PAY",
+                                    "HMO"
+                                ]
+                            },
+                            "registered_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "arrived_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "priority_level": {
+                                "type": "string",
+                                "description": "Restricted readers see place and status only: no name, phone, HMO text or note."
+                            },
+                            "registration_channel": {
+                                "type": "string",
+                                "enum": [
+                                    "PATIENT_APP",
+                                    "STAFF_CONSOLE",
+                                    "KIOSK",
+                                    "DOCTOR_APP"
+                                ]
+                            },
+                            "is_guest": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "label",
+                            "queue_number",
+                            "status",
+                            "queue_id",
+                            "local_date",
+                            "timezone",
+                            "clinic_location_id",
+                            "location_name",
+                            "doctor_profile_id",
+                            "doctor_name",
+                            "doctor_service_id",
+                            "service_name",
+                            "fee",
+                            "payer_type",
+                            "registered_at",
+                            "arrived_at",
+                            "priority_level",
+                            "registration_channel",
+                            "is_guest"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string",
+                                "description": "The number the patient is told, for example `A-07`: a place in this queue, not an appointment."
+                            },
+                            "queue_number": {
+                                "type": "integer"
+                            },
+                            "status": {
+                                "type": "string",
+                                "description": "REGISTERED (joined from the app, not arrived), WAITING, CALLED, IN_CONSULTATION, COMPLETED, SKIPPED, NO_SHOW, CANCELLED.",
+                                "enum": [
+                                    "REGISTERED",
+                                    "WAITING",
+                                    "CALLED",
+                                    "IN_CONSULTATION",
+                                    "COMPLETED",
+                                    "SKIPPED",
+                                    "NO_SHOW",
+                                    "CANCELLED"
+                                ]
+                            },
+                            "queue_id": {
+                                "type": "string"
+                            },
+                            "local_date": {
+                                "type": "string",
+                                "description": "The queue's local date at the location (Y-m-d)."
+                            },
+                            "timezone": {
+                                "type": "string"
+                            },
+                            "clinic_location_id": {
+                                "type": "string"
+                            },
+                            "location_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_profile_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_service_id": {
+                                "type": "string"
+                            },
+                            "service_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "fee": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "description": "The listed consultation fee in minor units. Nothing is charged: the fee is paid at the clinic and the final charge is the clinic's to set.",
+                                "properties": {
+                                    "amount": {
+                                        "type": "integer"
+                                    },
+                                    "currency": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "amount",
+                                    "currency"
+                                ]
+                            },
+                            "payer_type": {
+                                "type": "string",
+                                "enum": [
+                                    "SELF_PAY",
+                                    "HMO"
+                                ]
+                            },
+                            "registered_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "arrived_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "estimate": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "description": "The estimate, or null once the entry is no longer in the queue. Minutes are withheld when they would be a guess about a guess.",
+                                "properties": {
+                                    "position": {
+                                        "type": "integer"
+                                    },
+                                    "min_minutes": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    },
+                                    "max_minutes": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    },
+                                    "is_estimate": {
+                                        "type": "boolean"
+                                    },
+                                    "may_not_be_served_today": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "wait_status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "NOT_AVAILABLE_YET",
+                                            "ESTIMATED",
+                                            "UNKNOWN"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "position",
+                                    "min_minutes",
+                                    "max_minutes",
+                                    "is_estimate",
+                                    "may_not_be_served_today",
+                                    "wait_status"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "label",
+                            "queue_number",
+                            "status",
+                            "queue_id",
+                            "local_date",
+                            "timezone",
+                            "clinic_location_id",
+                            "location_name",
+                            "doctor_profile_id",
+                            "doctor_name",
+                            "doctor_service_id",
+                            "service_name",
+                            "fee",
+                            "payer_type",
+                            "registered_at",
+                            "arrived_at",
+                            "estimate"
+                        ]
+                    }
+                ],
+                "title": "WalkInEntryResource"
+            },
+            "WalkInPolicyResource": {
+                "type": "object",
+                "properties": {
+                    "assignment_id": {
+                        "type": "string"
+                    },
+                    "clinic_location_id": {
+                        "type": "string"
+                    },
+                    "doctor_profile_id": {
+                        "type": "string"
+                    },
+                    "allow_patient_app_registration": {
+                        "type": "string"
+                    },
+                    "cutoff_minutes_before_close": {
+                        "type": "string"
+                    },
+                    "number_prefix": {
+                        "type": "string"
+                    },
+                    "capacity_mode": {
+                        "type": "string"
+                    },
+                    "derived_capacity_today": {
+                        "type": "integer",
+                        "description": "The capacity today's schedule gives this doctor here (the sum over today's walk-in shifts). With UNLIMITED it is informational: the queue has no cap."
+                    },
+                    "local_date": {
+                        "type": "string",
+                        "description": "The location's local date the capacity is for (Y-m-d)."
+                    },
+                    "timezone": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "assignment_id",
+                    "clinic_location_id",
+                    "doctor_profile_id",
+                    "allow_patient_app_registration",
+                    "cutoff_minutes_before_close",
+                    "number_prefix",
+                    "capacity_mode",
+                    "derived_capacity_today",
+                    "local_date",
+                    "timezone"
+                ],
+                "title": "WalkInPolicyResource"
             }
         },
         "responses": {

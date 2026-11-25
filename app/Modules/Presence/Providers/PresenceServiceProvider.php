@@ -2,6 +2,8 @@
 
 namespace App\Modules\Presence\Providers;
 
+use App\Modules\Presence\Contracts\PresenceAdmission;
+use App\Modules\Presence\Services\PresenceAdmissionService;
 use App\Shared\Services\Fingerprint;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -12,6 +14,11 @@ use Illuminate\Support\ServiceProvider;
 /** Doctor presence (Phase 5, architecture.md §9). */
 final class PresenceServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(PresenceAdmission::class, PresenceAdmissionService::class);
+    }
+
     public function boot(): void
     {
         $user = fn (Request $request): string => (string) ($request->user()?->getAuthIdentifier() ?? Fingerprint::ip($request->ip()));

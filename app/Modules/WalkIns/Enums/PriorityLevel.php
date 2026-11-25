@@ -13,6 +13,23 @@ enum PriorityLevel: int
     case Priority = 5;
     case Urgent = 9;
 
+    /** The name the API uses (NORMAL, PRIORITY, URGENT): the API never accepts or returns the integer. */
+    public function apiName(): string
+    {
+        return strtoupper($this->name);
+    }
+
+    public static function fromApi(string $name): self
+    {
+        foreach (self::cases() as $case) {
+            if ($case->apiName() === $name) {
+                return $case;
+            }
+        }
+
+        throw new \ValueError("Unknown priority level: {$name}");
+    }
+
     /** A level above normal needs a reason code (and an audited override at call-next). */
     public function needsReason(): bool
     {

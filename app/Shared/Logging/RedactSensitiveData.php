@@ -31,13 +31,18 @@ final class RedactSensitiveData implements ProcessorInterface
         'card_number', 'cvv', 'cvc', 'tin',
         'chief_complaint', 'diagnosis', 'assessment', 'treatment_plan', 'medical_notes', 'notes',
         'body', 'message_body',
+        // Walk-in guests and registration (increment 5.5a): a guest's name and phone, the HMO name as typed, and priority or triage notes.
+        'guest', 'guest_name', 'guest_phone', 'guest_name_encrypted', 'guest_phone_encrypted', 'guest_phone_hash',
+        'hmo_card_name_text', 'hmo_card_name_encrypted', 'priority_note', 'triage_note', 'triage_note_encrypted',
+        // The walk-in dedupe search term: a phone number or a name.
+        'term',
     ];
 
     /**
      * Generic words that are sensitive only as the whole key: "code" (OTP) but
      * not "error_code" or "status_code". Not applied to free-text messages.
      */
-    private const EXACT_ONLY_KEYS = ['code', 'body', 'notes', 'tin'];
+    private const EXACT_ONLY_KEYS = ['code', 'body', 'notes', 'tin', 'guest', 'term'];
 
     public function __invoke(LogRecord $record): LogRecord
     {
