@@ -5,6 +5,7 @@ namespace App\Modules\Patients\Actions;
 use App\Modules\Audit\Contracts\RecordsAudit;
 use App\Modules\Audit\Contracts\RecordsConsents;
 use App\Modules\Audit\Enums\ConsentType;
+use App\Modules\Notifications\Contracts\TerminatesRealtimeSessions;
 use App\Modules\Patients\Enums\GuardianAuthorization;
 use App\Modules\Patients\Models\Dependent;
 use App\Modules\Patients\Models\PatientProfile;
@@ -24,6 +25,7 @@ final class ManageDependents
     public function __construct(
         private readonly RecordsConsents $consents,
         private readonly RecordsAudit $audit,
+        private readonly TerminatesRealtimeSessions $realtime,
     ) {}
 
     /** @param  array{first_name: string, middle_name: string|null, last_name: string, date_of_birth: string, sex: string|null, relationship: string}  $person */
@@ -102,6 +104,11 @@ final class ManageDependents
             );
 
             $this->audit->record('dependent.removed', 'patient_profile', $link->dependent_patient_profile_id);
+
+            // The guardian's live connections end with the authorisation (5.4b M-3); queued after commit, never on a rollback.
+            if ($guardian->user_id !== null) {
+                $this->realtime->terminateForUser((string) $guardian->user_id, 'guardian_revoked');
+            }
         });
     }
 }

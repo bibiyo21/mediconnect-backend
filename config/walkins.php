@@ -60,6 +60,9 @@ return [
     ],
 
     // A registration waits this long for a competing row or advisory lock, then answers 409 CONCURRENT_MODIFICATION.
+    // Real-time hints (decisions 266-270): queue-level hints are debounced per queue.
+    'realtime' => ['debounce_seconds' => (int) env('WALKINS_REALTIME_DEBOUNCE_SECONDS', 2)],
+
     'lock_timeout_ms' => (int) env('WALKINS_LOCK_TIMEOUT_MS', 3000),
 
     // Name search over a location's live entries decrypts in memory; this caps the rows read.

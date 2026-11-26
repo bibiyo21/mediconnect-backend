@@ -13,6 +13,7 @@ use App\Modules\WalkIns\Enums\ViewLevel;
 use App\Modules\WalkIns\Exceptions\InvalidEntryTransition;
 use App\Modules\WalkIns\Models\WalkInQueue;
 use App\Modules\WalkIns\Models\WalkInQueueEntry;
+use App\Modules\WalkIns\Realtime\QueueRealtime;
 use App\Shared\Contracts\Clock;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -32,6 +33,7 @@ final class EntryActions
         private readonly SendsNotifications $notifications,
         private readonly LockWait $locks,
         private readonly Clock $clock,
+        private readonly QueueRealtime $realtime,
     ) {}
 
     /** REGISTERED to WAITING: the patient is at the clinic. Sets arrived_at, the call-order key (B5). */
@@ -49,6 +51,7 @@ final class EntryActions
             $current->forceFill(['status' => EntryStatus::Waiting, 'arrived_at' => $this->clock->now()])->save();
             $this->event($queue, $current, 'ARRIVED', EntryStatus::Registered, EntryStatus::Waiting, $user, null, null);
             $this->audit->record('walkins.arrived', 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id], clinicId: $this->clinicId($queue));
+            $this->realtime->entryChanged($queue, $current);
 
             return $current;
         });
@@ -88,6 +91,7 @@ final class EntryActions
                     $this->notifications->notify($userId, 'walkins.cancelled', 'Your walk-in queue entry was cancelled', 'Open the app for details.', ['entry_id' => $current->id]);
                 }
             }
+            $this->realtime->entryChanged($queue, $current);
 
             return $current;
         });
@@ -120,6 +124,7 @@ final class EntryActions
                 'actor_id' => $user->id, 'reason' => null, 'metadata' => json_encode(['from' => $from->value, 'to' => $to->value]),
             ]);
             $this->audit->record($auditAction, 'walkin_queue', $locked->id, ['from' => $from->value, 'to' => $to->value], clinicId: $this->clinicId($locked));
+            $this->realtime->queueChanged($locked);
 
             return $locked;
         });

@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "notes": "Hints only: clients refetch the REST API. Payloads carry ids, labels, status enums, counts and times, never names, phones, notes or HMO text. All channels are presence channels (client prefix presence-). queue_version is an ordering hint (the count of events written for the queue): refetch whenever a hint arrives with a version greater than or equal to the one held, because an equal version can follow a missed hint. Hints are not sent on the sync queue's trailing edge and a failed hint is dropped (clients refetch on reconnect).",
+  "events": {
+    "WalkInRegistered": {
+      "channels": [
+        "presence-clinic.{locationId}.queue",
+        "presence-doctor.{doctorProfileId}"
+      ],
+      "payload": {
+        "queue_id": "string",
+        "clinic_location_id": "string",
+        "doctor_profile_id": "string|null",
+        "entry_id": "string",
+        "queue_label": "string",
+        "status": "string",
+        "waiting_count": "integer",
+        "queue_version": "integer",
+        "occurred_at": "string"
+      }
+    },
+    "WalkInQueueUpdated": {
+      "channels": [
+        "presence-clinic.{locationId}.queue",
+        "presence-doctor.{doctorProfileId}"
+      ],
+      "payload": {
+        "queue_id": "string",
+        "clinic_location_id": "string",
+        "doctor_profile_id": "string|null",
+        "status": "string",
+        "waiting_count": "integer",
+        "queue_version": "integer",
+        "occurred_at": "string"
+      }
+    },
+    "WalkInEntryUpdated": {
+      "channels": [
+        "presence-user.{userId}"
+      ],
+      "payload": {
+        "entry_id": "string",
+        "status": "string",
+        "queue_version": "integer",
+        "occurred_at": "string"
+      }
+    },
+    "DoctorCheckedIn": {
+      "channels": [
+        "presence-clinic.{locationId}"
+      ],
+      "payload": {
+        "doctor_profile_id": "string",
+        "clinic_location_id": "string",
+        "session_id": "string",
+        "status": "string",
+        "version": "integer"
+      }
+    },
+    "DoctorPresenceUpdated": {
+      "channels": [
+        "presence-clinic.{locationId}"
+      ],
+      "payload": {
+        "doctor_profile_id": "string",
+        "clinic_location_id": "string",
+        "session_id": "string",
+        "status": "string",
+        "version": "integer"
+      }
+    },
+    "DoctorBreakStarted": {
+      "channels": [
+        "presence-clinic.{locationId}"
+      ],
+      "payload": {
+        "doctor_profile_id": "string",
+        "clinic_location_id": "string",
+        "session_id": "string",
+        "break_expected_end_at": "string",
+        "version": "integer"
+      }
+    },
+    "DoctorBreakEnded": {
+      "channels": [
+        "presence-clinic.{locationId}"
+      ],
+      "payload": {
+        "doctor_profile_id": "string",
+        "clinic_location_id": "string",
+        "session_id": "string",
+        "version": "integer"
+      }
+    },
+    "NotificationCreated": {
+      "channels": [
+        "presence-user.{userId}"
+      ],
+      "payload": {
+        "notification_id": "string",
+        "type": "string"
+      }
+    }
+  }
+}

@@ -23,6 +23,7 @@ use App\Modules\WalkIns\Exceptions\LateRiskAcknowledgementRequired;
 use App\Modules\WalkIns\Exceptions\QueueFull;
 use App\Modules\WalkIns\Models\WalkInQueue;
 use App\Modules\WalkIns\Models\WalkInQueueEntry;
+use App\Modules\WalkIns\Realtime\QueueRealtime;
 use App\Shared\Contracts\Clock;
 use App\Shared\Services\Fingerprint;
 use Carbon\CarbonImmutable;
@@ -56,6 +57,7 @@ final class WalkInRegistration
         private readonly LockWait $locks,
         private readonly AdmissionRules $rules,
         private readonly Clock $clock,
+        private readonly QueueRealtime $realtime,
     ) {}
 
     public function register(RegistrationCommand $c): RegistrationResult
@@ -248,6 +250,7 @@ final class WalkInRegistration
         ])->save();
 
         $this->record($c, $queue, $entry, $status, $created, $overridden, $held, $capacity);
+        $this->realtime->registered($queue, $entry);
         if ($c->isRemote()) {
             // Generic text only (§18.3, decision 260): no doctor, clinic, specialty or number on a lock screen.
             $this->notifications->notify($c->user->id, 'walkins.registered', 'You joined a walk-in queue', 'This is a queue number, not an appointment. Open the app to see your place and estimated wait.', ['entry_id' => $entry->id]);
