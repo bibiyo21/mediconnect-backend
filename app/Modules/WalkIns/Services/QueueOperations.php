@@ -88,7 +88,7 @@ final class QueueOperations
         } catch (UniqueConstraintViolationException $e) {
             // The backstop: the advisory lock and the checks make this unreachable in normal use. The transaction is gone, so the winner is looked up now.
             if (str_contains($e->getMessage(), 'uq_one_called_entry_per_doctor')) {
-                throw new DoctorAlreadyCalling;
+                throw new DoctorAlreadyCalling($this->doctorCallingReason($doctorId, $queue));
             }
             if (str_contains($e->getMessage(), 'uq_one_called_entry_per_queue')) {
                 $called = WalkInQueueEntry::query()->where('walkin_queue_id', $queue->id)->where('status', EntryStatus::Called->value)->value('id');
@@ -130,12 +130,8 @@ final class QueueOperations
         if (is_string($calledHere)) {
             throw new EntryAlreadyCalled(null, $calledHere);
         }
-        $calledElsewhere = WalkInQueueEntry::query()->join('walkin_queues as q', 'q.id', '=', 'walkin_queue_entries.walkin_queue_id')
-            ->where('walkin_queue_entries.assigned_doctor_profile_id', $doctorId)->where('walkin_queue_entries.status', EntryStatus::Called->value)
-            ->value('q.local_date');
-        if ($calledElsewhere !== null) {
-            // A reason only, never the entry or queue id: it may belong to a location this caller cannot see.
-            throw new DoctorAlreadyCalling(substr((string) $calledElsewhere, 0, 10) < $locked->local_date->toDateString() ? 'previous_day' : 'other_queue');
+        if ($this->calledElsewhereDate($doctorId) !== null) {
+            throw new DoctorAlreadyCalling($this->doctorCallingReason($doctorId, $locked));
         }
 
         $head = WalkInQueueEntry::query()->where('walkin_queue_id', $locked->id)->where('status', EntryStatus::Waiting->value)
@@ -172,7 +168,7 @@ final class QueueOperations
         $this->event($locked, $head, 'CALLED', EntryStatus::Waiting, EntryStatus::Called, $user, null, $metadata);
         $this->intake->openForWalkIn(new WalkInCallIntake($head->id, $doctorId, $head->patient_profile_id, $locked->clinic_location_id, $now));
         $this->audit->record('walkins.called', 'walkin_queue_entry', $head->id, array_filter(['queue_id' => $locked->id, 'override' => $passed === null ? null : true, 'override_reason_code' => $passed?->value], fn ($v) => $v !== null), clinicId: $this->clinicId($locked));
-        $this->notify($head, 'walkins.called', "It's your turn", 'Open the app for details.');
+        $this->notify($head, 'walkins.called', 'Your turn at the clinic', 'Please go to the clinic desk now.');
         $this->realtime->entryChanged($locked, $head);
 
         return $head;
@@ -196,7 +192,7 @@ final class QueueOperations
             $current->forceFill(['recall_count' => $current->recall_count + 1])->save();
             $this->event($locked, $current, 'RECALLED', EntryStatus::Called, EntryStatus::Called, $user, null, ['recall_count' => $current->recall_count]);
             $this->audit->record('walkins.recalled', 'walkin_queue_entry', $current->id, ['queue_id' => $locked->id, 'recall_count' => $current->recall_count], clinicId: $this->clinicId($locked));
-            $this->notify($current, 'walkins.recalled', "Reminder: it's your turn", 'Open the app for details.');
+            $this->notify($current, 'walkins.recalled', "Reminder: it's your turn", 'Reminder: it is your turn. Please check in at the clinic desk.');
             $this->realtime->entryChanged($locked, $current);
 
             return $current;
@@ -206,13 +202,13 @@ final class QueueOperations
     /** CALLED to SKIPPED: the patient did not come. The consultation made at the call is cancelled and the doctor is free to call again. */
     public function skip(User $user, WalkInQueueEntry $entry): WalkInQueueEntry
     {
-        return $this->leaveCalled($user, $entry, EntryStatus::Skipped, 'SKIPPED', 'skipped', 'walkins.skipped', 'Your turn was skipped', 'Ask at the clinic desk if you are still here. Open the app for details.');
+        return $this->leaveCalled($user, $entry, EntryStatus::Skipped, 'SKIPPED', 'skipped', 'walkins.skipped', 'Your turn was skipped', 'Ask at the clinic desk if you are still here. Your place is held for now.');
     }
 
     /** SKIPPED to NO_SHOW always; CALLED to NO_SHOW only once the recall limit is reached (D9). */
     public function noShow(User $user, WalkInQueueEntry $entry): WalkInQueueEntry
     {
-        return $this->leaveCalled($user, $entry, EntryStatus::NoShow, 'NO_SHOW', 'marked as a no-show', 'walkins.no_show', 'Your queue entry was closed', 'Open the app for details.');
+        return $this->leaveCalled($user, $entry, EntryStatus::NoShow, 'NO_SHOW', 'marked as a no-show', 'walkins.no_show', 'Your queue entry was closed', 'Please ask the clinic desk.');
     }
 
     private function leaveCalled(User $user, WalkInQueueEntry $entry, EntryStatus $to, string $eventType, string $word, string $type, string $title, string $body): WalkInQueueEntry
@@ -228,7 +224,7 @@ final class QueueOperations
                 throw InvalidEntryTransition::entry($from, $word);
             }
             $current->forceFill(['status' => $to, 'assigned_doctor_profile_id' => null])->save();
-            $this->intake->cancelForWalkIn($current->id, $eventType);
+            $this->intake->cancelForWalkIn($current->id);
             $this->event($locked, $current, $eventType, $from, $to, $user, null, $from === EntryStatus::Called ? ['recall_count' => $current->recall_count] : null);
             $this->audit->record('walkins.'.strtolower($eventType), 'walkin_queue_entry', $current->id, ['queue_id' => $locked->id, 'from' => $from->value], clinicId: $this->clinicId($locked));
             $this->notify($current, $type, $title, $body);
@@ -288,11 +284,17 @@ final class QueueOperations
             }
             $this->requireDay($locked);
             $from = $current->triage_priority;
+            $newReason = $level->needsReason() ? $reason : null;
+            // The note is replaced only when one is sent; a level back to normal drops it with the reason.
+            $newNote = $level->needsReason() ? ($note ?? $current->triage_note_encrypted) : null;
+            // Same level, reason and note: nothing changed, so no event, no audit row and no realtime hint (no version bump).
+            if ($from === $level && $current->triage_reason_code === $newReason && $current->triage_note_encrypted === $newNote) {
+                return $current;
+            }
             $current->forceFill([
                 'triage_priority' => $level,
-                'triage_reason_code' => $level->needsReason() ? $reason : null,
-                // The note is replaced only when one is sent; a level back to normal drops it with the reason.
-                'triage_note_encrypted' => $level->needsReason() ? ($note ?? $current->triage_note_encrypted) : null,
+                'triage_reason_code' => $newReason,
+                'triage_note_encrypted' => $newNote,
             ])->save();
             $codes = array_filter(['from' => $from->apiName(), 'to' => $level->apiName(), 'reason_code' => $level->needsReason() ? $reason?->value : null], fn ($v) => $v !== null);
             $this->event($locked, $current, 'PRIORITY_CHANGED', $current->status, $current->status, $user, null, $codes);
@@ -314,6 +316,24 @@ final class QueueOperations
             WalkInQueue::query()->whereKey($queue->id)->lockForUpdate()->firstOrFail(),
             WalkInQueueEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail(),
         ];
+    }
+
+    /** The local date of another queue's CALLED entry for this doctor, or null. Never returns an id: that row may belong to a location the caller cannot see. */
+    private function calledElsewhereDate(string $doctorId): ?string
+    {
+        $date = WalkInQueueEntry::query()->join('walkin_queues as q', 'q.id', '=', 'walkin_queue_entries.walkin_queue_id')
+            ->where('walkin_queue_entries.assigned_doctor_profile_id', $doctorId)->where('walkin_queue_entries.status', EntryStatus::Called->value)
+            ->value('q.local_date');
+
+        return $date === null ? null : substr((string) $date, 0, 10);
+    }
+
+    /** DOCTOR_ALREADY_CALLING reason: `previous_day` for a stale CALLED entry of an earlier day, else `other_queue`. Read after a rollback, with no locks. */
+    private function doctorCallingReason(string $doctorId, WalkInQueue $queue): string
+    {
+        $date = $this->calledElsewhereDate($doctorId);
+
+        return $date !== null && $date < $queue->local_date->toDateString() ? 'previous_day' : 'other_queue';
     }
 
     /** A call or a return needs a queue that is not closed and is today's at its location (a stale queue of an earlier day is never called). */

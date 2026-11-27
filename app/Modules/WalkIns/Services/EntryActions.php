@@ -86,7 +86,7 @@ final class EntryActions
             $from = $current->status;
             $current->forceFill(['status' => EntryStatus::Cancelled, 'assigned_doctor_profile_id' => null])->save();
             // A skipped patient's consultation (SCHEDULED, then cancelled by the skip) stays cancelled; any care relationship for the entry ends here (idempotent).
-            $this->intake->cancelForWalkIn($current->id, $reason->value);
+            $this->intake->cancelForWalkIn($current->id);
             $this->event($queue, $current, 'CANCELLED', $from, EntryStatus::Cancelled, $user, $reason->value, array_filter(['by' => $byStaff ? 'STAFF' : 'PATIENT', 'patient_informed_in_person' => $byStaff && $current->isGuest() ? $patientInformedInPerson : null], fn ($v) => $v !== null));
             $this->audit->record('walkins.cancelled', 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id, 'reason_code' => $reason->value, 'by' => $byStaff ? 'STAFF' : 'PATIENT'], clinicId: $this->clinicId($queue));
             if ($byStaff && $current->patient_profile_id !== null) {

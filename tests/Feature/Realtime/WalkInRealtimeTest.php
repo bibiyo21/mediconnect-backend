@@ -137,35 +137,72 @@ it('tells a patient about their own entry on their own channel, and a guest gets
     register_walkin($headers, patient_body($this->svc, $profile))->assertCreated();
     register_walkin($this->staff, guest_body($this->svc))->assertCreated();
 
+    // The immediate hint and the fan-out round both reach the patient's own channel only: the guest has no account to hint.
     $hints = wi_emitted_named('WalkInEntryUpdated');
-    expect($hints)->toHaveCount(1)
-        ->and($hints[0]['channels'])->toBe(["presence-user.{$user->id}"])
-        ->and(array_keys($hints[0]['payload']))->toEqual(['entry_id', 'status', 'queue_version', 'occurred_at']);
+    expect($hints)->not->toBeEmpty();
+    foreach ($hints as $hint) {
+        expect($hint['channels'])->toBe(["presence-user.{$user->id}"])
+            ->and(array_keys($hint['payload']))->toEqual(['entry_id', 'status', 'queue_version', 'occurred_at']);
+    }
 
     $entry = DB::table('walkin_queue_entries')->where('patient_profile_id', $profile)->value('id');
     wi_post("{$entry}/arrive", $this->staff)->assertOk();
     expect(collect(wi_emitted_named('WalkInEntryUpdated'))->last()['payload']['status'])->toBe('WAITING')
-        ->and(wi_emitted_named('WalkInEntryUpdated'))->toHaveCount(2);
+        ->and(collect(wi_emitted_named('WalkInEntryUpdated'))->every(fn ($h) => $h['channels'] === ["presence-user.{$user->id}"]))->toBeTrue();
 });
 
-it('resolves the audience at dispatch: a revoked guardian gets no further entry hint, a current one does', function () {
+it('resolves the audience at dispatch: an authorized guardian gets the entry hint, a revoked one gets none', function () {
     [$guardian, $guardianProfile, $headers] = remote_patient();
     $dependant = wi_dependent($headers);
     register_walkin($headers, patient_body($this->svc, $dependant))->assertCreated();
     $entry = DB::table('walkin_queue_entries')->where('patient_profile_id', $dependant)->value('id');
 
-    $first = wi_emitted_named('WalkInEntryUpdated');
-    expect($first)->toHaveCount(1)->and($first[0]['channels'])->toBe(["presence-user.{$guardian->id}"]);
+    // A fresh debounce window before each transition, so the leading round is the one that runs (not a skipped trailing one).
+    Cache::flush();
+    Queue::fake();
+    wi_post("{$entry}/arrive", $this->staff)->assertOk();
+    $authorised = wi_emitted_named('WalkInEntryUpdated');
+    expect($authorised)->not->toBeEmpty();
+    foreach ($authorised as $hint) {
+        expect($hint['channels'])->toBe(["presence-user.{$guardian->id}"]);
+    }
 
     $link = Dependent::query()->where('dependent_patient_profile_id', $dependant)->firstOrFail();
     app('auth')->forgetGuards();
     $this->deleteJson("/api/v1/patients/me/dependents/{$dependant}", [], $headers)->assertSuccessful();
     expect($link->refresh()->authorization_status->value)->toBe('REVOKED');
 
-    wi_post("{$entry}/arrive", $this->staff)->assertOk();
-    // Staff still get queue hints; the revoked guardian gets nothing more.
-    expect(wi_emitted_named('WalkInEntryUpdated'))->toHaveCount(1)
+    Cache::flush();
+    Queue::fake();
+    wi_post("{$entry}/call", $this->staff)->assertOk();
+    // Staff still get queue hints; the revoked guardian gets no entry hint, neither the immediate one nor the fan-out.
+    expect(wi_emitted_named('WalkInEntryUpdated'))->toBeEmpty()
         ->and(wi_emitted_named('WalkInQueueUpdated'))->not->toBeEmpty();
+});
+
+it('fans out to an authorized guardian when another entry moves the dependant\'s place, with no immediate hint in between', function () {
+    [$guardian, , $headers] = remote_patient();
+    [, $otherProfile, $otherHeaders] = remote_patient();
+    // The bystander is registered first, so cancelling it moves the dependant (registered after it) up the line.
+    register_walkin($otherHeaders, patient_body($this->svc, $otherProfile))->assertCreated();
+    $leaving = DB::table('walkin_queue_entries')->where('patient_profile_id', $otherProfile)->value('id');
+    wi_post("{$leaving}/arrive", $this->staff)->assertOk();
+
+    $dependant = wi_dependent($headers);
+    register_walkin($headers, patient_body($this->svc, $dependant))->assertCreated();
+    $entry = DB::table('walkin_queue_entries')->where('patient_profile_id', $dependant)->value('id');
+    wi_post("{$entry}/arrive", $this->staff)->assertOk();
+
+    // A fresh debounce window: the only hint the guardian can get now is the fan-out from the other entry's cancel.
+    Cache::flush();
+    Queue::fake();
+    wi_post("{$leaving}/cancel", $this->staff, ['reason_code' => 'PATIENT_LEFT', 'patient_informed_in_person' => true])->assertOk();
+
+    $toGuardian = array_values(array_filter(wi_emitted_named('WalkInEntryUpdated'), fn ($h) => $h['payload']['entry_id'] === $entry));
+    expect($toGuardian)->not->toBeEmpty();
+    foreach ($toGuardian as $hint) {
+        expect($hint['channels'])->toBe(["presence-user.{$guardian->id}"]);
+    }
 });
 
 it('terminates the guardian\'s connections once on revocation, after commit and never on a rollback', function () {

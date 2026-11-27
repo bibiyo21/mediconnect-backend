@@ -6,6 +6,7 @@ use App\Modules\WalkIns\Enums\EntryStatus;
 use App\Modules\WalkIns\Events\WalkInEntryUpdated;
 use App\Modules\WalkIns\Events\WalkInQueueUpdated;
 use App\Modules\WalkIns\Events\WalkInRegistered;
+use App\Modules\WalkIns\Jobs\EmitEntryHints;
 use App\Modules\WalkIns\Jobs\EmitQueueUpdated;
 use App\Modules\WalkIns\Models\WalkInQueue;
 use App\Modules\WalkIns\Models\WalkInQueueEntry;
@@ -51,6 +52,7 @@ final class QueueRealtime
                 QueueLabel::of($queue->number_prefix, $entry->queue_number), $entry->status->value, $this->waiting($queue->id), $version, $now,
             );
             $this->entryHint($entry, $version, $now);
+            $this->fanOut($queueId);
         }));
     }
 
@@ -65,14 +67,65 @@ final class QueueRealtime
                 $this->entryHint($entry, $this->version($queueId), $this->stamp());
             }
             $this->debouncedQueueHint($queueId);
+            $this->fanOut($queueId);
         }));
     }
 
-    /** The queue itself changed (paused, opened, a status moved): a debounced queue hint. */
+    /** The queue itself changed (paused, opened, a status moved): a debounced queue hint and the fan-out to the other live entries. */
     public function queueChanged(WalkInQueue $queue): void
     {
         $queueId = $queue->id;
-        DB::afterCommit(fn () => $this->safely($queueId, fn () => $this->debouncedQueueHint($queueId)));
+        DB::afterCommit(fn () => $this->safely($queueId, function () use ($queueId): void {
+            $this->debouncedQueueHint($queueId);
+            $this->fanOut($queueId);
+        }));
+    }
+
+    /**
+     * Hints every other live entry of the queue (REGISTERED, WAITING, CALLED, SKIPPED): its position or estimate may have moved. Leading
+     * edge now; a change inside the window schedules one trailing round at its end. So a burst of changes sends at most two rounds per
+     * window. Each hint is a bare "your entry may have changed" with the version; the audience is judged at send time (PatientAccess).
+     */
+    public function fanOut(string $queueId): void
+    {
+        $window = max(1, (int) config('walkins.realtime.debounce_seconds', 2));
+        if (Cache::add("walkin:rt:fan:lead:{$queueId}", 1, $window)) {
+            $this->emitEntryHints($queueId);
+
+            return;
+        }
+        // As for the queue hint: on the sync queue a delayed job would run at once, so the trailing round is skipped there.
+        if (config('queue.default') === 'sync') {
+            return;
+        }
+        if (Cache::add("walkin:rt:fan:trail:{$queueId}", 1, $window)) {
+            EmitEntryHints::dispatch($queueId)->delay(now()->addSeconds($window));
+        }
+    }
+
+    /** Sends one entry hint per account that may see each live entry now, with the committed version. Used by the leading edge and the trailing job. */
+    public function emitEntryHints(string $queueId): void
+    {
+        if (! WalkInQueue::query()->whereKey($queueId)->exists()) {
+            return;
+        }
+        $entries = WalkInQueueEntry::query()->where('walkin_queue_id', $queueId)
+            ->whereIn('status', [EntryStatus::Registered->value, EntryStatus::Waiting->value, EntryStatus::Called->value, EntryStatus::Skipped->value])
+            ->whereNotNull('patient_profile_id')
+            ->get(['id', 'patient_profile_id', 'status']);
+        if ($entries->isEmpty()) {
+            return;
+        }
+        /** @var list<string> $profileIds */
+        $profileIds = array_values(array_unique($entries->pluck('patient_profile_id')->map(fn ($id) => (string) $id)->all()));
+        $audience = $this->patients->userIdsFor($profileIds);
+        $version = $this->version($queueId);
+        $now = $this->stamp();
+        foreach ($entries as $entry) {
+            foreach ($audience[(string) $entry->patient_profile_id] ?? [] as $userId) {
+                WalkInEntryUpdated::dispatch($userId, (string) $entry->patient_profile_id, (string) $entry->id, $entry->status->value, $version, $now);
+            }
+        }
     }
 
     /** Leading edge now; a change inside the window schedules one trailing hint at its end. Used by the job too. */

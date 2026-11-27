@@ -71,6 +71,26 @@ function enroll_mfa(User $user): array
     return [$secret, $confirm['recovery_codes'], $confirm['tokens']['access_token']];
 }
 
+/**
+ * Signs in a privileged user with MFA. With $stepUp the token also carries a
+ * fresh step-up (needed for suspend, roles and settings).
+ *
+ * @return array{0: User, 1: array<string, string>, 2: string}
+ */
+function admin_session(Role $role = Role::Admin, bool $stepUp = true): array
+{
+    app('auth')->forgetGuards(); // the test client caches the previous user between requests
+    $admin = account($role);
+    [$secret, , $access] = enroll_mfa($admin);
+    if ($stepUp) {
+        test()->travel(31)->seconds();
+        test()->postJson('/api/v1/auth/mfa/step-up', ['code' => current_totp($secret)], bearer($access))->assertOk();
+        app('auth')->forgetGuards();
+    }
+
+    return [$admin, bearer($access), $secret];
+}
+
 /** A patient account as registration creates it: user, user profile and patient profile. */
 function patient_account(): User
 {

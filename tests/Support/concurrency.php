@@ -9,12 +9,64 @@ use Illuminate\Support\Facades\DB;
  * tests/Concurrency (moved from RoleCombinationRaceTest in 4.7).
  */
 
+/**
+ * One test-run lock per database: a single-bigint session advisory lock. The app's own locks are (int, int) keys (LockWait 5501 to 5504),
+ * a different key shape, so they cannot collide with it. The projector's hashtextextended keys share the single-bigint space, so a
+ * collision is possible in principle (about 2^-64 per doctor), not ruled out.
+ */
+const TEST_RUN_LOCK_KEY = 21747602426123264;
+
+/** True when this session took the run lock (pg_try_advisory_lock never waits). */
+function try_test_run_lock(PDO $pdo): bool
+{
+    $statement = $pdo->query('SELECT pg_try_advisory_lock('.TEST_RUN_LOCK_KEY.') AS granted');
+    if ($statement === false) {
+        throw new RuntimeException('Could not query the test-run lock.');
+    }
+
+    return in_array($statement->fetchColumn(), [true, 't'], true);
+}
+
+/**
+ * Takes the run lock on a dedicated PDO session, outside Laravel's connection manager, so DB::purge() in the race helpers cannot release
+ * it. Held for the life of the process (forked children inherit it and are SIGKILLed, so they never release it). A second run exits at
+ * once with a message and touches no database. Called from TestCase::createApplication, after config loads and before any migration.
+ */
+function acquire_test_run_lock(): void
+{
+    static $session = null;
+    if ($session !== null) {
+        return;
+    }
+
+    $cfg = config('database.connections.pgsql_owner');
+    if (! str_ends_with((string) $cfg['database'], '_test')) {
+        throw new RuntimeException('Refusing to take the test-run lock: the database name must end with _test.');
+    }
+
+    $pdo = new PDO(
+        sprintf('pgsql:host=%s;port=%s;dbname=%s;sslmode=%s', $cfg['host'], $cfg['port'], $cfg['database'], $cfg['sslmode'] ?? 'prefer'),
+        $cfg['username'],
+        $cfg['password'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+    );
+
+    if (! try_test_run_lock($pdo)) {
+        fwrite(STDERR, "\nAnother pest run holds mediconnect_test (test-run lock is taken). This run was not started; wait for the other run to finish.\n\n");
+        exit(1);
+    }
+
+    $pdo->exec("SET application_name = 'pest:".getmypid()."'");
+    $session = $pdo;
+}
+
 /** Clean, freshly migrated test database; refuses to run against anything but *_test. */
 function fresh_test_database(): void
 {
     expect(config('database.connections.pgsql.database'))->toEndWith('_test');
-    Artisan::call('migrate:fresh', ['--database' => 'pgsql_owner', '--force' => true]);
     DB::purge('pgsql_second');
+    DB::connection('pgsql_owner')->statement("SET lock_timeout = '10s'");
+    Artisan::call('migrate:fresh', ['--database' => 'pgsql_owner', '--force' => true]);
 }
 
 /**

@@ -9,6 +9,15 @@ use Tests\Support\InMemorySearchEngine;
 
 abstract class TestCase extends BaseTestCase
 {
+    /** Takes the test-run lock before any migration (RefreshDatabase runs in setUp, after this). */
+    public function createApplication()
+    {
+        $app = parent::createApplication();
+        acquire_test_run_lock();
+
+        return $app;
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

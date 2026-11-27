@@ -7,6 +7,7 @@ use App\Modules\WalkIns\DTOs\RegistrationCommand;
 use App\Modules\WalkIns\Enums\CancelReason;
 use App\Modules\WalkIns\Enums\PayerType;
 use App\Modules\WalkIns\Enums\PriorityLevel;
+use App\Modules\WalkIns\Enums\PriorityReason;
 use App\Modules\WalkIns\Enums\RegistrationChannel;
 use App\Modules\WalkIns\Exceptions\ConcurrentRegistration;
 use App\Modules\WalkIns\Exceptions\DoctorAlreadyCalling;
@@ -22,6 +23,7 @@ use App\Modules\WalkIns\Services\QueueOperations;
 use App\Modules\WalkIns\Services\WalkInRegistration;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SpecialtySeeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -317,4 +319,85 @@ it('lock order proof: a call blocked on the queue row already holds the presence
     });
 
     expect(wi_outcomes($children))->toBe(['ok'])->and($proof['advisory'])->toBe(1)->and($proof['share'])->toBeTrue();
+});
+
+/** The forked child reports only the exception class and message, so the racer returns the reason it sees itself (no ids). */
+function cn_backstop_racer(): Closure
+{
+    return function () {
+        try {
+            app(QueueOperations::class)->callNext(test()->staffUser, test()->queue);
+
+            return 'ok';
+        } catch (DoctorAlreadyCalling $e) {
+            return ['reason' => $e->reasonCode(), 'json' => json_encode(['message' => $e->getMessage(), 'reason' => $e->reasonCode()])];
+        }
+    };
+}
+
+it('backstop reason other_queue: the loser of the unique-index race reports reason_code other_queue and no ids', function () {
+    config(['walkins.lock_timeout_ms' => 5000]);
+    [$second, $secondEntry] = wi_second_queue_for_doctor($this->w, 'WAITING');
+    $competing = DB::connection('pgsql_second');
+    $competing->beginTransaction();
+    $competing->table('walkin_queue_entries')->where('id', $secondEntry)->update(['status' => 'CALLED', 'assigned_doctor_profile_id' => $this->w['doctor']->id, 'called_at' => now(), 'queue_sort_at' => null]);
+
+    $children = wi_race_with_parent([cn_backstop_racer()], function () use ($competing) {
+        usleep(800_000);
+        $competing->commit();
+    });
+
+    $loser = $children[0]['ok'] ?? null;
+    expect($loser)->toBeArray()->and($loser['reason'])->toBe('other_queue')
+        ->and($loser['json'])->not->toContain($secondEntry)->and($loser['json'])->not->toContain($second)->and($loser['json'])->not->toContain($this->queue->id)
+        ->and(cn_called())->toBe(1)->and(DB::table('consultations')->count())->toBe(0);
+});
+
+it('backstop reason previous_day: a stale CALLED entry of yesterday makes the loser report previous_day, still no ids', function () {
+    config(['walkins.lock_timeout_ms' => 5000]);
+    [$second, $secondEntry] = wi_second_queue_for_doctor($this->w, 'WAITING');
+    $today = Carbon::parse(substr((string) DB::table('walkin_queues')->where('id', $this->queue->id)->value('local_date'), 0, 10));
+    DB::table('walkin_queues')->where('id', $second)->update(['local_date' => $today->copy()->subDay()->toDateString()]);
+    $competing = DB::connection('pgsql_second');
+    $competing->beginTransaction();
+    $competing->table('walkin_queue_entries')->where('id', $secondEntry)->update(['status' => 'CALLED', 'assigned_doctor_profile_id' => $this->w['doctor']->id, 'called_at' => now(), 'queue_sort_at' => null]);
+
+    $children = wi_race_with_parent([cn_backstop_racer()], function () use ($competing) {
+        usleep(800_000);
+        $competing->commit();
+    });
+
+    $loser = $children[0]['ok'] ?? null;
+    expect($loser)->toBeArray()->and($loser['reason'])->toBe('previous_day')
+        ->and($loser['json'])->not->toContain($secondEntry)->and($loser['json'])->not->toContain($second)->and($loser['json'])->not->toContain($this->queue->id)
+        ->and(cn_called())->toBe(1)->and(DB::table('consultations')->count())->toBe(0);
+});
+
+it('call vs priority change on the head: never two CALLED, and the priority event exists only if the change won', function () {
+    $staff = $this->staffUser;
+    $head = WalkInQueueEntry::query()->with('queue')->findOrFail($this->a);
+
+    $results = wi_race([
+        cn_call_next(),
+        fn () => app(QueueOperations::class)->setPriority($staff, $head, PriorityLevel::Urgent, PriorityReason::Pregnant, null)->triage_priority->value,
+    ]);
+
+    $outcomes = wi_outcomes($results);
+    expect([$outcomes])->toBeIn([[['ok', 'ok']], [['ok', InvalidEntryTransition::class]]])
+        ->and(cn_called())->toBe(1)->and(DB::table('walkin_queue_entries')->where('status', 'CALLED')->value('id'))->toBe($this->a)
+        ->and(DB::table('walkin_queue_events')->where('walkin_queue_entry_id', $this->a)->where('event_type', 'CALLED')->count())->toBe(1)
+        ->and(DB::table('walkin_queue_events')->where('walkin_queue_entry_id', $this->a)->where('event_type', 'PRIORITY_CHANGED')->count())->toBe($outcomes[1] === 'ok' ? 1 : 0);
+});
+
+it('two simultaneous priority no-ops write no event and no audit row', function () {
+    $setSame = fn () => app(QueueOperations::class)->setPriority(test()->staffUser, WalkInQueueEntry::query()->with('queue')->findOrFail(test()->b), PriorityLevel::Urgent, PriorityReason::Pregnant, null)->triage_priority->value;
+    app(QueueOperations::class)->setPriority($this->staffUser, WalkInQueueEntry::query()->with('queue')->findOrFail($this->b), PriorityLevel::Urgent, PriorityReason::Pregnant, null);
+    $events = DB::table('walkin_queue_events')->count();
+    $audits = DB::table('audit_logs')->where('action', 'walkins.priority_changed')->count();
+
+    $results = wi_race([$setSame, $setSame]);
+
+    expect(wi_outcomes($results))->toBe(['ok', 'ok'])
+        ->and(DB::table('walkin_queue_events')->count())->toBe($events)
+        ->and(DB::table('audit_logs')->where('action', 'walkins.priority_changed')->count())->toBe($audits);
 });

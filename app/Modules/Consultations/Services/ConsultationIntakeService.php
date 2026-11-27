@@ -42,7 +42,7 @@ final class ConsultationIntakeService implements ConsultationIntake
         };
     }
 
-    public function cancelForWalkIn(string $entryId, string $reasonCode): void
+    public function cancelForWalkIn(string $entryId): void
     {
         $consultation = Consultation::query()->where('walkin_queue_entry_id', $entryId)->lockForUpdate()->first();
         if ($consultation !== null) {

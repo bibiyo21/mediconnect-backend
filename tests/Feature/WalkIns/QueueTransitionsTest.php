@@ -70,7 +70,7 @@ it('sends a generic recall notice to a registered patient', function () {
     wi_post("{$id}/recall", $this->staff)->assertOk();
 
     $data = json_decode(DB::table('notifications')->where('type', 'walkins.recalled')->sole()->data, true);
-    expect($data['title'])->toBe("Reminder: it's your turn")->and($data['body'])->toBe('Open the app for details.')->and(array_keys($data))->toEqualCanonicalizing(['entry_id', 'title', 'body']);
+    expect($data['title'])->toBe("Reminder: it's your turn")->and($data['body'])->toBe('Reminder: it is your turn. Please check in at the clinic desk.')->and(array_keys($data))->toEqualCanonicalizing(['entry_id', 'title', 'body']);
 });
 
 it('skips a called patient: the consultation is cancelled, the doctor assignment is cleared, and a fresh call revives it with a new recall count (D3, D4, D9)', function () {
@@ -120,7 +120,11 @@ it('gives a patient a generic notice for skip and no-show', function () {
         $notice = DB::table('notifications')->where('type', $type)->sole();
         $data = json_decode($notice->data, true);
         expect($notice->notifiable_id)->toBe($user->id)->and(array_keys($data))->toEqualCanonicalizing(['entry_id', 'title', 'body'])
-            ->and(strtolower($data['title'].' '.$data['body']))->not->toContain('doctor')->not->toContain('clinic number')->not->toContain($this->clock->now()->format('Y'));
+            ->and(strtolower($data['title'].' '.$data['body']))->not->toContain('doctor')->not->toContain('clinic number')->not->toContain($this->clock->now()->format('Y'))
+            ->and($notice->data)->not->toContain('"push"')->and($data['body'])->not->toContain('Open the app');
+        expect($data['body'])->toBe($type === 'walkins.skipped'
+            ? 'Ask at the clinic desk if you are still here. Your place is held for now.'
+            : 'Please ask the clinic desk.');
     }
 });
 

@@ -41,7 +41,7 @@ it('revives a CANCELLED consultation when the entry is called again', function (
     $entry = wi_seed_entry($this->w, $this->profile);
     $id = $this->intake->openForWalkIn(($this->call)($entry));
 
-    $this->intake->cancelForWalkIn($entry, 'SKIPPED');
+    $this->intake->cancelForWalkIn($entry);
     expect(Consultation::findOrFail($id)->status)->toBe(ConsultationStatus::Cancelled);
 
     expect($this->intake->openForWalkIn(($this->call)($entry)))->toBe($id)
@@ -79,20 +79,20 @@ it('refuses to open over a started or finished consultation (LogicException)', f
 it('cancels idempotently, and leaves a missing, cancelled or completed row alone', function () {
     $entry = wi_seed_entry($this->w, $this->profile);
 
-    $this->intake->cancelForWalkIn($entry, 'NO_SHOW');
+    $this->intake->cancelForWalkIn($entry);
     expect(Consultation::count())->toBe(0);
 
     $id = $this->intake->openForWalkIn(($this->call)($entry));
-    $this->intake->cancelForWalkIn($entry, 'NO_SHOW');
-    $this->intake->cancelForWalkIn($entry, 'NO_SHOW');
+    $this->intake->cancelForWalkIn($entry);
+    $this->intake->cancelForWalkIn($entry);
     expect(Consultation::findOrFail($id)->status)->toBe(ConsultationStatus::Cancelled);
 
     DB::table('consultations')->where('id', $id)->update(['status' => 'COMPLETED', 'started_at' => now(), 'ended_at' => now(), 'duration_seconds' => 5]);
-    $this->intake->cancelForWalkIn($entry, 'CANCELLED');
+    $this->intake->cancelForWalkIn($entry);
     expect(Consultation::findOrFail($id)->status)->toBe(ConsultationStatus::Completed);
 
     DB::table('consultations')->where('id', $id)->update(['status' => 'IN_PROGRESS']);
-    expect(fn () => $this->intake->cancelForWalkIn($entry, 'CANCELLED'))->toThrow(LogicException::class);
+    expect(fn () => $this->intake->cancelForWalkIn($entry))->toThrow(LogicException::class);
 });
 
 it('revokes the care relationship when it cancels', function () {
@@ -100,7 +100,7 @@ it('revokes the care relationship when it cancels', function () {
     $this->intake->openForWalkIn(($this->call)($entry));
     app(CareRelationships::class)->grantForWalkIn($entry, $this->clock->now());
 
-    $this->intake->cancelForWalkIn($entry, 'CANCELLED');
+    $this->intake->cancelForWalkIn($entry);
 
     expect(DB::table('care_relationships')->where('source_id', $entry)->value('status'))->toBe('REVOKED');
 });
@@ -111,7 +111,7 @@ it('leaves the care relationship ACTIVE when the consultation is already COMPLET
     app(CareRelationships::class)->grantForWalkIn($entry, $this->clock->now());
     DB::table('consultations')->where('id', $id)->update(['status' => 'COMPLETED', 'started_at' => now(), 'ended_at' => now(), 'duration_seconds' => 5]);
 
-    $this->intake->cancelForWalkIn($entry, 'CANCELLED');
+    $this->intake->cancelForWalkIn($entry);
 
     expect(DB::table('care_relationships')->where('source_id', $entry)->value('status'))->toBe('ACTIVE');
 });

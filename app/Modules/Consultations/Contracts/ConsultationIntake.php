@@ -17,10 +17,10 @@ interface ConsultationIntake
 
     /**
      * Cancels the SCHEDULED consultation of an entry that left CALLED (skip, no-show, cancel) and revokes any care relationship
-     * for it. Idempotent: no row, a CANCELLED or a COMPLETED row changes nothing. The reason code is for the caller's own
-     * records; consultations store none.
+     * for it. Idempotent: no row, a CANCELLED or a COMPLETED row changes nothing. The reason is kept by the queue (its event and audit row),
+     * not here: consultations store none.
      *
      * @throws \LogicException when the consultation is IN_PROGRESS or INTERRUPTED
      */
-    public function cancelForWalkIn(string $entryId, string $reasonCode): void;
+    public function cancelForWalkIn(string $entryId): void;
 }

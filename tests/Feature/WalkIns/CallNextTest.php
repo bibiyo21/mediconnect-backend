@@ -86,7 +86,7 @@ it('gives a registered patient a generic in-app notice and an own-account hint o
 
     $notice = DB::table('notifications')->where('type', 'walkins.called')->sole();
     $data = json_decode($notice->data, true);
-    expect($notice->notifiable_id)->toBe($user->id)->and($data['title'])->toBe("It's your turn")->and($data['body'])->toBe('Open the app for details.')
+    expect($notice->notifiable_id)->toBe($user->id)->and($data['title'])->toBe('Your turn at the clinic')->and($data['body'])->toBe('Please go to the clinic desk now.')
         ->and(array_keys($data))->toEqualCanonicalizing(['entry_id', 'title', 'body']);
     // The patient sees status and estimate only: no staff fields.
     $own = wi_json("/api/v1/walk-ins/{$remote}", $headers)->assertOk()->json('data');
