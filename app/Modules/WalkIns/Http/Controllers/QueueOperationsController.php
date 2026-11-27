@@ -37,8 +37,8 @@ final class QueueOperationsController
      * Call the next patient.
      *
      * Calls the head of the queue order (triage, then the time they became ready, then the number); REGISTERED entries are never called. Needs
-     * `walkins.call_patient`. `409` codes: DOCTOR_NOT_AVAILABLE (reason_code on_break, unavailable, not_checked_in, checked_out), QUEUE_CLOSED (reason_code),
-     * ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING, QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code appointment or hold,
+     * `walkins.call_patient`. `409` codes: DOCTOR_NOT_AVAILABLE (reason_code on_break, unavailable, not_checked_in, checked_out, doctor_not_active, location_not_active, no_assignment, no_doctor),
+     * QUEUE_CLOSED (reason_code closed or not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING (reason_code other_queue or previous_day; no ids), QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code appointment or hold,
      * errors.blocked_until), CONCURRENT_MODIFICATION (retry with a new key). Never overrides a protected window, and `override_reason_code` in the body is refused (422).
      */
     public function callNext(CallNextRequest $request, string $id): JsonResponse
@@ -53,8 +53,11 @@ final class QueueOperationsController
     /**
      * Call one patient.
      *
-     * The entry must be WAITING and the head of the queue order (409 NOT_NEXT_IN_ORDER otherwise). `override_reason_code` lets a triaged patient pass an
-     * appointment-window refusal and needs `walkins.manage_queue` (422 for a patient with no triage).
+     * The entry must be WAITING and the head of the queue order (409 NOT_NEXT_IN_ORDER otherwise). `409` codes: DOCTOR_NOT_AVAILABLE (reason_code on_break,
+     * unavailable, not_checked_in, checked_out, doctor_not_active, location_not_active, no_assignment, no_doctor), QUEUE_CLOSED (reason_code closed or not_today),
+     * ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING (reason_code other_queue or previous_day;
+     * no ids), APPOINTMENT_WINDOW_PROTECTED (reason_code appointment or hold), CONCURRENT_MODIFICATION (retry with a new key).
+     * `override_reason_code` lets a triaged patient pass an appointment-window refusal and needs `walkins.manage_queue` (422 for a patient with no triage).
      */
     public function call(CallWalkInRequest $request, string $id): JsonResponse
     {

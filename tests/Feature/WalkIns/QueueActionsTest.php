@@ -1,11 +1,13 @@
 <?php
 
+use App\Modules\Consultations\Contracts\CareRelationships;
 use App\Modules\Presence\Contracts\PresenceAdmission;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Scheduling\Contracts\WalkInDay;
 use App\Modules\WalkIns\Models\WalkInQueue;
 use App\Modules\WalkIns\Models\WalkInQueueEntry;
 use App\Modules\WalkIns\Services\QueueEstimates;
+use Carbon\CarbonImmutable;
 use Database\Seeders\SpecialtySeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -186,14 +188,30 @@ it('lets only the location\'s staff and the queue\'s doctor pause or open a queu
     wi_post("queues/{$queue}/open", $this->w['manager'])->assertOk();
 });
 
-it('lets staff and the patient cancel a SKIPPED entry (D15)', function () {
+it('lets staff and the patient cancel a SKIPPED entry (D15), cancelling its consultation and revoking its care relationship', function () {
+    // Real call and skip: the call opens each consultation, and the skip cancels it and revokes the patient's care relationship.
+    $queue = wi_queue_id();
+    wi_call_next($queue, $this->staff)->assertOk()->assertJsonPath('data.id', $this->guest);
+    wi_post("{$this->guest}/skip", $this->staff)->assertOk();
+    wi_post("{$this->remote}/arrive", $this->staff)->assertOk();
+    wi_call_next($queue, $this->staff)->assertOk()->assertJsonPath('data.id', $this->remote);
+    // The care relationship is granted when a consultation starts; here it is granted directly, while the entry is still CALLED.
+    $grantId = app(CareRelationships::class)->grantForWalkIn($this->remote, CarbonImmutable::now());
+    expect($grantId)->not->toBeNull();
+    wi_post("{$this->remote}/skip", $this->staff)->assertOk();
+    expect(DB::table('care_relationships')->where('id', $grantId)->value('status'))->toBe('REVOKED');
+
     foreach ([['staff', $this->staff, 'PATIENT_LEFT'], ['patient', $this->headers, 'PATIENT_REQUEST']] as [$who, $headers, $reason]) {
         $entry = $who === 'staff' ? $this->guest : $this->remote;
-        DB::table('walkin_queue_entries')->where('id', $entry)->update(['status' => 'SKIPPED']);
+        expect(wi_status($entry))->toBe('SKIPPED')
+            ->and(DB::table('consultations')->where('walkin_queue_entry_id', $entry)->value('status'))->toBe('CANCELLED')
+            ->and(DB::table('care_relationships')->where('source_id', $entry)->where('status', 'ACTIVE')->count())->toBe(0);
         $body = ['reason_code' => $reason] + ($who === 'staff' ? ['patient_informed_in_person' => true] : []);
 
         wi_post("{$entry}/cancel", $headers, $body)->assertOk()->assertJsonPath('data.status', 'CANCELLED');
-        expect(DB::table('walkin_queue_events')->where('walkin_queue_entry_id', $entry)->where('event_type', 'CANCELLED')->value('from_status'))->toBe('SKIPPED');
+        expect(DB::table('walkin_queue_events')->where('walkin_queue_entry_id', $entry)->where('event_type', 'CANCELLED')->value('from_status'))->toBe('SKIPPED')
+            ->and(DB::table('consultations')->where('walkin_queue_entry_id', $entry)->value('status'))->toBe('CANCELLED')
+            ->and(DB::table('care_relationships')->where('source_id', $entry)->where('status', 'ACTIVE')->count())->toBe(0);
     }
 });
 

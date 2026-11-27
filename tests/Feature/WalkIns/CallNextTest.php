@@ -135,6 +135,15 @@ it('refuses when the doctor is on a break, unavailable, not checked in or checke
     expect(wi_status($g))->toBe('WAITING')->and(DB::table('consultations')->count())->toBe(0);
 });
 
+it('refuses a call on a queue with no doctor with reason no_doctor, never not_checked_in', function () {
+    $g = wi_guest($this->staff, $this->svc);
+    $queue = wi_queue_id();
+    DB::table('walkin_queues')->where('id', $queue)->update(['doctor_profile_id' => null]);
+
+    wi_call_next($queue, $this->staff)->assertStatus(409)->assertJsonPath('code', 'DOCTOR_NOT_AVAILABLE')->assertJsonPath('reason_code', 'no_doctor');
+    expect(wi_status($g))->toBe('WAITING')->and(DB::table('consultations')->count())->toBe(0);
+});
+
 it('calls on a paused queue (a pause stops registration only) and refuses a closed one or one of another day', function () {
     $g = wi_guest($this->staff, $this->svc);
     $queue = wi_queue_id();
@@ -174,8 +183,22 @@ it('refuses a call when the doctor is no longer assigned to the location, or the
     $queue = wi_queue_id();
 
     DB::table('doctor_clinic_assignments')->where('id', $this->w['assignment'])->update(['status' => 'ENDED', 'effective_until' => now(), 'end_reason' => 'Left the clinic']);
-    wi_call_next($queue, $this->staff)->assertStatus(409)->assertJsonPath('code', 'DOCTOR_NOT_AVAILABLE')->assertJsonPath('reason_code', 'not_assigned');
+    wi_call_next($queue, $this->staff)->assertStatus(409)->assertJsonPath('code', 'DOCTOR_NOT_AVAILABLE')->assertJsonPath('reason_code', 'no_assignment');
     expect(DB::table('walkin_queue_entries')->where('status', 'CALLED')->count())->toBe(0)->and(DB::table('consultations')->count())->toBe(0);
+});
+
+it('refuses a call while a stale CALLED entry from yesterday holds the doctor, with no ids in the body; skipping it clears the way', function () {
+    $g = wi_guest($this->staff, $this->svc);
+    $queue = wi_queue_id();
+    [$staleQueue, $stale] = wi_second_queue_for_doctor($this->w, 'CALLED');
+    DB::table('walkin_queues')->where('id', $staleQueue)->update(['local_date' => $this->clock->now()->setTimezone('Asia/Manila')->subDay()->toDateString()]);
+
+    $response = wi_call_next($queue, $this->staff);
+    $response->assertStatus(409)->assertJsonPath('code', 'DOCTOR_ALREADY_CALLING')->assertJsonPath('reason_code', 'previous_day');
+    expect($response->getContent())->not->toContain($stale)->not->toContain($staleQueue)->not->toContain($g);
+
+    wi_post("{$stale}/skip", $this->staff)->assertOk()->assertJsonPath('data.status', 'SKIPPED');
+    wi_call_next($queue, $this->staff)->assertOk()->assertJsonPath('data.id', $g);
 });
 
 it('calls an explicit entry only when it is the head of the order (NOT_NEXT_IN_ORDER otherwise)', function () {

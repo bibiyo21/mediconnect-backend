@@ -9094,7 +9094,7 @@
         "/walk-ins/queues/{id}/call-next": {
             "post": {
                 "operationId": "queueOperations.callNext",
-                "description": "Calls the head of the queue order (triage, then the time they became ready, then the number); REGISTERED entries are never called. Needs\n`walkins.call_patient`. `409` codes: DOCTOR_NOT_AVAILABLE (reason_code on_break, unavailable, not_checked_in, checked_out), QUEUE_CLOSED (reason_code),\nENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING, QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code appointment or hold,\nerrors.blocked_until), CONCURRENT_MODIFICATION (retry with a new key). Never overrides a protected window, and `override_reason_code` in the body is refused (422).",
+                "description": "Calls the head of the queue order (triage, then the time they became ready, then the number); REGISTERED entries are never called. Needs\n`walkins.call_patient`. `409` codes: DOCTOR_NOT_AVAILABLE (reason_code on_break, unavailable, not_checked_in, checked_out, doctor_not_active, location_not_active, no_assignment, no_doctor),\nQUEUE_CLOSED (reason_code closed or not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING (reason_code other_queue or previous_day; no ids), QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code appointment or hold,\nerrors.blocked_until), CONCURRENT_MODIFICATION (retry with a new key). Never overrides a protected window, and `override_reason_code` in the body is refused (422).",
                 "summary": "Call the next patient",
                 "tags": [
                     "QueueOperations"
@@ -9198,7 +9198,7 @@
                         "$ref": "#/components/responses/AuthorizationException"
                     },
                     "409": {
-                        "description": "DOCTOR_NOT_AVAILABLE (reason_code: on_break, unavailable, not_checked_in, checked_out), QUEUE_CLOSED (reason_code: closed, not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING, QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until), or CONCURRENT_MODIFICATION (retry with a NEW key). Call-next never overrides a protected window. Any 4xx answer is replayed for 48 hours for the same key, so send a NEW Idempotency-Key for each attempt.",
+                        "description": "DOCTOR_NOT_AVAILABLE (reason_code: on_break, unavailable, not_checked_in, checked_out, doctor_not_active, location_not_active, no_assignment, no_doctor: the queue has no doctor), QUEUE_CLOSED (reason_code: closed, not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING (reason_code: other_queue, previous_day; no ids), QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until), or CONCURRENT_MODIFICATION (retry with a NEW key). Call-next never overrides a protected window. Any 4xx answer is replayed for 48 hours for the same key, so send a NEW Idempotency-Key for each attempt.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -9231,7 +9231,7 @@
         "/walk-ins/{id}/call": {
             "post": {
                 "operationId": "queueOperations.call",
-                "description": "The entry must be WAITING and the head of the queue order (409 NOT_NEXT_IN_ORDER otherwise). `override_reason_code` lets a triaged patient pass an\nappointment-window refusal and needs `walkins.manage_queue` (422 for a patient with no triage).",
+                "description": "The entry must be WAITING and the head of the queue order (409 NOT_NEXT_IN_ORDER otherwise). `409` codes: DOCTOR_NOT_AVAILABLE (reason_code on_break,\nunavailable, not_checked_in, checked_out, doctor_not_active, location_not_active, no_assignment, no_doctor), QUEUE_CLOSED (reason_code closed or not_today),\nENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING (reason_code other_queue or previous_day;\nno ids), APPOINTMENT_WINDOW_PROTECTED (reason_code appointment or hold), CONCURRENT_MODIFICATION (retry with a new key).\n`override_reason_code` lets a triaged patient pass an appointment-window refusal and needs `walkins.manage_queue` (422 for a patient with no triage).",
                 "summary": "Call one patient",
                 "tags": [
                     "QueueOperations"
@@ -9325,7 +9325,7 @@
                         "$ref": "#/components/responses/AuthorizationException"
                     },
                     "409": {
-                        "description": "INVALID_STATE_TRANSITION (the entry is not WAITING; errors.status), NOT_NEXT_IN_ORDER, DOCTOR_NOT_AVAILABLE (reason_code), QUEUE_CLOSED (reason_code), ENTRY_ALREADY_CALLED, DOCTOR_ALREADY_CALLING, APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until; a triaged patient can pass it with override_reason_code), or CONCURRENT_MODIFICATION (retry with a NEW key).",
+                        "description": "INVALID_STATE_TRANSITION (the entry is not WAITING; errors.status), NOT_NEXT_IN_ORDER, DOCTOR_NOT_AVAILABLE (reason_code: on_break, unavailable, not_checked_in, checked_out, doctor_not_active, location_not_active, no_assignment, no_doctor), QUEUE_CLOSED (reason_code: closed, not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING (reason_code: other_queue, previous_day; no ids), APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until; a triaged patient can pass it with override_reason_code), or CONCURRENT_MODIFICATION (retry with a NEW key).",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -15770,7 +15770,10 @@
                             "checked_out",
                             "not_today",
                             "appointment",
-                            "hold"
+                            "hold",
+                            "no_doctor",
+                            "other_queue",
+                            "previous_day"
                         ]
                     },
                     "request_id": {

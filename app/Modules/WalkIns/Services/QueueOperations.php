@@ -81,7 +81,7 @@ final class QueueOperations
         if ($override !== null) {
             $this->access->requireActing($user, 'walkins.manage_queue', $queue);
         }
-        $doctorId = $queue->doctor_profile_id ?? throw new DoctorNotAvailable('not_checked_in');
+        $doctorId = $queue->doctor_profile_id ?? throw new DoctorNotAvailable('no_doctor');
 
         try {
             return $this->locks->run(fn () => $this->callLocked($user, $queue, $doctorId, $targetId, $override));
@@ -102,7 +102,6 @@ final class QueueOperations
 
     private function callLocked(User $user, WalkInQueue $queue, string $doctorId, ?string $targetId, ?PriorityReason $override): WalkInQueueEntry
     {
-        $now = $this->clock->now();
         $presence = $this->presence->lockShared($doctorId, $queue->clinic_location_id);
         if ($presence->status !== PresenceStatus::In) {
             throw new DoctorNotAvailable(match ($presence->status) {
@@ -114,9 +113,11 @@ final class QueueOperations
         }
         LockWait::advisory(LockWait::DOCTOR_CALL, $doctorId);
         $locked = WalkInQueue::query()->whereKey($queue->id)->lockForUpdate()->firstOrFail();
+        // Read under the queue lock, so called_at is the moment the call is actually made.
+        $now = $this->clock->now();
         $this->requireDay($locked);
         if (! DoctorClinicAssignment::activeAt($doctorId, $locked->clinic_location_id)) {
-            throw new DoctorNotAvailable('not_assigned');
+            throw new DoctorNotAvailable('no_assignment');
         }
 
         if ($targetId !== null) {
@@ -189,14 +190,14 @@ final class QueueOperations
                 throw InvalidEntryTransition::entry($current->status, 'recalled');
             }
             $this->requireDay($locked);
-            if ($current->recall_count >= $this->recallLimit($queue)) {
+            if ($current->recall_count >= $this->recallLimit($locked)) {
                 throw new RecallLimitReached;
             }
             $current->forceFill(['recall_count' => $current->recall_count + 1])->save();
-            $this->event($queue, $current, 'RECALLED', EntryStatus::Called, EntryStatus::Called, $user, null, ['recall_count' => $current->recall_count]);
-            $this->audit->record('walkins.recalled', 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id, 'recall_count' => $current->recall_count], clinicId: $this->clinicId($queue));
+            $this->event($locked, $current, 'RECALLED', EntryStatus::Called, EntryStatus::Called, $user, null, ['recall_count' => $current->recall_count]);
+            $this->audit->record('walkins.recalled', 'walkin_queue_entry', $current->id, ['queue_id' => $locked->id, 'recall_count' => $current->recall_count], clinicId: $this->clinicId($locked));
             $this->notify($current, 'walkins.recalled', "Reminder: it's your turn", 'Open the app for details.');
-            $this->realtime->entryChanged($queue, $current);
+            $this->realtime->entryChanged($locked, $current);
 
             return $current;
         });
@@ -220,18 +221,18 @@ final class QueueOperations
         $this->access->requireActing($user, 'walkins.manage_queue', $queue);
 
         return $this->locks->run(function () use ($user, $entry, $queue, $to, $eventType, $word, $type, $title, $body): WalkInQueueEntry {
-            $current = $this->lockEntry($queue, $entry);
+            [$locked, $current] = $this->lockBoth($queue, $entry);
             $from = $current->status;
             if (! EntryTransitions::allows($from, $to)
-                || ($to === EntryStatus::NoShow && $from === EntryStatus::Called && $current->recall_count < $this->recallLimit($queue))) {
+                || ($to === EntryStatus::NoShow && $from === EntryStatus::Called && $current->recall_count < $this->recallLimit($locked))) {
                 throw InvalidEntryTransition::entry($from, $word);
             }
             $current->forceFill(['status' => $to, 'assigned_doctor_profile_id' => null])->save();
             $this->intake->cancelForWalkIn($current->id, $eventType);
-            $this->event($queue, $current, $eventType, $from, $to, $user, null, $from === EntryStatus::Called ? ['recall_count' => $current->recall_count] : null);
-            $this->audit->record('walkins.'.strtolower($eventType), 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id, 'from' => $from->value], clinicId: $this->clinicId($queue));
+            $this->event($locked, $current, $eventType, $from, $to, $user, null, $from === EntryStatus::Called ? ['recall_count' => $current->recall_count] : null);
+            $this->audit->record('walkins.'.strtolower($eventType), 'walkin_queue_entry', $current->id, ['queue_id' => $locked->id, 'from' => $from->value], clinicId: $this->clinicId($locked));
             $this->notify($current, $type, $title, $body);
-            $this->realtime->entryChanged($queue, $current);
+            $this->realtime->entryChanged($locked, $current);
 
             return $current;
         });
@@ -254,9 +255,9 @@ final class QueueOperations
                 }
                 $this->requireDay($locked);
                 $current->forceFill(['status' => EntryStatus::Waiting, 'queue_sort_at' => $this->clock->now()])->save();
-                $this->event($queue, $current, 'RETURNED', EntryStatus::Skipped, EntryStatus::Waiting, $user, null, null);
-                $this->audit->record('walkins.returned', 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id], clinicId: $this->clinicId($queue));
-                $this->realtime->entryChanged($queue, $current);
+                $this->event($locked, $current, 'RETURNED', EntryStatus::Skipped, EntryStatus::Waiting, $user, null, null);
+                $this->audit->record('walkins.returned', 'walkin_queue_entry', $current->id, ['queue_id' => $locked->id], clinicId: $this->clinicId($locked));
+                $this->realtime->entryChanged($locked, $current);
 
                 return $current;
             });
@@ -294,21 +295,19 @@ final class QueueOperations
                 'triage_note_encrypted' => $level->needsReason() ? ($note ?? $current->triage_note_encrypted) : null,
             ])->save();
             $codes = array_filter(['from' => $from->apiName(), 'to' => $level->apiName(), 'reason_code' => $level->needsReason() ? $reason?->value : null], fn ($v) => $v !== null);
-            $this->event($queue, $current, 'PRIORITY_CHANGED', $current->status, $current->status, $user, null, $codes);
-            $this->audit->record('walkins.priority_changed', 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id, ...$codes], clinicId: $this->clinicId($queue));
-            $this->realtime->entryChanged($queue, $current);
+            $this->event($locked, $current, 'PRIORITY_CHANGED', $current->status, $current->status, $user, null, $codes);
+            $this->audit->record('walkins.priority_changed', 'walkin_queue_entry', $current->id, ['queue_id' => $locked->id, ...$codes], clinicId: $this->clinicId($locked));
+            $this->realtime->entryChanged($locked, $current);
 
             return $current;
         });
     }
 
-    /** The Phase 5 lock order: the queue row, then the entry (re-read under the lock). */
-    private function lockEntry(WalkInQueue $queue, WalkInQueueEntry $entry): WalkInQueueEntry
-    {
-        return $this->lockBoth($queue, $entry)[1];
-    }
-
-    /** @return array{0: WalkInQueue, 1: WalkInQueueEntry} the queue and the entry, both locked */
+    /**
+     * The Phase 5 lock order: the queue row, then the entry (re-read under the lock).
+     *
+     * @return array{0: WalkInQueue, 1: WalkInQueueEntry} the queue and the entry, both locked
+     */
     private function lockBoth(WalkInQueue $queue, WalkInQueueEntry $entry): array
     {
         return [
