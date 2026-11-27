@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\WalkIns\Http\Controllers\QueueControlController;
+use App\Modules\WalkIns\Http\Controllers\QueueOperationsController;
 use App\Modules\WalkIns\Http\Controllers\WalkInsController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +21,15 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->prefix('wa
     // Moves on an entry: Idempotency-Key required.
     Route::post('{id}/arrive', [WalkInsController::class, 'arrive'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
     Route::post('{id}/cancel', [WalkInsController::class, 'cancel'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
+
+    // Queue operations (5.6-2): the limiter runs before the Idempotency-Key middleware, so a 429 is never stored and replayed. UUID-constrained; the permission and the queue's state decide.
+    Route::post('queues/{id}/call-next', [QueueOperationsController::class, 'callNext'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
+    Route::post('{id}/call', [QueueOperationsController::class, 'call'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
+    Route::post('{id}/recall', [QueueOperationsController::class, 'recall'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
+    Route::post('{id}/skip', [QueueOperationsController::class, 'skip'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
+    Route::post('{id}/no-show', [QueueOperationsController::class, 'noShow'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
+    Route::post('{id}/return', [QueueOperationsController::class, 'returnToQueue'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
+    Route::post('{id}/priority', [QueueOperationsController::class, 'priority'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
 
     // Pause and reopen a queue: guarded by state (a repeat is 409 INVALID_STATE_TRANSITION).
     Route::post('queues/{id}/pause', [QueueControlController::class, 'pause'])->whereUuid('id')->middleware('throttle:walkin-write');

@@ -14,7 +14,8 @@ interface SendsNotifications
 {
     /**
      * @param  array<string, scalar|null>  $data  identifiers only (for example a location id), merged into the row's `data`
+     * @param  bool  $push  false keeps the notice in the app only: no push delivery is recorded or queued (operational notices such as a walk-in call)
      * @return string the notification id
      */
-    public function notify(string $userId, string $type, string $title, string $body, array $data = []): string;
+    public function notify(string $userId, string $type, string $title, string $body, array $data = [], bool $push = true): string;
 }

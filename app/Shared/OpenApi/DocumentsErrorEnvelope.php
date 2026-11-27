@@ -35,27 +35,39 @@ final class DocumentsErrorEnvelope
         // Walk-in registration (Phase 5, 5.5a).
         'doctor_not_active', 'location_not_active', 'remote_registration_off', 'mobile_not_verified', 'doctor_unavailable', 'doctor_checked_out', 'no_walkin_hours_today',
         'paused', 'closed', 'cutoff_passed', 'clinic_closed_today', 'live_entries_per_patient', 'patients_per_account_per_day',
+        // Walk-in queue operations (Phase 5, 5.6-2).
+        'on_break', 'unavailable', 'checked_out', 'not_today', 'appointment', 'hold',
     ];
 
     /** Business refusals of the walk-in routes, by operation (path suffix and method). */
     private const WALK_IN_409 = [
         'POST walk-ins' => 'QUEUE_NOT_STARTED (the doctor has not checked in; patient app only), REGISTRATION_NOT_ALLOWED (reason_code: remote_registration_off, mobile_not_verified, doctor_unavailable, doctor_checked_out, no_walkin_hours_today, doctor_not_active, location_not_active), QUEUE_CLOSED (reason_code: paused, closed, cutoff_passed, clinic_closed_today), QUEUE_FULL (patient app), CAPACITY_OVERRIDE_REQUIRED (staff and doctor: errors.current and errors.capacity; resend with capacity_override), ENTRY_ALREADY_LIVE (errors.entry_id), DAILY_LIMIT_REACHED (reason_code: live_entries_per_patient or patients_per_account_per_day; errors.limit), LATE_RISK_ACK_REQUIRED (send acknowledge_late_risk), CONCURRENT_MODIFICATION (retry with the same key: it is released). Reuse the Idempotency-Key only for a retry of the same body: any other 4xx is replayed for 48 hours.',
         'POST walk-ins/{id}/arrive' => 'INVALID_STATE_TRANSITION: the entry is not REGISTERED (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).',
-        'POST walk-ins/{id}/cancel' => 'INVALID_STATE_TRANSITION: only a REGISTERED or WAITING entry can be cancelled (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).',
+        'POST walk-ins/{id}/cancel' => 'INVALID_STATE_TRANSITION: only a REGISTERED, WAITING or SKIPPED entry can be cancelled (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).',
         'POST walk-ins/queues/{id}/pause' => 'INVALID_STATE_TRANSITION: only an OPEN queue can be paused (errors.status), or CONCURRENT_MODIFICATION (retry).',
         'POST walk-ins/queues/{id}/open' => 'INVALID_STATE_TRANSITION: only a PAUSED queue can be reopened; a closed queue stays closed (errors.status), or CONCURRENT_MODIFICATION (retry).',
+        'POST walk-ins/queues/{id}/call-next' => 'DOCTOR_NOT_AVAILABLE (reason_code: on_break, unavailable, not_checked_in, checked_out), QUEUE_CLOSED (reason_code: closed, not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING, QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until), or CONCURRENT_MODIFICATION (retry with a NEW key). Call-next never overrides a protected window. Any 4xx answer is replayed for 48 hours for the same key, so send a NEW Idempotency-Key for each attempt.',
+        'POST walk-ins/{id}/call' => 'INVALID_STATE_TRANSITION (the entry is not WAITING; errors.status), NOT_NEXT_IN_ORDER, DOCTOR_NOT_AVAILABLE (reason_code), QUEUE_CLOSED (reason_code), ENTRY_ALREADY_CALLED, DOCTOR_ALREADY_CALLING, APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until; a triaged patient can pass it with override_reason_code), or CONCURRENT_MODIFICATION (retry with a NEW key).',
+        'POST walk-ins/{id}/recall' => 'INVALID_STATE_TRANSITION (the entry is not CALLED; errors.status), QUEUE_CLOSED (reason_code: closed or not_today), RECALL_LIMIT_REACHED (nothing changes by itself afterwards), or CONCURRENT_MODIFICATION (retry with a NEW key).',
+        'POST walk-ins/{id}/skip' => 'INVALID_STATE_TRANSITION: only a CALLED entry can be skipped (errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key).',
+        'POST walk-ins/{id}/no-show' => 'INVALID_STATE_TRANSITION: a SKIPPED entry, or a CALLED one once the recall limit is reached (errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key).',
+        'POST walk-ins/{id}/return' => 'INVALID_STATE_TRANSITION (the entry is not SKIPPED; errors.status), QUEUE_CLOSED (reason_code: closed or not_today), ENTRY_ALREADY_LIVE (errors.entry_id), or CONCURRENT_MODIFICATION (retry with a NEW key).',
+        'POST walk-ins/{id}/priority' => 'INVALID_STATE_TRANSITION: only a WAITING or SKIPPED entry of a guest whose data was not purged can be given a new priority (errors.status), QUEUE_CLOSED (reason_code: closed or not_today), or CONCURRENT_MODIFICATION (retry with a NEW key).',
         'PATCH clinics/{clinicId}/doctor-assignments/{assignmentId}/walkin-policy' => 'INVALID_STATE_TRANSITION: the assignment has ended.',
     ];
 
     /** Walk-in operations that answer 404 for a missing record or one the caller has no standing at. */
     private const WALK_IN_404 = ['GET walk-ins/{id}', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel', 'POST walk-ins/queues/{id}/pause', 'POST walk-ins/queues/{id}/open',
+        'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority',
         'GET clinics/{clinicId}/doctor-assignments/{assignmentId}/walkin-policy', 'PATCH clinics/{clinicId}/doctor-assignments/{assignmentId}/walkin-policy'];
 
     /** Operations that need an Idempotency-Key header (the `idempotent` middleware): 400 when it is missing. */
-    private const WALK_IN_IDEMPOTENT = ['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel'];
+    private const WALK_IN_IDEMPOTENT = ['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel',
+        'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority'];
 
     /** Operations with no request body or query to validate: Scramble would add a 422 that can never happen. */
-    private const WALK_IN_NO_422 = ['POST walk-ins/{id}/arrive', 'POST walk-ins/queues/{id}/pause', 'POST walk-ins/queues/{id}/open', 'GET walk-ins/{id}'];
+    private const WALK_IN_NO_422 = ['POST walk-ins/{id}/arrive', 'POST walk-ins/queues/{id}/pause', 'POST walk-ins/queues/{id}/open', 'GET walk-ins/{id}',
+        'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return'];
 
     public function __invoke(OpenApi $openApi): void
     {

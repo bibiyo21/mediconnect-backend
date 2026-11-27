@@ -7,6 +7,7 @@ use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Users\Models\User;
 use App\Modules\WalkIns\Enums\RegistrationChannel;
 use App\Modules\WalkIns\Enums\ViewLevel;
+use App\Modules\WalkIns\Models\WalkInQueue;
 use Closure;
 use Spatie\Permission\Models\Role;
 
@@ -84,6 +85,19 @@ final class WalkInAccess
         }
 
         return null;
+    }
+
+    /** Judges the caller now and refuses (404 or 403, see refuse) unless they may act on the queue with the permission. */
+    public function requireActing(User $user, string $permission, WalkInQueue $queue): RegistrationChannel
+    {
+        return $this->actingChannel($user, $permission, $queue->clinic_location_id, $queue->doctor_profile_id) ?? $this->refuse($user, $queue);
+    }
+
+    /** 404 for a caller with no standing at the queue (its existence is not revealed); 403 for one who may read it but not change it. */
+    public function refuse(User $user, WalkInQueue $queue): never
+    {
+        $none = $this->viewLevel($user, $queue->clinic_location_id, $queue->doctor_profile_id) === ViewLevel::None;
+        abort($none ? 404 : 403, $none ? 'Not found.' : 'You do not have access to this queue.');
     }
 
     public function viewLevel(User $user, string $locationId, ?string $queueDoctorId): ViewLevel

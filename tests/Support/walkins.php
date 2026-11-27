@@ -18,6 +18,7 @@ use App\Modules\WalkIns\Services\EntryActions;
 use App\Modules\WalkIns\Services\EntryPresenter;
 use App\Modules\WalkIns\Services\JoinPreview;
 use App\Modules\WalkIns\Services\QueueEstimates;
+use App\Modules\WalkIns\Services\QueueOperations;
 use App\Modules\WalkIns\Services\WalkInReader;
 use App\Modules\WalkIns\Services\WalkInRegistration;
 use App\Shared\Contracts\Clock;
@@ -39,7 +40,7 @@ function pin_walkin_clock(?CarbonImmutable $at = null): PinnedClock
     foreach ([
         WalkInRegistration::class, WalkInDayService::class, QueueEstimates::class, EntryPresenter::class, PresenceAdmissionService::class,
         WaitTimeEstimator::class, RollingDurationStats::class, EntryActions::class, WalkInReader::class, JoinPreview::class, PurgeGuestWalkInPii::class,
-        WalkInPolicyController::class, QueueRealtime::class, CareRelationshipService::class,
+        WalkInPolicyController::class, QueueRealtime::class, CareRelationshipService::class, QueueOperations::class,
     ] as $consumer) {
         app()->when($consumer)->needs(Clock::class)->give(fn () => $clock);
     }
@@ -254,4 +255,62 @@ function wi_second_doctor(array $world, string $licence = '7654321'): array
     app('auth')->forgetGuards();
 
     return ['doctor' => $doctor, 'headers' => $headers, 'service' => (string) $service];
+}
+
+/** A guest the staff register (WAITING at once); returns the entry id. */
+function wi_guest(array $staff, string $service, string $name = 'Guest One', array $extra = []): string
+{
+    return register_walkin($staff, guest_body($service, $name, $extra))->assertCreated()->json('data.id');
+}
+
+/** A guest registered with a triage level above normal. */
+function wi_triaged(array $staff, string $service, string $name = 'Urgent Guest', string $level = 'URGENT'): string
+{
+    return wi_guest($staff, $service, $name, ['priority_level' => $level, 'priority_reason_code' => 'STAFF_CONCERN']);
+}
+
+/** Call-next on a queue (a fresh Idempotency-Key per attempt, as clients must). */
+function wi_call_next(string $queue, array $headers, ?string $key = null): TestResponse
+{
+    return wi_post("queues/{$queue}/call-next", $headers, [], $key);
+}
+
+/** Moves the pinned clock forward. */
+function wi_advance(int $minutes): void
+{
+    test()->clock->at = test()->clock->at->addMinutes($minutes);
+}
+
+/**
+ * A second queue of the world's doctor at the world's location today (another clinic-service pool, so the day-unique index allows it), with one entry
+ * straight from the database. A CALLED entry is assigned to the doctor. Returns [queue id, entry id].
+ *
+ * @return array{0: string, 1: string}
+ */
+function wi_second_queue_for_doctor(array $world, string $status = 'WAITING', string $prefix = 'B'): array
+{
+    $pool = (string) Str::uuid7();
+    DB::table('clinic_services')->insert(['id' => $pool, 'clinic_location_id' => $world['location'], 'name' => 'Pool '.Str::random(6), 'status' => 'ACTIVE', 'created_at' => now(), 'updated_at' => now()]);
+    $queue = (string) Str::uuid7();
+    DB::table('walkin_queues')->insert(['id' => $queue, 'clinic_location_id' => $world['location'], 'doctor_profile_id' => $world['doctor']->id, 'clinic_service_id' => $pool, 'local_date' => test()->clock->now()->setTimezone('Asia/Manila')->toDateString(), 'status' => 'OPEN', 'number_prefix' => $prefix, 'last_number' => 1, 'created_at' => now(), 'updated_at' => now()]);
+    $registrant = $world['doctor']->user_id;
+    // The service must belong to the queue's clinic-service pool (a trigger keeps an entry and its queue consistent).
+    $service = (string) Str::uuid7();
+    DB::table('doctor_services')->insert(['id' => $service, 'doctor_profile_id' => $world['doctor']->id, 'clinic_location_id' => $world['location'], 'clinic_service_id' => $pool, 'name' => 'Pool service '.Str::random(5),
+        'consultation_type' => 'IN_PERSON', 'duration_minutes' => 20, 'fee_amount' => 30000, 'currency' => 'PHP', 'status' => 'ACTIVE', 'effective_from' => now(), 'created_by' => $registrant]);
+    $entry = (string) Str::uuid7();
+    DB::table('walkin_queue_entries')->insert([
+        'id' => $entry, 'walkin_queue_id' => $queue, 'queue_number' => 1, 'guest_name_encrypted' => encrypt('Pool Guest'), 'registered_by_user_id' => $registrant, 'registration_channel' => 'STAFF_CONSOLE',
+        'status' => $status, 'payer_type' => 'SELF_PAY', 'doctor_service_id' => $service, 'arrived_at' => now(), 'queue_sort_at' => $status === 'WAITING' ? now() : null,
+        'assigned_doctor_profile_id' => $status === 'CALLED' ? $world['doctor']->id : null, 'called_at' => $status === 'CALLED' ? now() : null,
+        'privacy_notice_version' => 'v1', 'privacy_notice_shown_by_user_id' => $registrant, 'privacy_notice_shown_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    return [$queue, $entry];
+}
+
+/** The status of an entry, straight from the database. */
+function wi_status(string $id): string
+{
+    return (string) DB::table('walkin_queue_entries')->where('id', $id)->value('status');
 }

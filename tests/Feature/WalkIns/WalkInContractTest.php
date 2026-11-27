@@ -79,12 +79,12 @@ it('carries exactly the keys each audience may see in an entry', function () {
     $common = ['id', 'label', 'queue_number', 'status', 'queue_id', 'local_date', 'timezone', 'clinic_location_id', 'location_name', 'doctor_profile_id', 'doctor_name', 'doctor_service_id', 'service_name', 'fee', 'payer_type', 'registered_at', 'arrived_at'];
     expect(array_keys($patient->json('data')))->toEqualCanonicalizing([...$common, 'estimate'])
         ->and(array_keys($patient->json('data.estimate')))->toEqualCanonicalizing(['position', 'min_minutes', 'max_minutes', 'is_estimate', 'may_not_be_served_today', 'wait_status'])
-        ->and(array_keys($guest->json('data')))->toEqualCanonicalizing([...$common, 'registration_channel', 'is_guest', 'name', 'priority_level', 'priority_reason_code', 'hmo_claim', 'estimate'])
+        ->and(array_keys($guest->json('data')))->toEqualCanonicalizing([...$common, 'registration_channel', 'is_guest', 'name', 'priority_level', 'priority_reason_code', 'called_at', 'recall_count', 'hmo_claim', 'estimate'])
         ->and(array_keys($guest->json('data.estimate')))->toEqualCanonicalizing(['position', 'min_minutes', 'max_minutes', 'is_estimate', 'may_not_be_served_today', 'wait_status', 'basis']);
 
     $detail = wi_json("/api/v1/walk-ins/{$guest->json('data.id')}", $staff)->assertOk()->json('data');
     $restricted = wi_json("/api/v1/walk-ins/{$guest->json('data.id')}", session_for(account(Role::SupportAgent)))->assertOk()->json('data');
-    expect(array_keys($detail))->toEqualCanonicalizing([...$common, 'registration_channel', 'is_guest', 'name', 'priority_level', 'priority_reason_code', 'hmo_claim', 'estimate', 'guest_phone', 'priority_note'])
+    expect(array_keys($detail))->toEqualCanonicalizing([...$common, 'registration_channel', 'is_guest', 'name', 'priority_level', 'priority_reason_code', 'called_at', 'recall_count', 'hmo_claim', 'estimate', 'guest_phone', 'priority_note'])
         ->and(array_keys($restricted))->toEqualCanonicalizing([...$common, 'priority_level', 'registration_channel', 'is_guest']);
 });
 
@@ -93,14 +93,14 @@ it('puts a named limiter on every walk-in route and Idempotency-Key on the write
     $limiter = fn ($r) => collect($r->gatherMiddleware())->first(fn ($m) => is_string($m) && str_starts_with($m, 'throttle:walkin-'));
     $key = fn ($r) => in_array('idempotent', $r->gatherMiddleware(), true);
 
-    expect($routes)->toHaveCount(11);
+    expect($routes)->toHaveCount(18);
     foreach ($routes as $route) {
         expect($limiter($route))->not->toBeNull($route->uri())->and($route->gatherMiddleware())->toContain('auth:sanctum');
     }
     $byAction = $routes->mapWithKeys(fn ($r) => [implode('|', $r->methods()).' '.str_replace('api/v1/', '', $r->uri()) => $r]);
     expect($limiter($byAction['POST walk-ins']))->toBe('throttle:walkin-register')->and($limiter($byAction['POST walk-ins/search']))->toBe('throttle:walkin-search')
         ->and($limiter($byAction['GET|HEAD walk-ins/queue']))->toBe('throttle:walkin-read');
-    foreach (['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel'] as $needsKey) {
+    foreach (['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel', 'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority'] as $needsKey) {
         expect($key($byAction[$needsKey]))->toBeTrue($needsKey);
     }
     foreach (['POST walk-ins/queues/{id}/pause', 'POST walk-ins/queues/{id}/open', 'GET|HEAD walk-ins/{id}', 'POST walk-ins/search'] as $noKey) {

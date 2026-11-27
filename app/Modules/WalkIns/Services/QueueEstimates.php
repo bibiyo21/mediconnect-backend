@@ -68,6 +68,70 @@ final class QueueEstimates
         return $this->durations[$key] ??= $this->stats->expectedFor($doctorId, $doctorServiceId);
     }
 
+    /**
+     * When a patient called now would actually be seen (D8): now, or the expected end of the consultation in progress, whichever is later.
+     * Expected, not promised: an overrunning consultation ends later than this.
+     */
+    public function callWindowStart(string $doctorId): CarbonImmutable
+    {
+        $now = $this->clock->now();
+        $current = $this->current($doctorId);
+        if ($current === null) {
+            return $now;
+        }
+        $end = $current->startedAt->addSeconds($current->expectedDurationSeconds);
+
+        return $end > $now ? $end : $now;
+    }
+
+    /**
+     * The protected interval a call for [$start, $start + $seconds) would overlap (D8): a live appointment (protected until its end, and at
+     * least until the late grace has passed) or an ACTIVE hold. Scheduled breaks and off-shift gaps do not refuse a call. Null when clear.
+     * Adjacent and overlapping protected windows are merged, so `until` is when the whole protected run ends, not just the first window.
+     *
+     * @return array{reason: string, until: CarbonImmutable}|null `reason` is `appointment` or `hold` (of the first window hit)
+     */
+    public function protectedConflict(WalkInDayFacts $facts, CarbonImmutable $start, int $seconds): ?array
+    {
+        $end = $start->addSeconds(max(1, $seconds));
+        $grace = $facts->lateGraceMinutes ?? (int) config('walkins.estimation.appointment_grace_minutes', 15);
+        $windows = [];
+        foreach ($facts->appointments as $w) {
+            $windows[] = ['reason' => 'appointment', 'from' => $w->startsAt, 'until' => $this->appointmentProtectedUntil($w, $grace)];
+        }
+        foreach ($facts->activeHolds as $w) {
+            $windows[] = ['reason' => 'hold', 'from' => $w->startsAt, 'until' => $w->endsAt];
+        }
+        usort($windows, fn (array $a, array $b) => $a['from'] <=> $b['from']);
+
+        $first = null;
+        foreach ($windows as $i => $w) {
+            if ($start < $w['until'] && $w['from'] < $end) {
+                $first = $i;
+                break;
+            }
+        }
+        if ($first === null) {
+            return null;
+        }
+        $until = $windows[$first]['until'];
+        foreach (array_slice($windows, $first + 1) as $w) {
+            if ($w['from'] <= $until && $w['until'] > $until) {
+                $until = $w['until'];
+            }
+        }
+
+        return ['reason' => $windows[$first]['reason'], 'until' => $until];
+    }
+
+    /** A visit is protected for the whole appointment, and at least until the late grace has passed (m2d). */
+    private function appointmentProtectedUntil(TimeWindow $w, int $graceMinutes): CarbonImmutable
+    {
+        $graceEnd = $w->startsAt->addMinutes($graceMinutes);
+
+        return $graceEnd > $w->endsAt ? $graceEnd : $w->endsAt;
+    }
+
     /** The estimate for a patient who is about to join: staff-registered entries are WAITING since now, remote ones REGISTERED. */
     public function forNewEntry(EstimateInputs $inputs, ExpectedDuration $duration, EntryStatus $status, PriorityLevel $priority): WaitEstimate
     {
@@ -111,9 +175,8 @@ final class QueueEstimates
             $add(BlockKind::ScheduledBreak, $w);
         }
         foreach ($facts->appointments as $w) {
-            // Protected for the whole visit, and at least until the late grace has passed (m2d); an online appointment blocks too (m2e).
-            $protectedUntil = $w->startsAt->addMinutes($grace);
-            $add(BlockKind::Appointment, $w, $protectedUntil > $w->endsAt ? $protectedUntil : $w->endsAt);
+            // An online appointment blocks too (m2e).
+            $add(BlockKind::Appointment, $w, $this->appointmentProtectedUntil($w, $grace));
         }
         foreach ($facts->activeHolds as $w) {
             $add(BlockKind::Hold, $w);

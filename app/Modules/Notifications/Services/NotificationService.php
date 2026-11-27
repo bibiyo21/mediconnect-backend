@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 
 final class NotificationService implements SendsNotifications
 {
-    public function notify(string $userId, string $type, string $title, string $body, array $data = []): string
+    public function notify(string $userId, string $type, string $title, string $body, array $data = [], bool $push = true): string
     {
         $id = (string) Str::uuid7();
         $now = now();
@@ -21,11 +21,15 @@ final class NotificationService implements SendsNotifications
             'data' => json_encode([...$data, 'title' => $title, 'body' => $body]), 'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('notification_deliveries')->insert(['notification_id' => $id, 'channel' => 'IN_APP', 'provider' => 'database', 'status' => 'SENT', 'attempts' => 1, 'sent_at' => $now]);
-        DB::table('notification_deliveries')->insert(['notification_id' => $id, 'channel' => 'PUSH', 'status' => 'QUEUED']);
+        if ($push) {
+            DB::table('notification_deliveries')->insert(['notification_id' => $id, 'channel' => 'PUSH', 'status' => 'QUEUED']);
+        }
 
         // Hints and push go out only if the surrounding transaction commits (RealtimeEvent and the job both wait for it).
         NotificationCreated::dispatch($userId, $id, $type);
-        SendPushNotification::dispatch($id)->afterCommit();
+        if ($push) {
+            SendPushNotification::dispatch($id)->afterCommit();
+        }
 
         return $id;
     }

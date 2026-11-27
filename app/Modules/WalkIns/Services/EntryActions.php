@@ -4,12 +4,12 @@ namespace App\Modules\WalkIns\Services;
 
 use App\Modules\Audit\Contracts\RecordsAudit;
 use App\Modules\Clinics\Models\ClinicLocation;
+use App\Modules\Consultations\Contracts\ConsultationIntake;
 use App\Modules\Notifications\Contracts\SendsNotifications;
 use App\Modules\Users\Models\User;
 use App\Modules\WalkIns\Enums\CancelReason;
 use App\Modules\WalkIns\Enums\EntryStatus;
 use App\Modules\WalkIns\Enums\QueueStatus;
-use App\Modules\WalkIns\Enums\ViewLevel;
 use App\Modules\WalkIns\Exceptions\InvalidEntryTransition;
 use App\Modules\WalkIns\Models\WalkInQueue;
 use App\Modules\WalkIns\Models\WalkInQueueEntry;
@@ -34,6 +34,7 @@ final class EntryActions
         private readonly LockWait $locks,
         private readonly Clock $clock,
         private readonly QueueRealtime $realtime,
+        private readonly ConsultationIntake $intake,
     ) {}
 
     /** REGISTERED to WAITING: the patient is at the clinic. Sets arrived_at, the call-order key (B5). */
@@ -83,7 +84,9 @@ final class EntryActions
                 throw InvalidEntryTransition::entry($current->status, 'cancelled');
             }
             $from = $current->status;
-            $current->forceFill(['status' => EntryStatus::Cancelled])->save();
+            $current->forceFill(['status' => EntryStatus::Cancelled, 'assigned_doctor_profile_id' => null])->save();
+            // A skipped patient's consultation (SCHEDULED, then cancelled by the skip) stays cancelled; any care relationship for the entry ends here (idempotent).
+            $this->intake->cancelForWalkIn($current->id, $reason->value);
             $this->event($queue, $current, 'CANCELLED', $from, EntryStatus::Cancelled, $user, $reason->value, array_filter(['by' => $byStaff ? 'STAFF' : 'PATIENT', 'patient_informed_in_person' => $byStaff && $current->isGuest() ? $patientInformedInPerson : null], fn ($v) => $v !== null));
             $this->audit->record('walkins.cancelled', 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id, 'reason_code' => $reason->value, 'by' => $byStaff ? 'STAFF' : 'PATIENT'], clinicId: $this->clinicId($queue));
             if ($byStaff && $current->patient_profile_id !== null) {
@@ -133,15 +136,12 @@ final class EntryActions
 
     private function requireActing(User $user, WalkInQueue $queue): void
     {
-        if ($this->access->actingChannel($user, 'walkins.manage_queue', $queue->clinic_location_id, $queue->doctor_profile_id) === null) {
-            $this->refuse($user, $queue);
-        }
+        $this->access->requireActing($user, 'walkins.manage_queue', $queue);
     }
 
-    /** 404 for a caller with no standing at the queue (its existence is not revealed); 403 for one who may read it but not change it. */
     private function refuse(User $user, WalkInQueue $queue): never
     {
-        abort($this->access->viewLevel($user, $queue->clinic_location_id, $queue->doctor_profile_id) === ViewLevel::None ? 404 : 403, $this->access->viewLevel($user, $queue->clinic_location_id, $queue->doctor_profile_id) === ViewLevel::None ? 'Not found.' : 'You do not have access to this queue.');
+        $this->access->refuse($user, $queue);
     }
 
     /** The Phase 5 lock order: the queue row, then the entry. */

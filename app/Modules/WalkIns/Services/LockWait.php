@@ -20,6 +20,13 @@ final class LockWait
 
     public const LOCATION_DAY = 5503;
 
+    /** One call at a time per doctor, across queues (5.6 D6): after the presence session lock, before any queue lock, call paths only. */
+    public const DOCTOR_CALL = 5504;
+    // Order on the call paths: presence session row FOR SHARE first, then this advisory lock, then the queue row. A holder of 5504 never
+    // needs the presence row after taking it (it already holds it FOR SHARE, which check-out's FOR UPDATE waits on), and nothing takes 5504
+    // while holding a queue or entry lock, so no cycle can form: a check-out waits for the call to finish, and a call never waits for a check-out holder
+    // while holding 5504.
+
     /**
      * @template T
      *

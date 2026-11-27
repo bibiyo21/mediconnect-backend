@@ -9091,6 +9091,914 @@
                 ]
             }
         },
+        "/walk-ins/queues/{id}/call-next": {
+            "post": {
+                "operationId": "queueOperations.callNext",
+                "description": "Calls the head of the queue order (triage, then the time they became ready, then the number); REGISTERED entries are never called. Needs\n`walkins.call_patient`. `409` codes: DOCTOR_NOT_AVAILABLE (reason_code on_break, unavailable, not_checked_in, checked_out), QUEUE_CLOSED (reason_code),\nENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING, QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code appointment or hold,\nerrors.blocked_until), CONCURRENT_MODIFICATION (retry with a new key). Never overrides a protected window, and `override_reason_code` in the body is refused (422).",
+                "summary": "Call the next patient",
+                "tags": [
+                    "QueueOperations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CallNextRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "DOCTOR_NOT_AVAILABLE (reason_code: on_break, unavailable, not_checked_in, checked_out), QUEUE_CLOSED (reason_code: closed, not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING, QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until), or CONCURRENT_MODIFICATION (retry with a NEW key). Call-next never overrides a protected window. Any 4xx answer is replayed for 48 hours for the same key, so send a NEW Idempotency-Key for each attempt.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/call": {
+            "post": {
+                "operationId": "queueOperations.call",
+                "description": "The entry must be WAITING and the head of the queue order (409 NOT_NEXT_IN_ORDER otherwise). `override_reason_code` lets a triaged patient pass an\nappointment-window refusal and needs `walkins.manage_queue` (422 for a patient with no triage).",
+                "summary": "Call one patient",
+                "tags": [
+                    "QueueOperations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CallWalkInRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION (the entry is not WAITING; errors.status), NOT_NEXT_IN_ORDER, DOCTOR_NOT_AVAILABLE (reason_code), QUEUE_CLOSED (reason_code), ENTRY_ALREADY_CALLED, DOCTOR_ALREADY_CALLING, APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until; a triaged patient can pass it with override_reason_code), or CONCURRENT_MODIFICATION (retry with a NEW key).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/recall": {
+            "post": {
+                "operationId": "queueOperations.recall",
+                "summary": "Call the called patient again (CALLED only). Counts up to the doctor's recall limit at this location (409 RECALL_LIMIT_REACHED); nothing changes by itself afterwards. Needs `walkins.call_patient`",
+                "tags": [
+                    "QueueOperations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION (the entry is not CALLED; errors.status), QUEUE_CLOSED (reason_code: closed or not_today), RECALL_LIMIT_REACHED (nothing changes by itself afterwards), or CONCURRENT_MODIFICATION (retry with a NEW key).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/skip": {
+            "post": {
+                "operationId": "queueOperations.skip",
+                "summary": "Skip the called patient who did not come (CALLED to SKIPPED). They keep their place in the day and can be returned. Needs `walkins.manage_queue`",
+                "tags": [
+                    "QueueOperations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: only a CALLED entry can be skipped (errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/no-show": {
+            "post": {
+                "operationId": "queueOperations.noShow",
+                "summary": "Mark a no-show: a skipped patient at any time, a called patient only after the recall limit is reached. Needs `walkins.manage_queue`",
+                "tags": [
+                    "QueueOperations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: a SKIPPED entry, or a CALLED one once the recall limit is reached (errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/return": {
+            "post": {
+                "operationId": "queueOperations.returnToQueue",
+                "description": "Staff or doctor only (`walkins.manage_queue`). The queue must be open or paused and belong to today (409 QUEUE_CLOSED with reason_code `closed` or `not_today`).",
+                "summary": "Put a skipped patient back in line (SKIPPED to WAITING), at the end of their priority group from now",
+                "tags": [
+                    "QueueOperations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION (the entry is not SKIPPED; errors.status), QUEUE_CLOSED (reason_code: closed or not_today), ENTRY_ALREADY_LIVE (errors.entry_id), or CONCURRENT_MODIFICATION (retry with a NEW key).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/priority": {
+            "post": {
+                "operationId": "queueOperations.priority",
+                "summary": "Change the triage level of a WAITING or SKIPPED entry. Needs `walkins.manage_queue`; patients cannot. The reason is a code; the event and audit row carry codes only",
+                "tags": [
+                    "QueueOperations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChangePriorityRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION: only a WAITING or SKIPPED entry of a guest whose data was not purged can be given a new priority (errors.status), QUEUE_CLOSED (reason_code: closed or not_today), or CONCURRENT_MODIFICATION (retry with a NEW key).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/register": {
             "post": {
                 "operationId": "authentication.registration",
@@ -12304,7 +13212,7 @@
                         "$ref": "#/components/responses/AuthorizationException"
                     },
                     "409": {
-                        "description": "INVALID_STATE_TRANSITION: only a REGISTERED or WAITING entry can be cancelled (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).",
+                        "description": "INVALID_STATE_TRANSITION: only a REGISTERED, WAITING or SKIPPED entry can be cancelled (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13011,6 +13919,35 @@
                 ],
                 "title": "BroadcastAuthRequest"
             },
+            "CallNextRequest": {
+                "type": "object",
+                "description": "POST /walk-ins/queues/{id}/call-next",
+                "properties": {
+                    "override_reason_code": {
+                        "type": "string",
+                        "description": "Never accepted: call-next cannot override a protected appointment window (use `/walk-ins/{id}/call`)."
+                    }
+                },
+                "title": "CallNextRequest"
+            },
+            "CallWalkInRequest": {
+                "type": "object",
+                "description": "POST /walk-ins/{id}/call",
+                "properties": {
+                    "override_reason_code": {
+                        "anyOf": [
+                            {
+                                "description": "Only to call a triaged patient (priority or urgent) whose call would overlap a protected appointment window or an active hold.\nA fixed code, no free text. Needs `walkins.manage_queue`; the override is audited. Call-next never accepts it.",
+                                "$ref": "#/components/schemas/PriorityReason"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "title": "CallWalkInRequest"
+            },
             "CancelReason": {
                 "type": "string",
                 "description": "Why an entry was cancelled (decision 52). Only the code is ever stored on the event, audit row or notice.\n",
@@ -13048,6 +13985,44 @@
                     "UNLIMITED"
                 ],
                 "title": "CapacityMode"
+            },
+            "ChangePriorityRequest": {
+                "type": "object",
+                "description": "POST /walk-ins/{id}/priority",
+                "properties": {
+                    "priority_level": {
+                        "type": "string",
+                        "description": "NORMAL, PRIORITY or URGENT.",
+                        "enum": [
+                            "NORMAL",
+                            "PRIORITY",
+                            "URGENT"
+                        ]
+                    },
+                    "priority_reason_code": {
+                        "anyOf": [
+                            {
+                                "description": "Required for PRIORITY and URGENT: a fixed code, no free text.",
+                                "$ref": "#/components/schemas/PriorityReason"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "priority_note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "An optional short note for a priority: no symptoms or diagnosis. At most 140 characters. Kept encrypted on the entry; never in events, audit rows or notices.",
+                        "maxLength": 140
+                    }
+                },
+                "required": [
+                    "priority_level"
+                ],
+                "title": "ChangePriorityRequest"
             },
             "CheckInRequest": {
                 "type": "object",
@@ -14789,7 +15764,13 @@
                             "cutoff_passed",
                             "clinic_closed_today",
                             "live_entries_per_patient",
-                            "patients_per_account_per_day"
+                            "patients_per_account_per_day",
+                            "on_break",
+                            "unavailable",
+                            "checked_out",
+                            "not_today",
+                            "appointment",
+                            "hold"
                         ]
                     },
                     "request_id": {
@@ -18259,6 +19240,17 @@
                                     null
                                 ]
                             },
+                            "called_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "When the entry was called (UTC), null if it never was. A recall does not change it. Staff and doctor only."
+                            },
+                            "recall_count": {
+                                "type": "integer",
+                                "description": "How many times the called patient was called again since the last call. Staff and doctor only."
+                            },
                             "hmo_claim": {
                                 "type": [
                                     "object",
@@ -18372,6 +19364,8 @@
                             "name",
                             "priority_level",
                             "priority_reason_code",
+                            "called_at",
+                            "recall_count",
                             "hmo_claim",
                             "estimate",
                             "guest_phone",

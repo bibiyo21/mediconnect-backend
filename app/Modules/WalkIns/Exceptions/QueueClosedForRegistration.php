@@ -5,7 +5,7 @@ namespace App\Modules\WalkIns\Exceptions;
 use App\Shared\Enums\ErrorCode;
 use App\Shared\Exceptions\DomainException;
 
-/** The queue admits nobody now (409 QUEUE_CLOSED) with reason_code `paused`, `closed`, `cutoff_passed` or `clinic_closed_today` (decision 180). */
+/** The queue admits nobody now (409 QUEUE_CLOSED) with reason_code `paused`, `closed`, `cutoff_passed`, `clinic_closed_today` (decision 180) or `not_today` (a queue of another day cannot take a call or a return). */
 final class QueueClosedForRegistration extends DomainException
 {
     public function __construct(public readonly string $reason)
@@ -14,6 +14,7 @@ final class QueueClosedForRegistration extends DomainException
             'paused' => 'The clinic has paused this queue for now.',
             'cutoff_passed' => 'This queue is no longer taking new walk-ins today.',
             'clinic_closed_today' => 'The clinic is closed today.',
+            'not_today' => 'This queue belongs to another day.',
             default => 'This queue is closed.',
         });
     }

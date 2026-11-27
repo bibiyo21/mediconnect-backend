@@ -96,7 +96,7 @@ it('sets the dedupe mark only after the notice exists, so a failed run is retrie
 
     $failing = new class implements SendsNotifications
     {
-        public function notify(string $userId, string $type, string $title, string $body, array $data = []): string
+        public function notify(string $userId, string $type, string $title, string $body, array $data = [], bool $push = true): string
         {
             throw new RuntimeException('database hiccup');
         }
@@ -118,7 +118,7 @@ it('writes the notice rows together or not at all', function () {
 
     $half = new class implements SendsNotifications
     {
-        public function notify(string $userId, string $type, string $title, string $body, array $data = []): string
+        public function notify(string $userId, string $type, string $title, string $body, array $data = [], bool $push = true): string
         {
             DB::table('notifications')->insert(['id' => (string) Str::uuid7(), 'type' => $type, 'notifiable_type' => 'x', 'notifiable_id' => $userId, 'data' => '{}', 'created_at' => now(), 'updated_at' => now()]);
 

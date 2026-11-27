@@ -73,6 +73,10 @@ final class WalkInEntryResource extends JsonResource
             'name' => $v->displayName,
             'priority_level' => $e->triage_priority->apiName(),
             'priority_reason_code' => $e->triage_reason_code?->value,
+            /** When the entry was called (UTC), null if it never was. A recall does not change it. Staff and doctor only. */
+            'called_at' => $e->called_at?->toIso8601ZuluString(),
+            /** How many times the called patient was called again since the last call. Staff and doctor only. */
+            'recall_count' => $e->recall_count,
             /** What the patient says their HMO is called: as typed, not verified. Never a coverage statement. */
             'hmo_claim' => $e->payer_type->value === 'HMO' ? ['label' => 'Patient says HMO: not verified', 'card_name_text' => $e->hmo_card_name_encrypted] : null,
             /** Staff estimate with the basis codes. Minutes appear for the next waiting entries only. */
