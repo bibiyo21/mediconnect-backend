@@ -41,12 +41,16 @@ final class ConsultationReader
         /** @var CursorPaginator<int, Consultation> $page */
         $page = $query->cursorPaginate(self::PAGE_SIZE);
 
+        // Fail closed: a row this reader has no standing at is dropped from the page, never shown restricted.
+        $visible = $page->getCollection()->filter(fn (Consultation $c): bool => $this->scope->levelFor($scope, $c) !== null)->values();
+        $page->setCollection($visible);
+
         if ($scope->global) {
-            $restricted = $page->getCollection()->filter(fn (Consultation $c): bool => $this->scope->levelFor($scope, $c) === ConsultationView::Restricted)->count();
+            $restricted = $visible->filter(fn (Consultation $c): bool => $this->scope->levelFor($scope, $c) === ConsultationView::Restricted)->count();
             $applied = array_keys(array_filter($filters, fn (mixed $v): bool => $v !== null));
-            // L-4: the ids of the rows this page showed (ids only, no PHI). A page holds at most PAGE_SIZE rows, so the list stays bounded.
-            $ids = $page->getCollection()->map(fn (Consultation $c): string => (string) $c->id)->values()->all();
-            $this->audit->record('consultations.listed', null, null, ['count' => $page->count(), 'restricted' => $restricted, 'filters' => $applied, 'consultation_ids' => $ids], accessEvent: true);
+            // L-4: the ids of the rows this page returned (ids only, no PHI). A page holds at most PAGE_SIZE rows, so the list stays bounded.
+            $ids = $visible->map(fn (Consultation $c): string => (string) $c->id)->values()->all();
+            $this->audit->record('consultations.listed', null, null, ['count' => $visible->count(), 'restricted' => $restricted, 'filters' => $applied, 'consultation_ids' => $ids], accessEvent: true);
         }
 
         return $page;

@@ -5260,7 +5260,7 @@
                         "$ref": "#/components/responses/AuthenticationException"
                     },
                     "409": {
-                        "description": "DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable or not_checked_in: the doctor is not stored IN at this location), ACTIVE_CONSULTATION (another consultation of the doctor is in progress), INVALID_STATE_TRANSITION (errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key). A repeat is a 200.",
+                        "description": "DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable or not_checked_in: the doctor is not stored IN at this location; no_assignment, doctor_not_active or location_not_active: the doctor is no longer assigned, or the doctor or location is no longer active), QUEUE_CLOSED (reason_code: not_today: the walk-in queue is not today's), ACTIVE_CONSULTATION (another consultation of the doctor is in progress), INVALID_STATE_TRANSITION (errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key). A repeat is a 200.",
                         "content": {
                             "application/json": {
                                 "schema": {

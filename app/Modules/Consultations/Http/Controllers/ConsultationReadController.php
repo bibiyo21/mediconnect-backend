@@ -2,7 +2,6 @@
 
 namespace App\Modules\Consultations\Http\Controllers;
 
-use App\Modules\Consultations\Enums\ConsultationView;
 use App\Modules\Consultations\Http\Requests\ConsultationIndexRequest;
 use App\Modules\Consultations\Http\Resources\ConsultationResource;
 use App\Modules\Consultations\Models\Consultation;
@@ -37,7 +36,11 @@ final class ConsultationReadController
 
         $scope = $this->scope->for($user);
         $page = $this->reader->list($scope, $request->filters());
-        $rows = $page->getCollection()->map(fn (Consultation $c) => (new ConsultationResource($c, $this->scope->levelFor($scope, $c) ?? ConsultationView::Restricted))->resolve($request));
+        // Fail closed: a row with no level for this caller is dropped, not shown restricted.
+        $rows = $page->getCollection()
+            ->map(fn (Consultation $c): array => ['consultation' => $c, 'level' => $this->scope->levelFor($scope, $c)])
+            ->filter(fn (array $row): bool => $row['level'] !== null)
+            ->map(fn (array $row): array => (new ConsultationResource($row['consultation'], $row['level']))->resolve($request));
 
         return ApiResponse::success($rows->values()->all(), meta: [
             'per_page' => $page->perPage(), 'next_cursor' => $page->nextCursor()?->encode(), 'previous_cursor' => $page->previousCursor()?->encode(),

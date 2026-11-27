@@ -117,12 +117,6 @@ final class WalkInReader
     }
 
     /**
-     * Live entries in call order: in consultation and called first, then those ahead in the estimator's queue order, then skipped.
-     *
-     * @param  iterable<WalkInQueueEntry>  $list
-     * @return list<WalkInQueueEntry>
-     */
-    /**
      * @param  iterable<WalkInQueueEntry>  $list
      * @param  array<string, WaitEstimate>  $estimates  this queue's estimates, by entry id
      * @return list<WalkInQueueEntry>

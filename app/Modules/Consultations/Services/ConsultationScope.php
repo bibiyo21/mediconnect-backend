@@ -75,6 +75,7 @@ final class ConsultationScope
         }
 
         return $query->where(function (Builder $w) use ($scope): void {
+            $w->whereRaw('1 = 0');
             if ($scope->doctor !== null) {
                 $w->orWhere('doctor_profile_id', $scope->doctor);
             }
