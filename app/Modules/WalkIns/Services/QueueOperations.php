@@ -166,7 +166,7 @@ final class QueueOperations
         $head->forceFill(['status' => EntryStatus::Called, 'called_at' => $now, 'assigned_doctor_profile_id' => $doctorId, 'recall_count' => 0])->save();
         $metadata = $passed === null ? null : ['override' => true, 'reason_code' => $passed->value];
         $this->event($locked, $head, 'CALLED', EntryStatus::Waiting, EntryStatus::Called, $user, null, $metadata);
-        $this->intake->openForWalkIn(new WalkInCallIntake($head->id, $doctorId, $head->patient_profile_id, $locked->clinic_location_id, $now));
+        $this->intake->openForWalkIn(new WalkInCallIntake($head->id, $doctorId, $head->patient_profile_id, $locked->clinic_location_id));
         $this->audit->record('walkins.called', 'walkin_queue_entry', $head->id, array_filter(['queue_id' => $locked->id, 'override' => $passed === null ? null : true, 'override_reason_code' => $passed?->value], fn ($v) => $v !== null), clinicId: $this->clinicId($locked));
         $this->notify($head, 'walkins.called', 'Your turn at the clinic', 'Please go to the clinic desk now.');
         $this->realtime->entryChanged($locked, $head);

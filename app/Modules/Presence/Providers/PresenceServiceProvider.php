@@ -3,7 +3,9 @@
 namespace App\Modules\Presence\Providers;
 
 use App\Modules\Presence\Contracts\PresenceAdmission;
+use App\Modules\Presence\Contracts\PresenceVisibility;
 use App\Modules\Presence\Services\PresenceAdmissionService;
+use App\Modules\Presence\Services\PresenceCache;
 use App\Shared\Services\Fingerprint;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -17,6 +19,7 @@ final class PresenceServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(PresenceAdmission::class, PresenceAdmissionService::class);
+        $this->app->bind(PresenceVisibility::class, PresenceCache::class);
     }
 
     public function boot(): void

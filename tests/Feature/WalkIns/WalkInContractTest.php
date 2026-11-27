@@ -93,7 +93,7 @@ it('puts a named limiter on every walk-in route and Idempotency-Key on the write
     $limiter = fn ($r) => collect($r->gatherMiddleware())->first(fn ($m) => is_string($m) && str_starts_with($m, 'throttle:walkin-'));
     $key = fn ($r) => in_array('idempotent', $r->gatherMiddleware(), true);
 
-    expect($routes)->toHaveCount(18);
+    expect($routes)->toHaveCount(19);
     foreach ($routes as $route) {
         expect($limiter($route))->not->toBeNull($route->uri())->and($route->gatherMiddleware())->toContain('auth:sanctum');
     }

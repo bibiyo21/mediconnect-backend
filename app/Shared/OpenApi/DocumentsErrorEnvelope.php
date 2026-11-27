@@ -65,6 +65,13 @@ final class DocumentsErrorEnvelope
     private const WALK_IN_IDEMPOTENT = ['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel',
         'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority'];
 
+    /** Consultation refusals (Phase 5, 5.7), by operation. The reason codes are the presence and queue ones already in REASON_CODES. */
+    private const CONSULTATION_409 = [
+        'POST consultations/{id}/start' => 'DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable, not_checked_in, no_assignment, doctor_not_active or location_not_active: the doctor is not stored IN at this location, or the doctor or location is not active), QUEUE_CLOSED (reason_code: closed or not_today), INVALID_STATE_TRANSITION (errors.status: the consultation or the entry is not in a state that allows the start), ACTIVE_CONSULTATION (the doctor already has a consultation in progress), or CONCURRENT_MODIFICATION (retry with a NEW key). A repeat of a start that already happened is a 200, not a 409. A doctor\'s own patient profile is refused with 403.',
+        'POST consultations/{id}/end' => 'INVALID_STATE_TRANSITION (the consultation is not IN_PROGRESS or INTERRUPTED; errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key). Ending never refuses on presence. A repeat of an end that already happened is a 200, not a 409.',
+        'POST walk-ins/{id}/complete' => 'INVALID_STATE_TRANSITION (the consultation of this entry is not IN_PROGRESS or INTERRUPTED; errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key). The same rules as the consultation end.',
+    ];
+
     /** Operations with no request body or query to validate: Scramble would add a 422 that can never happen. */
     private const WALK_IN_NO_422 = ['POST walk-ins/{id}/arrive', 'POST walk-ins/queues/{id}/pause', 'POST walk-ins/queues/{id}/open', 'GET walk-ins/{id}',
         'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return'];
@@ -77,7 +84,7 @@ final class DocumentsErrorEnvelope
 
         foreach ($openApi->paths as $path) {
             foreach ($path->operations as $method => $operation) {
-                $description = self::WALK_IN_409[strtoupper((string) $method).' '.ltrim($path->path, '/')] ?? null;
+                $description = self::WALK_IN_409[strtoupper((string) $method).' '.ltrim($path->path, '/')] ?? self::CONSULTATION_409[strtoupper((string) $method).' '.ltrim($path->path, '/')] ?? null;
                 if ($description !== null) {
                     $operation->addResponse(Response::make(409)->setContent('application/json', $ref)->setDescription($description));
                 }
@@ -96,9 +103,10 @@ final class DocumentsErrorEnvelope
                     continue;
                 }
 
-                $operation->addResponse(Response::make(409)->setContent('application/json', $ref)->setDescription($isCheckIn
-                    ? 'INVALID_STATE_TRANSITION, reason_code `open_session`: the doctor already has an open session in another state or at another location (errors.clinic_location_id only for the doctor and staff of that location), or `change_in_progress` (CONCURRENT_MODIFICATION): retry.'
-                    : 'INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.'));
+                $activeNote = str_ends_with($path->path, 'presence/break/start') || str_ends_with($path->path, 'presence/unavailable') ? ' ACTIVE_CONSULTATION: a consultation is in progress; end it first (errors carry no ids).' : '';
+                $baseNote = $isCheckIn ? 'INVALID_STATE_TRANSITION, reason_code `open_session`: the doctor already has an open session in another state or at another location (errors.clinic_location_id only for the doctor and staff of that location), or `change_in_progress` (CONCURRENT_MODIFICATION): retry.'
+                    : 'INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.';
+                $operation->addResponse(Response::make(409)->setContent('application/json', $ref)->setDescription(trim($activeNote.' '.$baseNote)));
 
                 if ($isCheckIn) {
                     $operation->responses = array_values(array_filter($operation->responses ?? [], fn ($r) => ! ($r instanceof Reference && $r->fullName === 'ValidationException')));
@@ -118,19 +126,23 @@ final class DocumentsErrorEnvelope
             }
         };
 
+        if (in_array($key, ['POST consultations/{id}/start', 'POST consultations/{id}/end', 'POST walk-ins/{id}/complete'], true)) {
+            $add(404, 'NOT_FOUND: no such consultation, or the caller has no standing at it (its existence is not revealed). For complete: no consultation exists for this entry.');
+            $add(403, 'FORBIDDEN: the caller can see the consultation but may not start or end it (only its own doctor may).');
+        }
         if (in_array($key, self::WALK_IN_404, true)) {
             $add(404, 'NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).');
         }
         if ($key === 'GET clinics/{clinicId}/doctor-assignments/{assignmentId}/walkin-policy') {
             $add(403, 'FORBIDDEN: clinics.update is needed at the assignment\'s location.');
         }
-        if (in_array($key, self::WALK_IN_IDEMPOTENT, true)) {
+        if (in_array($key, self::WALK_IN_IDEMPOTENT, true) || in_array($key, ['POST consultations/{id}/start', 'POST consultations/{id}/end', 'POST walk-ins/{id}/complete'], true)) {
             $add(400, 'BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.');
             $parameter = (new Parameter('Idempotency-Key', 'header'))->setSchema(Schema::fromType((new StringType)->format('uuid')))->description('A new UUID or ULID for each distinct request; the same one when retrying it.');
             $parameter->required = true;
             $operation->addParameters([$parameter]);
         }
-        if (in_array($key, self::WALK_IN_NO_422, true)) {
+        if (in_array($key, self::WALK_IN_NO_422, true) || in_array($key, ['POST consultations/{id}/start', 'POST consultations/{id}/end', 'POST walk-ins/{id}/complete'], true)) {
             $operation->responses = array_values(array_filter($operation->responses ?? [], fn ($r) => ! ($r instanceof Reference && str_contains((string) $r->fullName, 'ValidationException')) && ! ($r instanceof Response && (int) $r->code === 422)));
         }
     }

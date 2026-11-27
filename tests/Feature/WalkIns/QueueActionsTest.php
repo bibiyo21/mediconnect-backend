@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Consultations\Contracts\CareRelationships;
 use App\Modules\Presence\Contracts\PresenceAdmission;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Scheduling\Contracts\WalkInDay;
@@ -196,7 +195,7 @@ it('lets staff and the patient cancel a SKIPPED entry (D15), cancelling its cons
     wi_post("{$this->remote}/arrive", $this->staff)->assertOk();
     wi_call_next($queue, $this->staff)->assertOk()->assertJsonPath('data.id', $this->remote);
     // The care relationship is granted when a consultation starts; here it is granted directly, while the entry is still CALLED.
-    $grantId = app(CareRelationships::class)->grantForWalkIn($this->remote, CarbonImmutable::now());
+    $grantId = care_grant($this->remote, CarbonImmutable::now());
     expect($grantId)->not->toBeNull();
     wi_post("{$this->remote}/skip", $this->staff)->assertOk();
     expect(DB::table('care_relationships')->where('id', $grantId)->value('status'))->toBe('REVOKED');

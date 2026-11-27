@@ -3,6 +3,7 @@
 namespace App\Modules\WalkIns\Services;
 
 use App\Modules\WalkIns\Exceptions\ConcurrentRegistration;
+use App\Shared\Database\LockTimeoutTransaction;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -35,25 +36,10 @@ final class LockWait
      */
     public function run(Closure $work): mixed
     {
-        $outer = DB::transactionLevel() > 0 ? (string) DB::selectOne("SELECT current_setting('lock_timeout') AS value")?->value : null;
-
         try {
-            return DB::transaction(function () use ($work) {
-                $ms = max(100, min(10000, (int) config('walkins.lock_timeout_ms')));
-                DB::statement("SET LOCAL lock_timeout = '{$ms}ms'");
-
-                return $work();
-            });
+            return LockTimeoutTransaction::run((int) config('walkins.lock_timeout_ms'), $work);
         } catch (QueryException $e) {
             throw $e->getCode() === '55P03' ? new ConcurrentRegistration : $e;
-        } finally {
-            if ($outer !== null) {
-                try {
-                    DB::statement("SET LOCAL lock_timeout = '".str_replace("'", '', $outer)."'");
-                } catch (\Throwable) {
-                    // The outer transaction is unusable anyway; nothing to restore.
-                }
-            }
         }
     }
 

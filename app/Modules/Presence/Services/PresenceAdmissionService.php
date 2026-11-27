@@ -17,18 +17,28 @@ final class PresenceAdmissionService implements PresenceAdmission
 
     public function lockShared(string $doctorProfileId, string $locationId): AdmissionPresence
     {
-        return $this->read($doctorProfileId, $locationId, true);
+        return $this->read($doctorProfileId, $locationId, 'share');
+    }
+
+    public function lockExclusive(string $doctorProfileId, string $locationId): AdmissionPresence
+    {
+        return $this->read($doctorProfileId, $locationId, 'update');
     }
 
     public function current(string $doctorProfileId, string $locationId): AdmissionPresence
     {
-        return $this->read($doctorProfileId, $locationId, false);
+        return $this->read($doctorProfileId, $locationId, 'none');
     }
 
-    private function read(string $doctorProfileId, string $locationId, bool $lock): AdmissionPresence
+    /** @param  'share'|'update'|'none'  $lock */
+    private function read(string $doctorProfileId, string $locationId, string $lock): AdmissionPresence
     {
         $query = DoctorPresenceSession::query()->where('doctor_profile_id', $doctorProfileId)->whereNull('checked_out_at');
-        $session = ($lock ? $query->sharedLock() : $query)->first();
+        $session = match ($lock) {
+            'share' => $query->sharedLock()->first(),
+            'update' => $query->lockForUpdate()->first(),
+            default => $query->first(),
+        };
 
         if ($session !== null) {
             // Open at another location (or online): the doctor is not in at this one.

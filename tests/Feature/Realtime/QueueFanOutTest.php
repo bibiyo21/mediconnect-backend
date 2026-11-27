@@ -248,3 +248,38 @@ it('fans out to the other live entries for a cancel, a pause and a reopen, and n
     expect(array_values(array_filter(fan_emitted(), fn ($e) => $e['payload']['entry_id'] === $bystander)))->not->toBeEmpty()
         ->and(array_filter(fan_emitted(), fn ($e) => in_array($e['payload']['entry_id'], $finished, true)))->toBeEmpty();
 });
+
+it('sends exactly one hint per entry on the leading edge, the changed entry included (no duplicate own-entry hint)', function () {
+    // The head is a patient, so the changed entry has an account to hint: the own-entry skip is really exercised.
+    [, $headProfile, $headHeaders] = remote_patient();
+    register_walkin($headHeaders, patient_body($this->svc, $headProfile))->assertCreated();
+    $head = DB::table('walkin_queue_entries')->where('patient_profile_id', $headProfile)->value('id');
+    wi_post("{$head}/arrive", $this->staff)->assertOk(); // WAITING, first in order
+    [, $profile, $headers] = remote_patient();
+    register_walkin($headers, patient_body($this->svc, $profile))->assertCreated();
+    $bystander = DB::table('walkin_queue_entries')->where('patient_profile_id', $profile)->value('id');
+    wi_post("{$bystander}/arrive", $this->staff)->assertOk();
+
+    // A call of the head changes its status (entryChanged). The leading round must hint each live entry once, the called one included.
+    Cache::flush();
+    Queue::fake();
+    wi_call_next(wi_queue_id(), $this->staff)->assertOk()->assertJsonPath('data.id', $head);
+
+    $perEntry = collect(fan_emitted())->countBy(fn ($e) => $e['payload']['entry_id']);
+    expect($perEntry[$head])->toBe(1)
+        ->and($perEntry[$bystander])->toBe(1)
+        ->and($perEntry->every(fn ($count) => $count === 1))->toBeTrue();
+});
+
+it('hints the changed patient entry once on the leading edge (own entry, not repeated by the fan-out)', function () {
+    [$user, $profile, $headers] = remote_patient();
+    register_walkin($headers, patient_body($this->svc, $profile))->assertCreated();
+    $own = DB::table('walkin_queue_entries')->where('patient_profile_id', $profile)->value('id');
+    Cache::flush();
+    Queue::fake();
+
+    wi_post("{$own}/arrive", $this->staff)->assertOk(); // WAITING: the status change of its own entry
+
+    $toOwn = array_values(array_filter(fan_emitted(), fn ($e) => $e['payload']['entry_id'] === $own));
+    expect($toOwn)->toHaveCount(1)->and($toOwn[0]['channels'])->toBe(["presence-user.{$user->id}"]);
+});

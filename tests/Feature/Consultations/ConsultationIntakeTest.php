@@ -1,11 +1,9 @@
 <?php
 
-use App\Modules\Consultations\Contracts\CareRelationships;
 use App\Modules\Consultations\Contracts\ConsultationIntake;
 use App\Modules\Consultations\DTOs\WalkInCallIntake;
 use App\Modules\Consultations\Enums\ConsultationStatus;
 use App\Modules\Consultations\Models\Consultation;
-use Carbon\CarbonImmutable;
 use Database\Seeders\SpecialtySeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +19,7 @@ beforeEach(function () {
         $row = DB::table('walkin_queue_entries as e')->join('walkin_queues as q', 'q.id', '=', 'e.walkin_queue_id')->where('e.id', $entry)
             ->first(['e.patient_profile_id', 'q.doctor_profile_id', 'q.clinic_location_id']);
 
-        return new WalkInCallIntake($entry, $row->doctor_profile_id, $row->patient_profile_id, $row->clinic_location_id, CarbonImmutable::now());
+        return new WalkInCallIntake($entry, $row->doctor_profile_id, $row->patient_profile_id, $row->clinic_location_id);
     };
 });
 
@@ -60,7 +58,7 @@ it('opens a consultation with a null patient for a guest', function () {
 it('rejects a call that does not match its entry (source trigger)', function () {
     $entry = wi_seed_entry($this->w, $this->profile);
     $call = ($this->call)($entry);
-    $wrong = new WalkInCallIntake($entry, $call->doctorProfileId, null, $call->clinicLocationId, $call->calledAt);
+    $wrong = new WalkInCallIntake($entry, $call->doctorProfileId, null, $call->clinicLocationId);
 
     expect(fn () => DB::transaction(fn () => $this->intake->openForWalkIn($wrong)))->toThrow(QueryException::class, 'consultation does not match its source');
     expect(Consultation::count())->toBe(0);
@@ -98,7 +96,7 @@ it('cancels idempotently, and leaves a missing, cancelled or completed row alone
 it('revokes the care relationship when it cancels', function () {
     $entry = wi_seed_entry($this->w, $this->profile);
     $this->intake->openForWalkIn(($this->call)($entry));
-    app(CareRelationships::class)->grantForWalkIn($entry, $this->clock->now());
+    care_grant($entry, $this->clock->now());
 
     $this->intake->cancelForWalkIn($entry);
 
@@ -108,7 +106,7 @@ it('revokes the care relationship when it cancels', function () {
 it('leaves the care relationship ACTIVE when the consultation is already COMPLETED', function () {
     $entry = wi_seed_entry($this->w, $this->profile);
     $id = $this->intake->openForWalkIn(($this->call)($entry));
-    app(CareRelationships::class)->grantForWalkIn($entry, $this->clock->now());
+    care_grant($entry, $this->clock->now());
     DB::table('consultations')->where('id', $id)->update(['status' => 'COMPLETED', 'started_at' => now(), 'ended_at' => now(), 'duration_seconds' => 5]);
 
     $this->intake->cancelForWalkIn($entry);

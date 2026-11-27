@@ -52,7 +52,7 @@ final class QueueRealtime
                 QueueLabel::of($queue->number_prefix, $entry->queue_number), $entry->status->value, $this->waiting($queue->id), $version, $now,
             );
             $this->entryHint($entry, $version, $now);
-            $this->fanOut($queueId);
+            $this->fanOut($queueId, $entryId);
         }));
     }
 
@@ -67,7 +67,7 @@ final class QueueRealtime
                 $this->entryHint($entry, $this->version($queueId), $this->stamp());
             }
             $this->debouncedQueueHint($queueId);
-            $this->fanOut($queueId);
+            $this->fanOut($queueId, $entryId);
         }));
     }
 
@@ -86,11 +86,12 @@ final class QueueRealtime
      * edge now; a change inside the window schedules one trailing round at its end. So a burst of changes sends at most two rounds per
      * window. Each hint is a bare "your entry may have changed" with the version; the audience is judged at send time (PatientAccess).
      */
-    public function fanOut(string $queueId): void
+    public function fanOut(string $queueId, ?string $alreadyHintedEntryId = null): void
     {
         $window = max(1, (int) config('walkins.realtime.debounce_seconds', 2));
         if (Cache::add("walkin:rt:fan:lead:{$queueId}", 1, $window)) {
-            $this->emitEntryHints($queueId);
+            // The entry the caller has just hinted is skipped here, so it gets exactly one hint on this round (the trailing round may repeat it).
+            $this->emitEntryHints($queueId, $alreadyHintedEntryId);
 
             return;
         }
@@ -104,7 +105,7 @@ final class QueueRealtime
     }
 
     /** Sends one entry hint per account that may see each live entry now, with the committed version. Used by the leading edge and the trailing job. */
-    public function emitEntryHints(string $queueId): void
+    public function emitEntryHints(string $queueId, ?string $skipEntryId = null): void
     {
         if (! WalkInQueue::query()->whereKey($queueId)->exists()) {
             return;
@@ -122,6 +123,9 @@ final class QueueRealtime
         $version = $this->version($queueId);
         $now = $this->stamp();
         foreach ($entries as $entry) {
+            if ($skipEntryId !== null && (string) $entry->id === $skipEntryId) {
+                continue;
+            }
             foreach ($audience[(string) $entry->patient_profile_id] ?? [] as $userId) {
                 WalkInEntryUpdated::dispatch($userId, (string) $entry->patient_profile_id, (string) $entry->id, $entry->status->value, $version, $now);
             }
@@ -166,13 +170,17 @@ final class QueueRealtime
         }
     }
 
-    /** A hint must never break a committed write: log the queue id and the exception class only, and drop the hint (clients refetch on reconnect). */
-    private function safely(string $queueId, \Closure $send): void
+    /**
+     * A hint must never break a committed write nor fail its job: log the job, the queue id and the exception class only, and drop the hint
+     * (clients refetch on reconnect). Public so the hint jobs use the same rule.
+     */
+    public function safely(string $queueId, \Closure $send, ?string $job = null): void
     {
         try {
             $send();
         } catch (Throwable $e) {
-            Log::warning('walkins.realtime_hint_dropped', ['queue_id' => $queueId, 'exception' => $e::class]);
+            $context = ['queue_id' => $queueId, 'exception' => $e::class];
+            Log::warning('walkins.realtime_hint_dropped', $job === null ? $context : ['job' => $job] + $context);
         }
     }
 

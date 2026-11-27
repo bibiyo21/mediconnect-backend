@@ -4,6 +4,7 @@ namespace App\Modules\Presence\Services;
 
 use App\Modules\Audit\Contracts\RecordsAudit;
 use App\Modules\Clinics\Contracts\ClinicAccess;
+use App\Modules\Consultations\Contracts\ActiveConsultations;
 use App\Modules\Notifications\Contracts\SendsNotifications;
 use App\Modules\Presence\Enums\PresenceReason;
 use App\Modules\Presence\Enums\PresenceStatus;
@@ -11,6 +12,7 @@ use App\Modules\Presence\Events\DoctorBreakEnded;
 use App\Modules\Presence\Events\DoctorBreakStarted;
 use App\Modules\Presence\Events\DoctorCheckedIn;
 use App\Modules\Presence\Events\DoctorPresenceUpdated;
+use App\Modules\Presence\Exceptions\ActiveConsultationBlocksChange;
 use App\Modules\Presence\Exceptions\InvalidPresenceTransition;
 use App\Modules\Presence\Exceptions\PresenceChangeInProgress;
 use App\Modules\Presence\Jobs\SendBreakReminder;
@@ -45,6 +47,7 @@ final class PresenceSessions
         private readonly PresenceCache $cache,
         private readonly Clock $clock,
         private readonly ClinicAccess $clinics,
+        private readonly ActiveConsultations $consultations,
     ) {}
 
     /**
@@ -197,6 +200,10 @@ final class PresenceSessions
             // The endpoint names the one status it moves from (break end is not "available"); the table says the move is legal at all.
             if ($from !== $expectedFrom || ! PresenceTransitions::allows($from, $to)) {
                 throw InvalidPresenceTransition::between($from, $to);
+            }
+            // D-I: taken under the session lock above, so no consultation can start between this check and the change.
+            if (in_array($to, [PresenceStatus::OnBreak, PresenceStatus::TemporarilyUnavailable], true) && $this->consultations->inProgressFor($doctorId) !== null) {
+                throw new ActiveConsultationBlocksChange;
             }
 
             $metadata = $prepare !== null ? $prepare($session) : null;

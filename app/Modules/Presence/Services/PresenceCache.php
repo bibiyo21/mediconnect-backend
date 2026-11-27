@@ -2,6 +2,7 @@
 
 namespace App\Modules\Presence\Services;
 
+use App\Modules\Presence\Contracts\PresenceVisibility;
 use App\Modules\Presence\Enums\PresenceStatus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +13,7 @@ use Throwable;
  * §25 clinic key, a documented deviation): a rewritten hint of the stored status, never read as
  * the truth (24-hour TTL, version-compared on write). PostgreSQL decides; a failing cache must not fail a committed change.
  */
-final class PresenceCache
+final class PresenceCache implements PresenceVisibility
 {
     public static function key(string $doctorId, string $locationId): string
     {

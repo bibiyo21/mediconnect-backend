@@ -8,7 +8,7 @@ use App\Shared\Exceptions\DomainException;
 /** The doctor already has a CALLED entry in another queue (409 DOCTOR_ALREADY_CALLING). */
 final class DoctorAlreadyCalling extends DomainException
 {
-    public function __construct(public readonly ?string $reason = null, public readonly ?string $entryId = null)
+    public function __construct(public readonly ?string $reason = null)
     {
         parent::__construct();
     }

@@ -3,6 +3,7 @@
 require_once __DIR__.'/Support/auth.php';
 require_once __DIR__.'/Support/clinics.php';
 require_once __DIR__.'/Support/concurrency.php';
+require_once __DIR__.'/Support/consultations.php';
 require_once __DIR__.'/Support/directory.php';
 require_once __DIR__.'/Support/presence.php';
 require_once __DIR__.'/Support/realtime.php';

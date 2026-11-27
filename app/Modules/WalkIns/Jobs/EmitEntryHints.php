@@ -25,6 +25,7 @@ final class EmitEntryHints implements ShouldQueue
 
     public function handle(QueueRealtime $realtime): void
     {
-        $realtime->emitEntryHints($this->queueId);
+        // A failed hint is dropped, not retried into failed_jobs (M-1): clients refetch.
+        $realtime->safely($this->queueId, fn () => $realtime->emitEntryHints($this->queueId), 'EmitEntryHints');
     }
 }

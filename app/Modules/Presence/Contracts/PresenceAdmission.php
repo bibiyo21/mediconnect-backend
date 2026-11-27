@@ -21,6 +21,12 @@ interface PresenceAdmission
      */
     public function lockShared(string $doctorProfileId, string $locationId): AdmissionPresence;
 
+    /**
+     * Reads the doctor's open session with a FOR UPDATE lock: the lock of a consultation start or end, and of every change that must not
+     * interleave with one (increment 5.7). Same semantics as lockShared otherwise. Must run inside a database transaction.
+     */
+    public function lockExclusive(string $doctorProfileId, string $locationId): AdmissionPresence;
+
     /** The same answer without a lock, for previews and boards. Advisory: admission decides under lock. */
     public function current(string $doctorProfileId, string $locationId): AdmissionPresence;
 }
