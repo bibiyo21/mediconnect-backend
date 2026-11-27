@@ -5038,6 +5038,268 @@
                 ]
             }
         },
+        "/consultations/{id}/interrupt": {
+            "post": {
+                "operationId": "consultationLifecycle.interrupt",
+                "summary": "Interrupt a running walk-in consultation (IN_PROGRESS to INTERRUPTED). Only the consultation's own doctor, with consultations.end.\nNever refused on presence. The entry stays IN_CONSULTATION, the care relationship is untouched, and the doctor is not BUSY while\ninterrupted. A repeat answers 200 with no write.\nErrors: 409 INVALID_STATE_TRANSITION (errors.status), CONCURRENT_MODIFICATION (retry with a NEW key)",
+                "tags": [
+                    "ConsultationLifecycle"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConsultationResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such consultation, or the caller has no standing at it (its existence is not revealed). For complete: no consultation exists for this entry.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION (the consultation is not IN_PROGRESS; errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key). Never refused on presence. A repeat is a 200.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the caller can see the consultation but may not start or end it (only its own doctor may).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/consultations/{id}/resume": {
+            "post": {
+                "operationId": "consultationLifecycle.resume",
+                "summary": "Resume an interrupted walk-in consultation (INTERRUPTED to IN_PROGRESS). Only the consultation's own doctor, with consultations.start.\nThe doctor must be stored IN at this location, and no other consultation of the doctor may be IN_PROGRESS. A repeat answers 200.\nErrors: 409 DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable or not_checked_in), ACTIVE_CONSULTATION,\nINVALID_STATE_TRANSITION (errors.status), CONCURRENT_MODIFICATION (retry with a NEW key)",
+                "tags": [
+                    "ConsultationLifecycle"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConsultationResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such consultation, or the caller has no standing at it (its existence is not revealed). For complete: no consultation exists for this entry.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "409": {
+                        "description": "DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable or not_checked_in: the doctor is not stored IN at this location), ACTIVE_CONSULTATION (another consultation of the doctor is in progress), INVALID_STATE_TRANSITION (errors.status), or CONCURRENT_MODIFICATION (retry with a NEW key). A repeat is a 200.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the caller can see the consultation but may not start or end it (only its own doctor may).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/walk-ins/{id}/complete": {
             "post": {
                 "operationId": "consultationLifecycle.complete",
@@ -5158,6 +5420,297 @@
                                 }
                             }
                         }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/consultations": {
+            "get": {
+                "operationId": "consultationRead.index",
+                "summary": "List consultations the caller may read, newest first, 20 per page (cursor).\nFilters: status, clinic_location_id, from and to (UTC instants on the creation time; to is exclusive)",
+                "tags": [
+                    "ConsultationRead"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/components/schemas/ConsultationStatus"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "clinic_location_id",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "format": "date-time"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "array",
+                                                "items": {}
+                                            }
+                                        },
+                                        "meta": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "per_page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "next_cursor": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "previous_cursor": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "per_page",
+                                                        "next_cursor",
+                                                        "previous_cursor"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                "You do not have access to consultations."
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/consultations/{id}": {
+            "get": {
+                "operationId": "consultationRead.show",
+                "summary": "One consultation, in the view the caller's standing gives. 404 with no standing; 403 when the permission is missing",
+                "tags": [
+                    "ConsultationRead"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConsultationResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                "You do not have access to consultations."
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such consultation, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
                     }
                 },
                 "security": [
@@ -14946,78 +15499,181 @@
                 "title": "ConfirmSpecialtiesRequest"
             },
             "ConsultationResource": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string"
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": [
-                            "SCHEDULED",
-                            "WAITING_ROOM",
-                            "IN_PROGRESS",
-                            "INTERRUPTED",
-                            "COMPLETED",
-                            "CANCELLED"
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "SCHEDULED",
+                                    "WAITING_ROOM",
+                                    "IN_PROGRESS",
+                                    "INTERRUPTED",
+                                    "COMPLETED",
+                                    "CANCELLED"
+                                ]
+                            },
+                            "consultation_type": {
+                                "type": "string"
+                            },
+                            "clinic_location_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_profile_id": {
+                                "type": "string"
+                            },
+                            "started_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "ended_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "duration_seconds": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "walkin_queue_entry_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "appointment_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "patient_profile_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "participant_roles": {
+                                "type": "array",
+                                "description": "The roles of the people in the consultation, never their names. Loaded by the caller; empty when not loaded.",
+                                "items": {}
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "status",
+                            "consultation_type",
+                            "clinic_location_id",
+                            "doctor_profile_id",
+                            "started_at",
+                            "ended_at",
+                            "duration_seconds",
+                            "walkin_queue_entry_id",
+                            "appointment_id",
+                            "patient_profile_id",
+                            "participant_roles"
                         ]
                     },
-                    "consultation_type": {
-                        "type": "string"
-                    },
-                    "walkin_queue_entry_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "doctor_profile_id": {
-                        "type": "string"
-                    },
-                    "patient_profile_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "clinic_location_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "started_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "ended_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "duration_seconds": {
-                        "type": [
-                            "integer",
-                            "null"
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "SCHEDULED",
+                                    "WAITING_ROOM",
+                                    "IN_PROGRESS",
+                                    "INTERRUPTED",
+                                    "COMPLETED",
+                                    "CANCELLED"
+                                ]
+                            },
+                            "consultation_type": {
+                                "type": "string"
+                            },
+                            "clinic_location_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "doctor_profile_id": {
+                                "type": "string"
+                            },
+                            "started_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "ended_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "duration_seconds": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "walkin_queue_entry_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "appointment_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "status",
+                            "consultation_type",
+                            "clinic_location_id",
+                            "doctor_profile_id",
+                            "started_at",
+                            "ended_at",
+                            "duration_seconds",
+                            "walkin_queue_entry_id",
+                            "appointment_id"
                         ]
                     }
-                },
-                "required": [
-                    "id",
-                    "status",
-                    "consultation_type",
-                    "walkin_queue_entry_id",
-                    "doctor_profile_id",
-                    "patient_profile_id",
-                    "clinic_location_id",
-                    "started_at",
-                    "ended_at",
-                    "duration_seconds"
                 ],
                 "title": "ConsultationResource"
+            },
+            "ConsultationStatus": {
+                "type": "string",
+                "description": "Consultation lifecycle (database-schema.md \u00a710).\n",
+                "enum": [
+                    "SCHEDULED",
+                    "WAITING_ROOM",
+                    "IN_PROGRESS",
+                    "INTERRUPTED",
+                    "COMPLETED",
+                    "CANCELLED"
+                ],
+                "title": "ConsultationStatus"
             },
             "ConsultationType": {
                 "type": "string",
@@ -16968,6 +17624,10 @@
                             }
                         ]
                     },
+                    "effective_status": {
+                        "type": "string",
+                        "description": "The status a patient would see: BUSY while the stored IN doctor has a consultation in progress (derived, never stored)."
+                    },
                     "session_id": {
                         "type": [
                             "string",
@@ -17005,6 +17665,7 @@
                 },
                 "required": [
                     "status",
+                    "effective_status",
                     "session_id",
                     "clinic_location_id",
                     "checked_in_at",
@@ -19801,6 +20462,13 @@
                                     "basis"
                                 ]
                             },
+                            "consultation_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "The consultation of this entry while it is CALLED or IN_CONSULTATION; null otherwise. Staff and doctor views only."
+                            },
                             "guest_phone": {
                                 "type": [
                                     "string",
@@ -19841,6 +20509,7 @@
                             "recall_count",
                             "hmo_claim",
                             "estimate",
+                            "consultation_id",
                             "guest_phone",
                             "priority_note"
                         ]

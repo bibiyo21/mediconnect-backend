@@ -64,6 +64,7 @@ function acquire_test_run_lock(): void
 function fresh_test_database(): void
 {
     expect(config('database.connections.pgsql.database'))->toEndWith('_test');
+    expect(config('database.connections.pgsql_owner.database'))->toEndWith('_test');
     DB::purge('pgsql_second');
     DB::connection('pgsql_owner')->statement("SET lock_timeout = '10s'");
     Artisan::call('migrate:fresh', ['--database' => 'pgsql_owner', '--force' => true]);

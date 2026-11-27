@@ -20,6 +20,22 @@ final class PresenceReader
     /** The public answer is kept this long server-side (and dropped on every change); a stale one is bounded by this. */
     public const PUBLIC_TTL_SECONDS = 10;
 
+    /**
+     * The status for the doctor's own view (`effective_status`, D-H): BUSY when stored IN and a consultation is in progress, else the stored
+     * status. Not stored and not cached; advisory, so transitions still read the stored status.
+     */
+    public function effectiveStatus(?DoctorPresenceSession $session): PresenceStatus
+    {
+        if ($session === null) {
+            return PresenceStatus::NotCheckedIn;
+        }
+        if ($session->current_status === PresenceStatus::In && $this->consultations->inProgressFor($session->doctor_profile_id) !== null) {
+            return PresenceStatus::Busy;
+        }
+
+        return $session->current_status;
+    }
+
     public function openSession(string $doctorId): ?DoctorPresenceSession
     {
         return DoctorPresenceSession::where('doctor_profile_id', $doctorId)->whereNull('checked_out_at')->first();

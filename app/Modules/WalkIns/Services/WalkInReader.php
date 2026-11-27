@@ -11,6 +11,7 @@ use App\Modules\Users\Models\User;
 use App\Modules\WalkIns\DTOs\EntryView;
 use App\Modules\WalkIns\Enums\EntryStatus;
 use App\Modules\WalkIns\Enums\ViewLevel;
+use App\Modules\WalkIns\Estimation\WaitEstimate;
 use App\Modules\WalkIns\Models\WalkInQueue;
 use App\Modules\WalkIns\Models\WalkInQueueEntry;
 use App\Shared\Contracts\Clock;
@@ -69,9 +70,14 @@ final class WalkInReader
         $live = array_map(fn (EntryStatus $s) => $s->value, [...EntryStatus::live(), EntryStatus::Skipped]);
         $byQueue = $levels === [] ? collect() : WalkInQueueEntry::query()->whereIn('walkin_queue_id', array_keys($levels))->whereIn('status', $live)->orderBy('queue_number')->get()->groupBy('walkin_queue_id');
         $ordered = [];
+        // Each queue's estimate is computed once for this read and shared by the ordering and the presentation.
+        $estimates = [];
         foreach ($queues as $queue) {
             if (isset($levels[$queue->id])) {
-                $ordered[$queue->id] = $this->callOrder($queue, $byQueue->get($queue->id, collect()), $levels[$queue->id]);
+                if ($levels[$queue->id] !== ViewLevel::Restricted) {
+                    $estimates[$queue->id] = $this->presenter->estimatesFor($queue);
+                }
+                $ordered[$queue->id] = $this->callOrder($queue, $byQueue->get($queue->id, collect()), $levels[$queue->id], $estimates[$queue->id] ?? []);
             }
         }
         $views = [];
@@ -83,7 +89,7 @@ final class WalkInReader
                     array_push($entries, ...$list);
                 }
             }
-            foreach ($this->presenter->present($entries, $level, withEstimate: $level !== ViewLevel::Restricted, minutesForNext: (int) config('walkins.board_minutes_for_next')) as $view) {
+            foreach ($this->presenter->present($entries, $level, withEstimate: $level !== ViewLevel::Restricted, minutesForNext: (int) config('walkins.board_minutes_for_next'), estimates: $estimates) as $view) {
                 $views[$view->queue->id][] = $view;
             }
         }
@@ -116,7 +122,12 @@ final class WalkInReader
      * @param  iterable<WalkInQueueEntry>  $list
      * @return list<WalkInQueueEntry>
      */
-    private function callOrder(WalkInQueue $queue, iterable $list, ViewLevel $level): array
+    /**
+     * @param  iterable<WalkInQueueEntry>  $list
+     * @param  array<string, WaitEstimate>  $estimates  this queue's estimates, by entry id
+     * @return list<WalkInQueueEntry>
+     */
+    private function callOrder(WalkInQueue $queue, iterable $list, ViewLevel $level, array $estimates): array
     {
         $entries = collect($list);
         $entries->each(fn (WalkInQueueEntry $e) => $e->setRelation('queue', $queue));
@@ -124,7 +135,7 @@ final class WalkInReader
             return array_values($entries->sortBy('queue_number')->all());
         }
 
-        $position = array_flip(array_keys($this->presenter->estimatesFor($queue)));
+        $position = array_flip(array_keys($estimates));
         $rank = function (WalkInQueueEntry $e) use ($position): array {
             $group = match (true) {
                 in_array($e->status, self::LIVE_ORDER, true) => 0,

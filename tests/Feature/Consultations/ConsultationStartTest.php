@@ -276,3 +276,20 @@ it('reads the COMPLETED consultation in the rolling duration stats (MINOR-4)', f
 
     expect($expected->source)->toBe(DurationSource::Rolling)->and($expected->seconds)->toBe(420);
 });
+
+it('next entry estimate moves after start', function () {
+    [, $consultation] = called_patient();
+    fresh_session();
+    $next = wi_guest($this->staff, $this->svc, 'Next In Line');
+    fresh_session();
+    $before = wi_json("/api/v1/walk-ins/{$next}", $this->staff)->assertOk()->json('data.estimate');
+
+    consultation_post("{$consultation}/start", $this->w['doctorHeaders'])->assertOk();
+    wi_advance(7);
+    fresh_session();
+    $after = wi_json("/api/v1/walk-ins/{$next}", $this->staff)->assertOk()->json('data.estimate');
+
+    expect($before['position'])->toBe(2)->and($after['position'])->toBe(1)
+        ->and($after['basis'])->toContain('current_consultation')
+        ->and($after['max_minutes'])->toBeLessThan($before['max_minutes']);
+});

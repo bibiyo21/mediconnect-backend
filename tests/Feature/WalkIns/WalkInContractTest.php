@@ -79,12 +79,12 @@ it('carries exactly the keys each audience may see in an entry', function () {
     $common = ['id', 'label', 'queue_number', 'status', 'queue_id', 'local_date', 'timezone', 'clinic_location_id', 'location_name', 'doctor_profile_id', 'doctor_name', 'doctor_service_id', 'service_name', 'fee', 'payer_type', 'registered_at', 'arrived_at'];
     expect(array_keys($patient->json('data')))->toEqualCanonicalizing([...$common, 'estimate'])
         ->and(array_keys($patient->json('data.estimate')))->toEqualCanonicalizing(['position', 'min_minutes', 'max_minutes', 'is_estimate', 'may_not_be_served_today', 'wait_status'])
-        ->and(array_keys($guest->json('data')))->toEqualCanonicalizing([...$common, 'registration_channel', 'is_guest', 'name', 'priority_level', 'priority_reason_code', 'called_at', 'recall_count', 'hmo_claim', 'estimate'])
+        ->and(array_keys($guest->json('data')))->toEqualCanonicalizing([...$common, 'registration_channel', 'is_guest', 'name', 'priority_level', 'priority_reason_code', 'called_at', 'recall_count', 'hmo_claim', 'estimate', 'consultation_id'])
         ->and(array_keys($guest->json('data.estimate')))->toEqualCanonicalizing(['position', 'min_minutes', 'max_minutes', 'is_estimate', 'may_not_be_served_today', 'wait_status', 'basis']);
 
     $detail = wi_json("/api/v1/walk-ins/{$guest->json('data.id')}", $staff)->assertOk()->json('data');
     $restricted = wi_json("/api/v1/walk-ins/{$guest->json('data.id')}", session_for(account(Role::SupportAgent)))->assertOk()->json('data');
-    expect(array_keys($detail))->toEqualCanonicalizing([...$common, 'registration_channel', 'is_guest', 'name', 'priority_level', 'priority_reason_code', 'called_at', 'recall_count', 'hmo_claim', 'estimate', 'guest_phone', 'priority_note'])
+    expect(array_keys($detail))->toEqualCanonicalizing([...$common, 'registration_channel', 'is_guest', 'name', 'priority_level', 'priority_reason_code', 'called_at', 'recall_count', 'hmo_claim', 'estimate', 'consultation_id', 'guest_phone', 'priority_note'])
         ->and(array_keys($restricted))->toEqualCanonicalizing([...$common, 'priority_level', 'registration_channel', 'is_guest']);
 });
 

@@ -39,7 +39,7 @@ final class ConsultationLifecycleController
         $consultation = Consultation::query()->findOrFail($id);
         $this->authorise($user, $consultation, 'start');
 
-        return ApiResponse::success(new ConsultationResource($this->lifecycle->start($user, $consultation)));
+        return $this->respond($this->lifecycle->start($user, $consultation));
     }
 
     /**
@@ -56,7 +56,7 @@ final class ConsultationLifecycleController
         $consultation = Consultation::query()->findOrFail($id);
         $this->authorise($user, $consultation, 'end');
 
-        return ApiResponse::success(new ConsultationResource($this->lifecycle->end($user, $consultation)));
+        return $this->respond($this->lifecycle->end($user, $consultation));
     }
 
     /**
@@ -72,7 +72,45 @@ final class ConsultationLifecycleController
         $consultation = Consultation::query()->where('walkin_queue_entry_id', $id)->firstOrFail();
         $this->authorise($user, $consultation, 'end');
 
-        return ApiResponse::success(new ConsultationResource($this->lifecycle->end($user, $consultation)));
+        return $this->respond($this->lifecycle->end($user, $consultation));
+    }
+
+    /**
+     * Interrupt a running walk-in consultation (IN_PROGRESS to INTERRUPTED). Only the consultation's own doctor, with consultations.end.
+     * Never refused on presence. The entry stays IN_CONSULTATION, the care relationship is untouched, and the doctor is not BUSY while
+     * interrupted. A repeat answers 200 with no write.
+     * Errors: 409 INVALID_STATE_TRANSITION (errors.status), CONCURRENT_MODIFICATION (retry with a NEW key).
+     */
+    public function interrupt(ConsultationActionRequest $request, string $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $consultation = Consultation::query()->findOrFail($id);
+        $this->authorise($user, $consultation, 'interrupt');
+
+        return $this->respond($this->lifecycle->interrupt($consultation));
+    }
+
+    /**
+     * Resume an interrupted walk-in consultation (INTERRUPTED to IN_PROGRESS). Only the consultation's own doctor, with consultations.start.
+     * The doctor must be stored IN at this location, and no other consultation of the doctor may be IN_PROGRESS. A repeat answers 200.
+     * Errors: 409 DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable or not_checked_in), ACTIVE_CONSULTATION,
+     * INVALID_STATE_TRANSITION (errors.status), CONCURRENT_MODIFICATION (retry with a NEW key).
+     */
+    public function resume(ConsultationActionRequest $request, string $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $consultation = Consultation::query()->findOrFail($id);
+        $this->authorise($user, $consultation, 'resume');
+
+        return $this->respond($this->lifecycle->resume($consultation));
+    }
+
+    /** The consultation as the write answers it: participants loaded, so the full view carries their roles. */
+    private function respond(Consultation $consultation): JsonResponse
+    {
+        return ApiResponse::success(new ConsultationResource($consultation->loadMissing('participants')));
     }
 
     /** No standing is a 404; standing without the write permission is a 403. */

@@ -15,6 +15,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 final class PresenceStateResource extends JsonResource
 {
+    public function __construct($resource, private readonly ?PresenceStatus $effective = null)
+    {
+        parent::__construct($resource);
+    }
+
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
@@ -23,6 +28,8 @@ final class PresenceStateResource extends JsonResource
         return [
             /** The stored status: IN, ON_BREAK or TEMPORARILY_UNAVAILABLE while a session is open, otherwise NOT_CHECKED_IN. */
             'status' => ($session->current_status ?? PresenceStatus::NotCheckedIn)->value,
+            /** The status a patient would see: BUSY while the stored IN doctor has a consultation in progress (derived, never stored). */
+            'effective_status' => ($this->effective ?? $session->current_status ?? PresenceStatus::NotCheckedIn)->value,
             /** @var string|null Null when there is no open session. */
             'session_id' => $session?->id,
             /** @var string|null */

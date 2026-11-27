@@ -36,6 +36,8 @@ final class ConsultationsServiceProvider extends ServiceProvider
 
         Gate::policy(Consultation::class, ConsultationPolicy::class);
 
+        RateLimiter::for('consultation-read', fn (Request $request) => Limit::perMinute((int) config('consultations.limits.read_per_minute'))
+            ->by('consultation-read:'.(string) ($request->user()?->getAuthIdentifier() ?? $request->ip())));
         RateLimiter::for('consultation-write', fn (Request $request) => Limit::perMinute((int) config('consultations.limits.write_per_minute'))
             ->by('consultation-write:'.(string) ($request->user()?->getAuthIdentifier() ?? $request->ip())));
 

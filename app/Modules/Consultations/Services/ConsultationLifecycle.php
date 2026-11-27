@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Starts and ends a walk-in consultation (increment 5.7, brief D-A to D-F). Lock order, fixed for every path (doctor-presence.md):
+ * Starts, ends, interrupts and resumes a walk-in consultation (increment 5.7, brief D-A to D-G). Lock order, fixed for every path (doctor-presence.md):
  * presence session FOR UPDATE, then the walk-in queue, then its entry (both through WalkInConsultationEntries), then the consultation,
  * then care_relationships (start only, as the last write). A refusal rolls everything back, so no care row survives it.
  *
@@ -118,7 +118,7 @@ final class ConsultationLifecycle
         // Last domain write (D-A): a refusal or rollback above leaves no care relationship behind. The audit row follows the grant so it can name it (L-5).
         $careId = $this->care->grantForWalkIn(new WalkInCareGrant($facts->entryId, $doctorId, $facts->patientProfileId, $facts->timezone, $now));
         $this->audit->record('consultations.started', 'consultation', $consultation->id, [
-            'walkin_queue_entry_id' => $facts->entryId, 'clinic_location_id' => $locationId, 'guest' => $facts->patientProfileId === null,
+            'walkin_queue_entry_id' => $facts->entryId, 'clinic_location_id' => $locationId, 'is_guest' => $facts->patientProfileId === null,
             'care_relationship_id' => $careId,
         ], clinicId: $this->clinicOf($locationId));
         DB::afterCommit(fn () => $this->visibility->forgetPublic($doctorId));
@@ -154,6 +154,108 @@ final class ConsultationLifecycle
             ->update(['left_at' => $now, 'updated_at' => $now]);
         $this->audit->record('consultations.ended', 'consultation', $consultation->id, [
             'walkin_queue_entry_id' => $facts->entryId, 'clinic_location_id' => $locationId, 'duration_seconds' => $duration,
+        ], clinicId: $this->clinicOf($locationId));
+        DB::afterCommit(fn () => $this->visibility->forgetPublic($doctorId));
+
+        return $consultation;
+    }
+
+    /**
+     * Interrupts a running consultation (IN_PROGRESS to INTERRUPTED, brief D-G). Never refuses on presence: a doctor must be able to pause
+     * a consultation whatever the stored state. The entry stays IN_CONSULTATION, the grant is untouched and the doctor is not BUSY while it is
+     * interrupted. A repeat of an interrupt that already happened returns the consultation with no write.
+     */
+    public function interrupt(Consultation $consultation): Consultation
+    {
+        $entryId = $this->entryOf($consultation);
+
+        return $this->locked(fn () => $this->interruptLocked($consultation, $entryId));
+    }
+
+    /**
+     * Resumes an interrupted consultation (INTERRUPTED to IN_PROGRESS, D-G). Needs the doctor stored IN at this location and no other
+     * IN_PROGRESS consultation of the doctor. A repeat of a resume that already happened returns the consultation with no write.
+     */
+    public function resume(Consultation $consultation): Consultation
+    {
+        $entryId = $this->entryOf($consultation);
+
+        return $this->locked(fn () => $this->resumeLocked($consultation, $entryId));
+    }
+
+    private function interruptLocked(Consultation $outer, string $entryId): Consultation
+    {
+        $doctorId = $outer->doctor_profile_id;
+        $locationId = (string) $outer->clinic_location_id;
+
+        $this->presence->lockExclusive($doctorId, $locationId);
+        $facts = $this->entries->lockEntry($entryId);
+        $consultation = Consultation::query()->whereKey($outer->id)->lockForUpdate()->firstOrFail();
+        if ($consultation->status === ConsultationStatus::Interrupted) {
+            return $consultation;
+        }
+        if ($consultation->status !== ConsultationStatus::InProgress) {
+            throw ConsultationRefused::invalidTransition($consultation->status->value);
+        }
+        if ($facts->status !== EntryStatus::InConsultation) {
+            throw ConsultationRefused::invalidTransition($facts->status->value);
+        }
+
+        $consultation->forceFill(['status' => ConsultationStatus::Interrupted])->save();
+        $this->audit->record('consultations.interrupted', 'consultation', $consultation->id, [
+            'walkin_queue_entry_id' => $facts->entryId, 'clinic_location_id' => $locationId,
+        ], clinicId: $this->clinicOf($locationId));
+        DB::afterCommit(fn () => $this->visibility->forgetPublic($doctorId));
+
+        return $consultation;
+    }
+
+    private function resumeLocked(Consultation $outer, string $entryId): Consultation
+    {
+        $doctorId = $outer->doctor_profile_id;
+        $locationId = (string) $outer->clinic_location_id;
+
+        $presence = $this->presence->lockExclusive($doctorId, $locationId);
+        $facts = $this->entries->lockEntry($entryId);
+        $consultation = Consultation::query()->whereKey($outer->id)->lockForUpdate()->firstOrFail();
+        if ($consultation->status === ConsultationStatus::InProgress) {
+            return $consultation;
+        }
+        if ($consultation->status !== ConsultationStatus::Interrupted) {
+            throw ConsultationRefused::invalidTransition($consultation->status->value);
+        }
+        if ($presence->status !== PresenceStatus::In) {
+            throw ConsultationRefused::notAvailable(match ($presence->status) {
+                PresenceStatus::OnBreak => 'on_break',
+                PresenceStatus::Out => 'checked_out',
+                PresenceStatus::NotCheckedIn => 'not_checked_in',
+                default => 'unavailable',
+            });
+        }
+        if ($facts->status !== EntryStatus::InConsultation) {
+            throw ConsultationRefused::invalidTransition($facts->status->value);
+        }
+        // m3 / L-1: resume repeats start's checks, so a consultation interrupted before a de-verification, a suspension, an
+        // unassignment or the end of the queue's day cannot be resumed by a stale stored IN presence.
+        if (! $facts->queueIsToday) {
+            throw ConsultationRefused::queueClosed('not_today');
+        }
+        if (! $facts->assignmentActive) {
+            throw ConsultationRefused::notAvailable('no_assignment');
+        }
+        if (! $facts->doctorActive) {
+            throw ConsultationRefused::notAvailable('doctor_not_active');
+        }
+        if (! $facts->locationActive) {
+            throw ConsultationRefused::notAvailable('location_not_active');
+        }
+        if ($this->active->inProgressFor($doctorId) !== null) {
+            throw ConsultationRefused::activeConsultation();
+        }
+
+        $consultation->forceFill(['status' => ConsultationStatus::InProgress])->save();
+        $this->audit->record('consultations.resumed', 'consultation', $consultation->id, [
+            'walkin_queue_entry_id' => $facts->entryId, 'clinic_location_id' => $locationId,
         ], clinicId: $this->clinicOf($locationId));
         DB::afterCommit(fn () => $this->visibility->forgetPublic($doctorId));
 

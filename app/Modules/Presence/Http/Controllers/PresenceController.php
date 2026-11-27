@@ -8,6 +8,7 @@ use App\Modules\Presence\Http\Requests\PresenceActionRequest;
 use App\Modules\Presence\Http\Requests\StartBreakRequest;
 use App\Modules\Presence\Http\Resources\PresenceStateResource;
 use App\Modules\Presence\Http\SourceDevice;
+use App\Modules\Presence\Models\DoctorPresenceSession;
 use App\Modules\Presence\Services\PresenceAccess;
 use App\Modules\Presence\Services\PresenceActor;
 use App\Modules\Presence\Services\PresenceReader;
@@ -39,7 +40,7 @@ final class PresenceController
         $user = $request->user();
         ['doctor' => $doctor] = $this->access->resolve($user, null, null);
 
-        return ApiResponse::success(new PresenceStateResource($this->reader->openSession($doctor)));
+        return ApiResponse::success($this->state($this->reader->openSession($doctor)));
     }
 
     /**
@@ -58,10 +59,10 @@ final class PresenceController
 
         // 200 with the current state when the doctor is already IN at this location (a retry); 201 for a new session.
         if (! $session->wasRecentlyCreated) {
-            return ApiResponse::success(new PresenceStateResource($session));
+            return ApiResponse::success($this->state($session));
         }
 
-        return ApiResponse::success(new PresenceStateResource($session), status: 201);
+        return ApiResponse::success($this->state($session), status: 201);
     }
 
     /** Start a break. Only from IN (409 otherwise; already ON_BREAK: 200, unchanged). A reminder is sent at the expected end. */
@@ -70,7 +71,7 @@ final class PresenceController
         ['doctor' => $doctor, 'actor' => $actor] = $this->actor($request, $request->doctorId(), $request->locationId());
         $scheduled = $request->validated('scheduled_break_id');
 
-        return ApiResponse::success(new PresenceStateResource($this->sessions->startBreak($actor, $doctor, $request->locationId(), (int) $request->validated('expected_minutes'), is_string($scheduled) ? $scheduled : null)));
+        return ApiResponse::success($this->state($this->sessions->startBreak($actor, $doctor, $request->locationId(), (int) $request->validated('expected_minutes'), is_string($scheduled) ? $scheduled : null)));
     }
 
     /** End a break. Only from ON_BREAK (409 otherwise; already IN: 200, unchanged). */
@@ -78,7 +79,7 @@ final class PresenceController
     {
         ['doctor' => $doctor, 'actor' => $actor] = $this->actor($request, $request->doctorId(), $request->locationId());
 
-        return ApiResponse::success(new PresenceStateResource($this->sessions->endBreak($actor, $doctor, $request->locationId())));
+        return ApiResponse::success($this->state($this->sessions->endBreak($actor, $doctor, $request->locationId())));
     }
 
     /** Mark yourself temporarily unavailable (TEMPORARILY_UNAVAILABLE). Only from IN (409 otherwise; already unavailable: 200, unchanged). */
@@ -86,7 +87,7 @@ final class PresenceController
     {
         ['doctor' => $doctor, 'actor' => $actor] = $this->actor($request, $request->doctorId(), $request->locationId());
 
-        return ApiResponse::success(new PresenceStateResource($this->sessions->markUnavailable($actor, $doctor, $request->locationId(), $request->reason())));
+        return ApiResponse::success($this->state($this->sessions->markUnavailable($actor, $doctor, $request->locationId(), $request->reason())));
     }
 
     /** Become available again. Only from TEMPORARILY_UNAVAILABLE (409 otherwise; already IN: 200, unchanged). */
@@ -94,7 +95,13 @@ final class PresenceController
     {
         ['doctor' => $doctor, 'actor' => $actor] = $this->actor($request, $request->doctorId(), $request->locationId());
 
-        return ApiResponse::success(new PresenceStateResource($this->sessions->markAvailable($actor, $doctor, $request->locationId())));
+        return ApiResponse::success($this->state($this->sessions->markAvailable($actor, $doctor, $request->locationId())));
+    }
+
+    /** The doctor's own state with its effective status (derived BUSY). */
+    private function state(?DoctorPresenceSession $session): PresenceStateResource
+    {
+        return new PresenceStateResource($session, $this->reader->effectiveStatus($session));
     }
 
     /** @return array{doctor: string, actor: PresenceActor} */

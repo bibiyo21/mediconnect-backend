@@ -81,6 +81,8 @@ final class WalkInEntryResource extends JsonResource
             'hmo_claim' => $e->payer_type->value === 'HMO' ? ['label' => 'Patient says HMO: not verified', 'card_name_text' => $e->hmo_card_name_encrypted] : null,
             /** Staff estimate with the basis codes. Minutes appear for the next waiting entries only. */
             'estimate' => $v->estimate === null ? null : EstimateView::forStaff($v->estimate, $v->showMinutes),
+            /** The consultation of this entry while it is CALLED or IN_CONSULTATION; null otherwise. Staff and doctor views only. */
+            'consultation_id' => $v->consultationId,
         ];
         if ($v->includePhone) {
             // The guest's contact number (+63, E.164): present only for a guest, only in this detail, null after the purge; the read is audited.

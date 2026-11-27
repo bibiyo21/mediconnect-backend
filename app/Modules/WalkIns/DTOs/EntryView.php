@@ -28,5 +28,7 @@ final class EntryView
         public readonly bool $showMinutes = true,
         public readonly ?string $displayName = null,
         public readonly bool $includePhone = false,
+        /** The consultation of a CALLED or IN_CONSULTATION entry, for the staff and doctor views only. */
+        public readonly ?string $consultationId = null,
     ) {}
 }

@@ -13,5 +13,7 @@ return [
     'limits' => [
         // Start, end and complete, per user per minute.
         'write_per_minute' => env('CONSULTATIONS_WRITE_PER_MINUTE', 30),
+        // Reads of consultations (list and detail), per user per minute.
+        'read_per_minute' => env('CONSULTATIONS_READ_PER_MINUTE', 120),
     ],
 ];
