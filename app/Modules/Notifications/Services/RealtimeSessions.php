@@ -5,7 +5,10 @@ namespace App\Modules\Notifications\Services;
 use App\Modules\Audit\Contracts\RecordsSecurityEvents;
 use App\Modules\Audit\Enums\SecurityEventType;
 use App\Modules\Notifications\Contracts\TerminatesRealtimeSessions;
+use App\Modules\Notifications\Exceptions\RealtimeTerminationFailedException;
 use App\Modules\Notifications\Jobs\TerminateRealtimeConnections;
+use Illuminate\Broadcasting\Broadcasters\PusherBroadcaster;
+use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,9 +24,15 @@ use Throwable;
  * why every channel is a presence channel (see Channels).
  *
  * A failure never breaks the request that ended the authorization, and it is never silent: it is
- * logged by id and recorded as a REALTIME_TERMINATION_FAILED security event (HIGH), so a socket that
+ * logged by id, recorded as a REALTIME_TERMINATION_FAILED security event (HIGH) and reported to Sentry
+ * as RealtimeTerminationFailedException (alertable; the alert rule is a human setup step), so a socket that
  * could not be cut is visible to operations. The job runs on the `critical` queue (CLAUDE.md §24) and
  * the Pusher client's HTTP timeout (config/broadcasting.php, 3 s) is below the job timeout.
+ *
+ * Backstop: the `realtime:reconcile` sweep (RealtimeReconciler, every minute) re-checks every live
+ * subscription and terminates the ones whose authorization or credential has ended, which bounds the
+ * residual risk below and catches any revocation path that forgot to call this class. Runbook:
+ * docs/operations/realtime-runbook.md.
  *
  * Residual risk, by design of Reverb (no per-socket close API exists): a socket that obtained a
  * channel signature from /broadcasting/auth but has NOT yet subscribed carries no user id, so
@@ -58,18 +67,58 @@ final class RealtimeSessions implements TerminatesRealtimeSessions
     }
 
     /**
-     * Logs by id and records a HIGH security event: ids, the reason label and the exception class
-     * only, never the message (it can echo a host or a secret). One row per user and reason a minute,
-     * so a retry storm or the sync queue does not repeat it.
+     * Closes the user's connections NOW, in this process (the realtime sweep and `realtime:terminate`
+     * use it, so a stopped queue worker cannot delay them). True only when Reverb accepted the call;
+     * a failure goes through recordFailure and answers false.
+     */
+    public function terminateNow(string $userId, string $reason): bool
+    {
+        $broadcaster = app(BroadcastManager::class)->connection();
+        if (! $broadcaster instanceof PusherBroadcaster) {
+            return true; // null and log drivers hold no connections
+        }
+
+        try {
+            $broadcaster->getPusher()->terminateUserConnections($userId);
+
+            return true;
+        } catch (Throwable $e) {
+            self::recordFailure($userId, $reason, $e);
+
+            return false;
+        }
+    }
+
+    /**
+     * Logs by id, reports one alertable exception to Sentry and records a HIGH security event: ids,
+     * the reason label and the exception class only, never the message (it can echo a host or a
+     * secret). One report and row per user and reason a minute, so a retry storm or the sync queue
+     * does not repeat it. The Sentry report comes FIRST and in its own try, so a database outage
+     * (which breaks the security event) cannot suppress the alert.
      */
     public static function recordFailure(string $userId, string $reason, Throwable $e): void
     {
         Log::warning('realtime.terminate_failed', ['user_id' => $userId, 'reason' => $reason, 'exception' => $e::class]);
 
         try {
-            if (Cache::add('realtime-terminate-failed:'.hash('sha256', $userId.'|'.$reason), 1, 60)) {
-                app(RecordsSecurityEvents::class)->record(SecurityEventType::RealtimeTerminationFailed, $userId, ['reason' => $reason, 'exception' => $e::class]);
-            }
+            $first = Cache::add('realtime-terminate-failed:'.hash('sha256', $userId.'|'.$reason), 1, 60);
+        } catch (Throwable) {
+            $first = true; // a cache fault must not hide the failure
+        }
+        if (! $first) {
+            return;
+        }
+
+        try {
+            // report(), not a log channel: bootstrap/app.php wires Sentry into the exception handler,
+            // whereas the sentry log channels only receive records when LOG_STACK names them (default: single).
+            report(new RealtimeTerminationFailedException);
+        } catch (Throwable) {
+            // The log line above is the fallback.
+        }
+
+        try {
+            app(RecordsSecurityEvents::class)->record(SecurityEventType::RealtimeTerminationFailed, $userId, ['reason' => $reason, 'exception' => $e::class]);
         } catch (Throwable) {
             // The log line above is the fallback; recording must never break the caller.
         }

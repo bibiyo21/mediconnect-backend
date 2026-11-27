@@ -3,6 +3,7 @@
 namespace App\Modules\Notifications\Realtime;
 
 use Illuminate\Broadcasting\PresenceChannel;
+use Illuminate\Support\Str;
 
 /**
  * The only places channel names are spelled (architecture.md §15.2, rbac-permissions.md §8).
@@ -28,6 +29,35 @@ use Illuminate\Broadcasting\PresenceChannel;
  */
 final class Channels
 {
+    /**
+     * Every pattern registered in routes/channels.php (names without the `presence-` prefix) and its
+     * kind. The sweep parses live channel names with it; a test fails when this and the routes drift.
+     */
+    public const PATTERNS = [
+        'user.{userId}' => ChannelKind::User,
+        'doctor.{doctorProfileId}' => ChannelKind::Doctor,
+        'clinic.{locationId}' => ChannelKind::Clinic,
+        'clinic.{locationId}.queue' => ChannelKind::ClinicQueue,
+    ];
+
+    /** Parses a presence channel name as Reverb reports it (with the `presence-` prefix); null when it is none of ours. */
+    public static function parse(string $name): ?ChannelRef
+    {
+        if (! str_starts_with($name, 'presence-')) {
+            return null;
+        }
+        $bare = substr($name, strlen('presence-'));
+
+        foreach (self::PATTERNS as $pattern => $kind) {
+            $regex = '/^'.preg_replace('/\{\w+\}/', '([^.]+)', str_replace('.', '\.', $pattern)).'$/';
+            if (preg_match($regex, $bare, $m) === 1 && Str::isUuid($m[1])) {
+                return new ChannelRef($kind, $m[1]);
+            }
+        }
+
+        return null;
+    }
+
     public static function user(string $userId): PresenceChannel
     {
         return new PresenceChannel("user.{$userId}");

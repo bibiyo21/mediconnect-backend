@@ -2,6 +2,8 @@
 
 namespace App\Modules\Notifications\Providers;
 
+use App\Modules\Notifications\Console\ReconcileRealtime;
+use App\Modules\Notifications\Console\TerminateRealtime;
 use App\Modules\Notifications\Contracts\PushGateway;
 use App\Modules\Notifications\Contracts\SendsNotifications;
 use App\Modules\Notifications\Contracts\SendsOneTimeMessages;
@@ -52,8 +54,12 @@ final class NotificationsServiceProvider extends ServiceProvider
         // Channel subscriptions: 60 a minute per user (a client joins a handful of channels at connect).
         RateLimiter::for('broadcast-auth', fn (Request $request) => Limit::perMinute(60)->by('broadcast-auth:'.($request->user()?->getAuthIdentifier() ?? Fingerprint::ip($request->ip()))));
 
+        if ($this->app->runningInConsole()) {
+            $this->commands([ReconcileRealtime::class, TerminateRealtime::class]);
+        }
+
         PushConfigGuard::assertSafe((string) config('app.env'), (string) config('services.push.driver'));
-        RealtimeConfigGuard::assertSafe((string) config('app.env'), (string) config('broadcasting.default'), (array) config('reverb.apps.apps.0.allowed_origins', []));
+        RealtimeConfigGuard::assertSafe((string) config('app.env'), (string) config('broadcasting.default'), (array) config('reverb.apps.apps.0.allowed_origins', []), (bool) config('reverb.servers.reverb.scaling.enabled', false));
 
         // Channel authorization callbacks (routes/channels.php), registered on the configured broadcaster.
         require base_path('routes/channels.php');

@@ -26,15 +26,15 @@ it('signs a native client in with tokens bound to a new device', function () {
 it('accepts the mobile number as the identifier', function () {
     $user = User::factory()->create(['mobile_e164' => '+639171234567', 'password' => TEST_PASSWORD]);
 
-    $this->postJson('/api/v1/auth/login', ['identifier' => '0917 123 4567', 'password' => TEST_PASSWORD])
+    $this->postJson('/api/v1/auth/login', ['identifier' => '0917 123 4567', 'password' => TEST_PASSWORD, 'device' => ['platform' => 'IOS']])
         ->assertOk()->assertJsonPath('data.user.id', $user->id);
 });
 
 it('gives the same answer for an unknown account and a wrong password', function () {
     account(Role::Patient)->forceFill(['email' => 'known@example.com'])->save();
 
-    $wrong = $this->postJson('/api/v1/auth/login', ['identifier' => 'known@example.com', 'password' => 'Wrong-password-1']);
-    $unknown = $this->postJson('/api/v1/auth/login', ['identifier' => 'nobody@example.com', 'password' => 'Wrong-password-1']);
+    $wrong = $this->postJson('/api/v1/auth/login', ['identifier' => 'known@example.com', 'password' => 'Wrong-password-1', 'device' => ['platform' => 'IOS']]);
+    $unknown = $this->postJson('/api/v1/auth/login', ['identifier' => 'nobody@example.com', 'password' => 'Wrong-password-1', 'device' => ['platform' => 'IOS']]);
 
     $strip = fn ($r) => collect($r->json())->except('request_id')->all();
 
@@ -47,7 +47,7 @@ it('tells a suspended user only after the correct password', function () {
     $user = account(Role::Patient);
     $user->forceFill(['status' => 'SUSPENDED'])->save();
 
-    $this->postJson('/api/v1/auth/login', ['identifier' => $user->email, 'password' => 'Wrong-password-1'])->assertStatus(401);
+    $this->postJson('/api/v1/auth/login', ['identifier' => $user->email, 'password' => 'Wrong-password-1', 'device' => ['platform' => 'IOS']])->assertStatus(401);
     native_login($user)->assertStatus(403)->assertJsonPath('code', 'FORBIDDEN');
 });
 
@@ -84,10 +84,10 @@ it('limits login attempts per identifier', function () {
     $user = account(Role::Patient);
 
     foreach (range(1, 5) as $_) {
-        $this->postJson('/api/v1/auth/login', ['identifier' => $user->email, 'password' => 'Wrong-password-1'])->assertStatus(401);
+        $this->postJson('/api/v1/auth/login', ['identifier' => $user->email, 'password' => 'Wrong-password-1', 'device' => ['platform' => 'IOS']])->assertStatus(401);
     }
 
-    $this->postJson('/api/v1/auth/login', ['identifier' => $user->email, 'password' => TEST_PASSWORD])
+    $this->postJson('/api/v1/auth/login', ['identifier' => $user->email, 'password' => TEST_PASSWORD, 'device' => ['platform' => 'IOS']])
         ->assertStatus(429)->assertJsonPath('code', 'RATE_LIMITED')->assertHeader('Retry-After');
 });
 

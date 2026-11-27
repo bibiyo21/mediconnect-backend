@@ -15,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  * Runs after auth:sanctum on every protected route:
  * - the account must still be ACTIVE (a suspension takes effect immediately);
  * - a web session must belong to a device that has not been signed out
- *   (revoking a device in "my devices" ends that browser's session too).
+ *   (revoking a device in "my devices" ends that browser's session too), and the device's
+ *   last_seen_at is refreshed (throttled) so idle browser sessions can be told from live ones.
  */
 final class EnsureSignInIsValid
 {
@@ -41,6 +42,12 @@ final class EnsureSignInIsValid
                 $request->session()->invalidate();
 
                 throw AuthFailure::invalidRefreshToken();
+            }
+
+            // Heartbeat for the realtime sweep: a browser session is live while its device keeps being seen.
+            // At most one write per device per 5 minutes.
+            if ($device->last_seen_at === null || $device->last_seen_at->lt(now()->subMinutes(5))) {
+                UserDevice::whereKey($device->id)->update(['last_seen_at' => now()]);
             }
         }
 

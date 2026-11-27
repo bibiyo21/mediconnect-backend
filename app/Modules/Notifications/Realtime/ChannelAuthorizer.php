@@ -16,6 +16,17 @@ final class ChannelAuthorizer
 {
     public function __construct(private readonly ClinicAccess $clinics) {}
 
+    /** The same decision the subscription made, for a channel parsed from a live connection (the realtime sweep). */
+    public function allows(User $user, ChannelRef $channel): bool
+    {
+        return match ($channel->kind) {
+            ChannelKind::User => $this->user($user, $channel->id),
+            ChannelKind::Doctor => $this->doctor($user, $channel->id),
+            ChannelKind::Clinic => $this->clinic($user, $channel->id),
+            ChannelKind::ClinicQueue => $this->clinicQueue($user, $channel->id),
+        };
+    }
+
     /** Your own user channel only. */
     public function user(User $user, string $userId): bool
     {

@@ -12,6 +12,7 @@ use App\Modules\Authentication\Services\SessionIssuer;
 use App\Modules\Users\Contracts\Accounts;
 use App\Modules\Users\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 final class CompleteMfaLogin
 {
@@ -32,6 +33,13 @@ final class CompleteMfaLogin
             throw AuthFailure::invalidCode();
         }
 
+        // The first factor decided cookie or token. A cookie sign-in needs a session, which only a stateful request has:
+        // finishing it from another kind of client is a client error (422), never a 500.
+        $web = $pending['web'] ?? null;
+        if ($web === true && ! $this->issuer->isWebClient($request)) {
+            throw ValidationException::withMessages(['mfa_challenge_id' => 'Finish this sign-in from the same web client that started it.']);
+        }
+
         if (! $this->mfa->verify($user, $code, $recoveryCode)) {
             $this->pending->fail($challengeId);
 
@@ -40,7 +48,7 @@ final class CompleteMfaLogin
 
         $this->pending->finish($challengeId);
 
-        $session = $this->issuer->signIn($request, $user, $pending['device'], fullAccess: true);
+        $session = $this->issuer->signIn($request, $user, $pending['device'], fullAccess: true, web: $web);
         $this->accounts->recordLogin($user);
         $this->securityEvents->record(SecurityEventType::LoginSucceeded, $user->id, ['device_id' => $session->device->id, 'mfa' => true]);
 

@@ -9094,6 +9094,8 @@
         "/auth/register": {
             "post": {
                 "operationId": "authentication.registration",
+                "description": "Web clients (an Origin on a stateful domain) receive a session cookie. Every other client receives tokens and MUST send\n`device.platform` (`IOS` or `ANDROID`): without it the request is refused with 422. `device.name` and `device.app_version` are optional.",
+                "summary": "Complete registration (step 2) and sign in",
                 "tags": [
                     "Registration"
                 ],
@@ -10573,6 +10575,8 @@
         "/auth/login": {
             "post": {
                 "operationId": "session.login",
+                "description": "Web clients (an Origin on a stateful domain) receive a session cookie. Every other client receives tokens and MUST send\n`device.platform` (`IOS` or `ANDROID`): without it the request is refused with 422. `device.name` and `device.app_version` are optional.",
+                "summary": "Sign in with email or mobile and password",
                 "tags": [
                     "Session"
                 ],

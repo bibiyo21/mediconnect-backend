@@ -26,6 +26,12 @@ use Illuminate\Support\Facades\Auth;
  */
 final class SessionController
 {
+    /**
+     * Sign in with email or mobile and password.
+     *
+     * Web clients (an Origin on a stateful domain) receive a session cookie. Every other client receives tokens and MUST send
+     * `device.platform` (`IOS` or `ANDROID`): without it the request is refused with 422. `device.name` and `device.app_version` are optional.
+     */
     public function login(LoginRequest $request, AttemptLogin $login): JsonResponse
     {
         $result = $login->handle($request, (string) $request->input('identifier'), (string) $request->input('password'), DeviceRules::from($request));

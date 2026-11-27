@@ -3,12 +3,14 @@
 namespace App\Modules\Authentication\Providers;
 
 use App\Modules\Authentication\Console\AnonymizeDeletedAccounts;
+use App\Modules\Authentication\Contracts\LiveSessions;
 use App\Modules\Authentication\Contracts\RevokesSessions;
 use App\Modules\Authentication\Http\Middleware\EnsureMfaSatisfied;
 use App\Modules\Authentication\Http\Middleware\EnsureSignInIsValid;
 use App\Modules\Authentication\Http\Middleware\RequireStepUp;
 use App\Modules\Authentication\Models\PersonalAccessToken;
 use App\Modules\Authentication\Services\DeviceRevocation;
+use App\Modules\Authentication\Services\LiveSessionChecker;
 use App\Shared\Services\Fingerprint;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -24,6 +26,7 @@ final class AuthenticationServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(RevokesSessions::class, DeviceRevocation::class);
+        $this->app->singleton(LiveSessions::class, LiveSessionChecker::class);
         $this->app->singleton(Google2FA::class, fn () => new Google2FA);
     }
 

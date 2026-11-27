@@ -15,6 +15,12 @@ use Illuminate\Http\JsonResponse;
 /** POST /auth/register (step 2; step 1 is POST /auth/otp with purpose REGISTER). */
 final class RegistrationController
 {
+    /**
+     * Complete registration (step 2) and sign in.
+     *
+     * Web clients (an Origin on a stateful domain) receive a session cookie. Every other client receives tokens and MUST send
+     * `device.platform` (`IOS` or `ANDROID`): without it the request is refused with 422. `device.name` and `device.app_version` are optional.
+     */
     public function __invoke(RegisterRequest $request, RegisterAccount $register, SessionIssuer $issuer, MfaService $mfa, Accounts $accounts): JsonResponse
     {
         $user = $register->handle(

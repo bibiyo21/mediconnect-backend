@@ -55,7 +55,7 @@ final class AttemptLogin
         }
 
         if ($this->mfa->isEnrolled($user)) {
-            return $this->pending->start($user->id, $deviceInfo);
+            return $this->pending->start($user->id, $deviceInfo, web: $this->issuer->isWebClient($request));
         }
 
         $session = $this->issuer->signIn($request, $user, $deviceInfo, $this->mfa->accessIsFull($user, mfaJustVerified: false));

@@ -21,12 +21,16 @@ enum SecurityEventType: string
     case MalwareDetected = 'MALWARE_DETECTED';
     case RealtimeSubscriptionDenied = 'REALTIME_SUBSCRIPTION_DENIED';
     case RealtimeTerminationFailed = 'REALTIME_TERMINATION_FAILED';
+    case RealtimeReconcileRevoked = 'REALTIME_RECONCILE_REVOKED';
+    case RealtimeReconcileFailed = 'REALTIME_RECONCILE_FAILED';
+    case RealtimeChannelAnomaly = 'REALTIME_CHANNEL_ANOMALY';
+    case RealtimeManualTerminate = 'REALTIME_MANUAL_TERMINATE';
 
     public function defaultSeverity(): Severity
     {
         return match ($this) {
-            self::RefreshTokenReuse, self::MalwareDetected, self::RealtimeTerminationFailed => Severity::High,
-            self::LoginFailed, self::MfaFailed, self::OtpLocked, self::SuspendedAccountLogin, self::RecoveryCodeUsed, self::RealtimeSubscriptionDenied => Severity::Warning,
+            self::RefreshTokenReuse, self::MalwareDetected, self::RealtimeTerminationFailed, self::RealtimeReconcileFailed, self::RealtimeChannelAnomaly => Severity::High,
+            self::LoginFailed, self::MfaFailed, self::OtpLocked, self::SuspendedAccountLogin, self::RecoveryCodeUsed, self::RealtimeSubscriptionDenied, self::RealtimeReconcileRevoked, self::RealtimeManualTerminate => Severity::Warning,
             default => Severity::Info,
         };
     }

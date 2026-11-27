@@ -105,7 +105,7 @@ it('anonymises the account, profiles, address and sole-guardian dependents after
         ->and(Dependent::where('dependent_patient_profile_id', $child)->sole()->authorization_status->value)->toBe('REVOKED');
 
     // The old credentials no longer work, and nothing personal survives in the account row.
-    $this->postJson('/api/v1/auth/login', ['identifier' => $email, 'password' => TEST_PASSWORD])->assertStatus(401);
+    $this->postJson('/api/v1/auth/login', ['identifier' => $email, 'password' => TEST_PASSWORD, 'device' => ['platform' => 'IOS']])->assertStatus(401);
     expect(json_encode(DB::table('users')->where('id', $user->id)->first()))->not->toContain($email);
     expect(DB::table('security_events')->where('event_type', 'ACCOUNT_ANONYMIZED')->count())->toBe(1);
 });

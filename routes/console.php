@@ -23,3 +23,6 @@ Schedule::command('availability:generate')->dailyAt('02:30')->withoutOverlapping
 Schedule::job(new ExpireSlotReservations)->everyMinute();
 // Guest walk-in data (A5, plan Q6): names, phones, typed HMO names and priority notes are cleared after the retention period.
 Schedule::job(new PurgeGuestWalkInPii)->dailyAt('03:30');
+// Realtime sweep (increment 5.6-0): closes sockets whose authorization or credential ended without a
+// terminate call. A command, not a queued job, so each tick starts with no stale model or permission state.
+Schedule::command('realtime:reconcile')->everyMinute()->withoutOverlapping(5)->onOneServer()->runInBackground();

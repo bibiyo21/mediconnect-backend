@@ -26,7 +26,7 @@ it('never writes passwords, codes or tokens to logs or security events', functio
 
     // Login, wrong login, refresh, reset-password with OTP, logout.
     $login = native_login($user)->json('data.tokens');
-    $this->postJson('/api/v1/auth/login', ['identifier' => $user->email, 'password' => 'Wrong-password-9']);
+    $this->postJson('/api/v1/auth/login', ['identifier' => $user->email, 'password' => 'Wrong-password-9', 'device' => ['platform' => 'IOS']]);
     $secrets[] = 'Wrong-password-9';
     $refreshed = $this->postJson('/api/v1/auth/refresh', ['refresh_token' => $login['refresh_token']])->json('data.tokens');
     $this->postJson('/api/v1/auth/refresh', ['refresh_token' => $login['refresh_token']]); // reuse -> security event

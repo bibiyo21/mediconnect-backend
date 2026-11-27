@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 /**
@@ -32,9 +33,9 @@ final class SessionIssuer
     /**
      * @param  array{platform?: string|null, name?: string|null, app_version?: string|null}  $deviceInfo
      */
-    public function signIn(Request $request, User $user, array $deviceInfo, bool $fullAccess): IssuedSession
+    public function signIn(Request $request, User $user, array $deviceInfo, bool $fullAccess, ?bool $web = null): IssuedSession
     {
-        return $this->isWebClient($request)
+        return ($web ?? $this->isWebClient($request))
             ? $this->startWebSession($request, $user, $fullAccess)
             : $this->issueNativeTokens($request, $user, $deviceInfo, $fullAccess);
     }
@@ -113,7 +114,7 @@ final class SessionIssuer
     private function createDevice(Request $request, User $user, array $deviceInfo): UserDevice
     {
         $device = new UserDevice([
-            'platform' => $deviceInfo['platform'] ?? DevicePlatform::Web->value,
+            'platform' => $deviceInfo['platform'] ?? throw ValidationException::withMessages(['device.platform' => 'The device platform (IOS or ANDROID) is required for token sign-ins.']),
             'device_name' => isset($deviceInfo['name']) ? mb_substr((string) $deviceInfo['name'], 0, 100) : null,
             'app_version' => isset($deviceInfo['app_version']) ? mb_substr((string) $deviceInfo['app_version'], 0, 40) : null,
             'last_seen_at' => now(),

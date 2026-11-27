@@ -15,20 +15,20 @@ final class PendingMfaLogins
      * @param  array<string, mixed>  $deviceInfo
      * @return array{id: string, expires_at: string}
      */
-    public function start(string $userId, array $deviceInfo): array
+    public function start(string $userId, array $deviceInfo, bool $web = false): array
     {
         $id = (string) Str::uuid7();
         $expiresAt = now()->addMinutes((int) config('authentication.mfa.pending_login_minutes'));
 
-        Cache::put($this->key($id), ['user_id' => $userId, 'device' => $deviceInfo, 'attempts' => 0], $expiresAt);
+        Cache::put($this->key($id), ['user_id' => $userId, 'device' => $deviceInfo, 'web' => $web, 'attempts' => 0], $expiresAt);
 
         return ['id' => $id, 'expires_at' => $expiresAt->toIso8601ZuluString()];
     }
 
-    /** @return array{user_id: string, device: array<string, mixed>, attempts: int}|null */
+    /** @return array{user_id: string, device: array<string, mixed>, web?: bool, attempts: int}|null */
     public function find(string $id): ?array
     {
-        /** @var array{user_id: string, device: array<string, mixed>, attempts: int}|null $pending */
+        /** @var array{user_id: string, device: array<string, mixed>, web?: bool, attempts: int}|null $pending */
         $pending = Cache::get($this->key($id));
 
         return is_array($pending) ? $pending : null;
