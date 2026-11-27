@@ -30,7 +30,7 @@ use Illuminate\Support\Facades\DB;
  * stays pure; this class is the only place that knows where each input comes from. An estimate is advisory: it is
  * computed on every read and never stored for clients (decision 98).
  *
- * Inputs: arrival time (sortAt) from arrived_at; closing as the earlier of the clinic's closing and the doctor's last shift's end;
+ * Inputs: arrival time (sortAt) from queue_sort_at; closing as the earlier of the clinic's closing and the doctor's last shift's end;
  * gaps between shifts (OFF_SHIFT) and scheduled breaks; live appointments, protected until the late grace has passed (m2d), and ACTIVE
  * unexpired holds; the presence return instant; the consultation running now from any source (always none until 5.6 and Phase 6).
  */
@@ -54,7 +54,7 @@ final class QueueEstimates
                 continue;
             }
             $duration = $this->duration($doctorId, $entry->doctor_service_id);
-            $arrived = $entry->status === EntryStatus::Registered ? null : ($entry->arrived_at ?? $entry->called_at ?? $this->clock->now());
+            $arrived = $entry->status === EntryStatus::Registered ? null : ($entry->queue_sort_at ?? $entry->arrived_at ?? $entry->called_at ?? $this->clock->now());
             $inputs[] = new QueueEntryInput($entry->id, $entry->queue_number, $entry->triage_priority->value, $entry->status, $duration->seconds, $duration->source, $arrived);
         }
 

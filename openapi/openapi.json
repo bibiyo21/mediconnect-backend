@@ -14745,6 +14745,13 @@
                             "CAPACITY_OVERRIDE_REQUIRED",
                             "ENTRY_ALREADY_LIVE",
                             "DAILY_LIMIT_REACHED",
+                            "APPOINTMENT_WINDOW_PROTECTED",
+                            "DOCTOR_NOT_AVAILABLE",
+                            "ENTRY_ALREADY_CALLED",
+                            "DOCTOR_ALREADY_CALLING",
+                            "NOT_NEXT_IN_ORDER",
+                            "RECALL_LIMIT_REACHED",
+                            "QUEUE_EMPTY",
                             "LATE_RISK_ACK_REQUIRED",
                             "VALIDATION_FAILED",
                             "IDEMPOTENCY_KEY_REUSED",
@@ -18031,6 +18038,12 @@
                     "capacity_mode": {
                         "description": "DERIVED takes the capacity from the schedule; UNLIMITED admits until the cutoff.\n\n| |\n|---|\n| `DERIVED` <br/> Capacity comes from the schedule (walkin_capacity, else window minutes over slot length). |\n| `UNLIMITED` <br/> No cap: only the cutoff stops registrations. Stored on the queue as a null capacity. |",
                         "$ref": "#/components/schemas/CapacityMode"
+                    },
+                    "recall_limit": {
+                        "type": "integer",
+                        "description": "How many times a called patient may be recalled before staff may mark them a no-show. 1 to 10 (WalkInPolicy::MAX_RECALL_LIMIT), default 2.",
+                        "minimum": 1,
+                        "maximum": 10
                     }
                 },
                 "title": "UpdateWalkInPolicyRequest"
@@ -18702,16 +18715,20 @@
                         "type": "string"
                     },
                     "allow_patient_app_registration": {
-                        "type": "string"
+                        "type": "boolean"
                     },
                     "cutoff_minutes_before_close": {
-                        "type": "string"
+                        "type": "integer"
                     },
                     "number_prefix": {
                         "type": "string"
                     },
                     "capacity_mode": {
                         "type": "string"
+                    },
+                    "recall_limit": {
+                        "type": "integer",
+                        "description": "How many times a called patient may be recalled before staff may mark a no-show."
                     },
                     "derived_capacity_today": {
                         "type": "integer",
@@ -18733,6 +18750,7 @@
                     "cutoff_minutes_before_close",
                     "number_prefix",
                     "capacity_mode",
+                    "recall_limit",
                     "derived_capacity_today",
                     "local_date",
                     "timezone"

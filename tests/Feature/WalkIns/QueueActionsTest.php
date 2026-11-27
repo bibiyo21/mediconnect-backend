@@ -1,6 +1,11 @@
 <?php
 
+use App\Modules\Presence\Contracts\PresenceAdmission;
 use App\Modules\Rbac\Enums\Role;
+use App\Modules\Scheduling\Contracts\WalkInDay;
+use App\Modules\WalkIns\Models\WalkInQueue;
+use App\Modules\WalkIns\Models\WalkInQueueEntry;
+use App\Modules\WalkIns\Services\QueueEstimates;
 use Database\Seeders\SpecialtySeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -179,4 +184,31 @@ it('lets only the location\'s staff and the queue\'s doctor pause or open a queu
 
     wi_post("queues/{$queue}/pause", $this->w['doctorHeaders'])->assertOk();
     wi_post("queues/{$queue}/open", $this->w['manager'])->assertOk();
+});
+
+it('lets staff and the patient cancel a SKIPPED entry (D15)', function () {
+    foreach ([['staff', $this->staff, 'PATIENT_LEFT'], ['patient', $this->headers, 'PATIENT_REQUEST']] as [$who, $headers, $reason]) {
+        $entry = $who === 'staff' ? $this->guest : $this->remote;
+        DB::table('walkin_queue_entries')->where('id', $entry)->update(['status' => 'SKIPPED']);
+        $body = ['reason_code' => $reason] + ($who === 'staff' ? ['patient_informed_in_person' => true] : []);
+
+        wi_post("{$entry}/cancel", $headers, $body)->assertOk()->assertJsonPath('data.status', 'CANCELLED');
+        expect(DB::table('walkin_queue_events')->where('walkin_queue_entry_id', $entry)->where('event_type', 'CANCELLED')->value('from_status'))->toBe('SKIPPED');
+    }
+});
+
+it('orders estimate inputs by queue_sort_at, not arrived_at', function () {
+    wi_post("{$this->remote}/arrive", $this->staff)->assertOk();
+    $guestRow = DB::table('walkin_queue_entries')->where('id', $this->guest)->first();
+    DB::table('walkin_queue_entries')->where('id', $this->guest)->update(['status' => 'WAITING', 'arrived_at' => '2026-12-01 01:00:00+00', 'queue_sort_at' => '2026-12-01 03:00:00+00']);
+    DB::table('walkin_queue_entries')->where('id', $this->remote)->update(['arrived_at' => '2026-12-01 02:00:00+00', 'queue_sort_at' => '2026-12-01 02:00:00+00']);
+    $queue = WalkInQueue::findOrFail($guestRow->walkin_queue_id);
+    $entries = WalkInQueueEntry::query()->where('walkin_queue_id', $queue->id)->get();
+    $facts = app(WalkInDay::class)->forDoctorAtLocation($queue->doctor_profile_id, $queue->clinic_location_id, walkin_today(), anyClinicService: true);
+    $presence = app(PresenceAdmission::class)->current($queue->doctor_profile_id, $queue->clinic_location_id);
+
+    $inputs = app(QueueEstimates::class)->inputs($queue->doctor_profile_id, walkin_today(), $facts, $presence, $entries);
+
+    $byId = collect($inputs->entries)->keyBy(fn ($e) => $e->id);
+    expect($byId[$this->guest]->sortAt->format('H:i'))->toBe('03:00')->and($byId[$this->remote]->sortAt->format('H:i'))->toBe('02:00');
 });

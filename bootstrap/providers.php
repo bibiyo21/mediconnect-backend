@@ -4,6 +4,7 @@ use App\Modules\Administration\Providers\AdministrationServiceProvider;
 use App\Modules\Audit\Providers\AuditServiceProvider;
 use App\Modules\Authentication\Providers\AuthenticationServiceProvider;
 use App\Modules\Clinics\Providers\ClinicsServiceProvider;
+use App\Modules\Consultations\Providers\ConsultationsServiceProvider;
 use App\Modules\Discovery\Providers\DiscoveryServiceProvider;
 use App\Modules\Doctors\Providers\DoctorsServiceProvider;
 use App\Modules\Notifications\Providers\NotificationsServiceProvider;
@@ -33,5 +34,6 @@ return [
     DiscoveryServiceProvider::class,
     SchedulingServiceProvider::class,
     PresenceServiceProvider::class,
+    ConsultationsServiceProvider::class,
     WalkInsServiceProvider::class,
 ];

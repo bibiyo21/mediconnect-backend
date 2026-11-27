@@ -246,6 +246,7 @@ final class WalkInRegistration
             'estimated_call_at_min' => $estimate->callAtMin,
             'estimated_call_at_max' => $estimate->callAtMax,
             'arrived_at' => $status === EntryStatus::Waiting ? $now : null,
+            'queue_sort_at' => $status === EntryStatus::Waiting ? $now : null,
             'idempotency_key' => $c->idempotencyKey,
         ])->save();
 

@@ -98,7 +98,7 @@ beforeEach(function () {
         $guest = $patient === null
             ? ['guest_name_encrypted' => 'cipher', 'privacy_notice_version' => '2026-11', 'privacy_notice_shown_by_user_id' => $this->user, 'privacy_notice_shown_at' => '2026-12-01 01:30:00+00']
             : [];
-        $arrived = $status === 'WAITING' ? ['arrived_at' => '2026-12-01 01:30:00+00'] : [];
+        $arrived = $status === 'WAITING' ? ['arrived_at' => '2026-12-01 01:30:00+00', 'queue_sort_at' => '2026-12-01 01:30:00+00'] : [];
         $id = (string) Str::uuid7();
         DB::table('walkin_queue_entries')->insert([
             'id' => $id, 'walkin_queue_id' => $queue, 'queue_number' => $number, 'patient_profile_id' => $patient,
@@ -272,7 +272,8 @@ it('rejects a second live entry for the same patient in one queue, but not once 
         expect(schema_error(fn () => ($this->entry)($queue, 2, $patient, $status, ['assigned_doctor_profile_id' => $this->doctor2->id])))->toContain('uq_one_live_entry_per_patient');
     }
 
-    foreach (['COMPLETED', 'SKIPPED', 'NO_SHOW', 'CANCELLED'] as $i => $status) {
+    // SKIPPED is not here: it still holds the patient's place (uq_one_held_entry_per_patient, tested below).
+    foreach (['COMPLETED', 'NO_SHOW', 'CANCELLED'] as $i => $status) {
         $queue = ($this->queue)(['local_date' => '2027-02-0'.($i + 1)]);
         $patient = ($this->newPatient)();
         $first = ($this->entry)($queue, 1, $patient);
@@ -509,7 +510,7 @@ it('encrypts guest name and phone and keeps them out of serialised output', func
     $entry = (new WalkInQueueEntry)->forceFill([
         'walkin_queue_id' => $queue, 'queue_number' => 1, 'guest_name_encrypted' => 'Juan Dela Cruz', 'guest_phone_encrypted' => '+639171234567',
         'guest_phone_hash' => hash('sha256', '+639171234567'), 'registered_by_user_id' => $this->user, 'registration_channel' => 'STAFF_CONSOLE', 'status' => 'WAITING', 'payer_type' => 'HMO',
-        'doctor_service_id' => $this->service, 'arrived_at' => '2026-12-01 01:30:00+00', 'privacy_notice_version' => '2026-11', 'privacy_notice_shown_by_user_id' => $this->user,
+        'doctor_service_id' => $this->service, 'arrived_at' => '2026-12-01 01:30:00+00', 'queue_sort_at' => '2026-12-01 01:30:00+00', 'privacy_notice_version' => '2026-11', 'privacy_notice_shown_by_user_id' => $this->user,
         'privacy_notice_shown_at' => '2026-12-01 01:30:00+00', 'hmo_card_name_encrypted' => 'Maxi Care Gold', 'triage_priority' => 5, 'triage_reason_code' => 'PREGNANT', 'triage_note_encrypted' => 'Due next month',
     ]);
     $entry->save();
@@ -562,6 +563,10 @@ it('keeps the enums equal to the database constraints, both directions', functio
     $liveEntry = $index('uq_one_live_entry_per_patient');
     foreach (EntryStatus::cases() as $status) {
         expect($mentions($liveEntry, $status->value))->toBe($status->isLive(), $status->value);
+    }
+    $heldEntry = $index('uq_one_held_entry_per_patient');
+    foreach (EntryStatus::cases() as $status) {
+        expect($mentions($heldEntry, $status->value))->toBe(in_array($status, EntryStatus::held(), true), $status->value);
     }
 
     // Each enum is exactly the CHECK list of its column: nothing missing, nothing extra.
@@ -850,4 +855,44 @@ it('keeps the new enums equal to the database constraints, both directions', fun
         ->and(array_map('intval', explode(',', $levels[1] ?? '')))->toBe(collect(PriorityLevel::cases())->map(fn ($c) => $c->value)->all())
         ->and(PriorityLevel::Normal->needsReason())->toBeFalse()
         ->and(PriorityLevel::Priority->needsReason() && PriorityLevel::Urgent->needsReason())->toBeTrue();
+});
+
+it('requires a call-order key for a waiting entry, and none for a registered one (5.6-1)', function () {
+    $queue = ($this->queue)();
+
+    expect(schema_error(fn () => ($this->entry)($queue, 1, ($this->newPatient)(), 'WAITING', ['queue_sort_at' => null])))->toContain('walkin_queue_entries_sort_check')
+        ->and(schema_error(fn () => ($this->entry)($queue, 2, ($this->newPatient)(), 'REGISTERED', ['queue_sort_at' => '2026-12-01 01:30:00+00'])))->toContain('walkin_queue_entries_sort_check')
+        ->and(schema_rejects(fn () => ($this->entry)($queue, 3, ($this->newPatient)(), 'REGISTERED')))->toBeNull()
+        ->and(schema_rejects(fn () => ($this->entry)($queue, 4, ($this->newPatient)(), 'WAITING')))->toBeNull()
+        // Other statuses may carry or lack a key.
+        ->and(schema_rejects(fn () => ($this->entry)($queue, 5, ($this->newPatient)(), 'CANCELLED', ['queue_sort_at' => '2026-12-01 01:30:00+00', 'arrived_at' => '2026-12-01 01:30:00+00'])))->toBeNull()
+        ->and(schema_rejects(fn () => ($this->entry)($queue, 6, ($this->newPatient)(), 'CANCELLED')))->toBeNull();
+});
+
+it('serves call-next from a partial index on WAITING entries in call order (5.6-1)', function () {
+    $def = (string) DB::selectOne("SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_queue_next'")->indexdef;
+
+    expect($def)->toStartWith('CREATE INDEX ix_queue_next ON public.walkin_queue_entries')
+        ->and($def)->toContain('walkin_queue_id, triage_priority DESC, queue_sort_at, queue_number')
+        ->and($def)->toContain("status)::text = 'WAITING'")
+        ->and($def)->not->toContain('status,');
+});
+
+it('holds one place per patient per queue, SKIPPED included, but lets a no-show register again (5.6-1)', function () {
+    $queue = ($this->queue)();
+    $patient = ($this->newPatient)();
+    ($this->entry)($queue, 1, $patient, 'SKIPPED');
+
+    foreach (['REGISTERED', 'WAITING', 'SKIPPED'] as $i => $status) {
+        expect(schema_error(fn () => ($this->entry)($queue, 2 + $i, $patient, $status)))->toContain('uq_one_held_entry_per_patient');
+    }
+    // The older live index still names its own violation for the live statuses.
+    expect(schema_error(fn () => ($this->entry)($queue, 9, $patient, 'WAITING')))->toContain('uq');
+
+    $other = ($this->newPatient)();
+    ($this->entry)($queue, 10, $other, 'NO_SHOW');
+    ($this->entry)($queue, 11, $other, 'CANCELLED');
+    expect(schema_rejects(fn () => ($this->entry)($queue, 12, $other, 'WAITING')))->toBeNull()
+        // Another queue, another place.
+        ->and(schema_rejects(fn () => ($this->entry)(($this->queue)(['local_date' => '2026-12-02']), 1, $patient, 'WAITING')))->toBeNull();
 });

@@ -58,7 +58,7 @@ it('reads only well-formed stored values and ignores the rest, including the sup
     $bad = WalkInPolicy::fromStored(['allow_patient_app_registration' => 'true', 'cutoff_minutes_before_close' => '30', 'number_prefix' => 'dr', 'capacity_mode' => 'NONE']);
 
     expect($p->allowPatientAppRegistration)->toBeTrue()->and($p->cutoffMinutesBeforeClose)->toBe(0)->and($p->numberPrefix)->toBe('DR')->and($p->capacityMode)->toBe(CapacityMode::Unlimited)
-        ->and($p->toStored())->toBe(['allow_patient_app_registration' => true, 'cutoff_minutes_before_close' => 0, 'number_prefix' => 'DR', 'capacity_mode' => 'UNLIMITED'])
+        ->and($p->toStored())->toBe(['allow_patient_app_registration' => true, 'cutoff_minutes_before_close' => 0, 'number_prefix' => 'DR', 'capacity_mode' => 'UNLIMITED', 'recall_limit' => 2])
         ->and($bad->allowPatientAppRegistration)->toBeFalse()->and($bad->cutoffMinutesBeforeClose)->toBe(30)->and($bad->numberPrefix)->toBeNull()->and($bad->capacityMode)->toBe(CapacityMode::Derived);
     expect($p->with(['number_prefix' => null])->numberPrefix)->toBeNull()->and($p->with(['cutoff_minutes_before_close' => 15])->allowPatientAppRegistration)->toBeTrue();
 });
@@ -85,4 +85,12 @@ it('exposes exactly three priority levels by name and never by number (decision 
 
 it('keeps the live statuses in step with the database index', function () {
     expect(array_map(fn (EntryStatus $s) => $s->value, EntryStatus::live()))->toBe(['REGISTERED', 'WAITING', 'CALLED', 'IN_CONSULTATION']);
+});
+
+it('reads recall_limit between 1 and 10 and defaults anything else to 2', function () {
+    expect(WalkInPolicy::fromStored(['recall_limit' => 5])->recallLimit)->toBe(5);
+    foreach ([0, 11, '3', null, 2.5] as $bad) {
+        expect(WalkInPolicy::fromStored(['recall_limit' => $bad])->recallLimit)->toBe(2);
+    }
+    expect((new WalkInPolicy)->with(['recall_limit' => 4])->toStored()['recall_limit'])->toBe(4);
 });

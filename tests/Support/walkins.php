@@ -3,6 +3,7 @@
 use App\Modules\Clinics\Http\Controllers\WalkInPolicyController;
 use App\Modules\Clinics\Models\ClinicLocation;
 use App\Modules\Clinics\Models\DoctorClinicAssignment;
+use App\Modules\Consultations\Services\CareRelationshipService;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Patients\Models\PatientProfile;
 use App\Modules\Presence\Services\PresenceAdmissionService;
@@ -38,7 +39,7 @@ function pin_walkin_clock(?CarbonImmutable $at = null): PinnedClock
     foreach ([
         WalkInRegistration::class, WalkInDayService::class, QueueEstimates::class, EntryPresenter::class, PresenceAdmissionService::class,
         WaitTimeEstimator::class, RollingDurationStats::class, EntryActions::class, WalkInReader::class, JoinPreview::class, PurgeGuestWalkInPii::class,
-        WalkInPolicyController::class, QueueRealtime::class,
+        WalkInPolicyController::class, QueueRealtime::class, CareRelationshipService::class,
     ] as $consumer) {
         app()->when($consumer)->needs(Clock::class)->give(fn () => $clock);
     }
@@ -148,6 +149,7 @@ function wi_seed_entry(array $world, ?string $profileId, string $status = 'WAITI
         'registration_channel' => $channel, 'status' => $status, 'payer_type' => 'SELF_PAY', 'doctor_service_id' => $service,
         'privacy_notice_version' => $profileId === null ? 'v1' : null, 'privacy_notice_shown_by_user_id' => $profileId === null ? ($registeredBy ?? $doctor->user_id) : null, 'privacy_notice_shown_at' => $profileId === null ? now() : null,
         'arrived_at' => in_array($status, ['WAITING', 'CALLED', 'IN_CONSULTATION'], true) ? now() : null,
+        'queue_sort_at' => $status === 'WAITING' ? now() : null,
         'completed_at' => $status === 'COMPLETED' ? now() : null,
         'created_at' => now(), 'updated_at' => now(), ...$extra,
     ]);

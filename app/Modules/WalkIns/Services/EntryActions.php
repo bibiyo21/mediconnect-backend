@@ -48,7 +48,8 @@ final class EntryActions
             if ($current->status !== EntryStatus::Registered) {
                 throw InvalidEntryTransition::entry($current->status, 'marked as arrived');
             }
-            $current->forceFill(['status' => EntryStatus::Waiting, 'arrived_at' => $this->clock->now()])->save();
+            $now = $this->clock->now();
+            $current->forceFill(['status' => EntryStatus::Waiting, 'arrived_at' => $now, 'queue_sort_at' => $now])->save();
             $this->event($queue, $current, 'ARRIVED', EntryStatus::Registered, EntryStatus::Waiting, $user, null, null);
             $this->audit->record('walkins.arrived', 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id], clinicId: $this->clinicId($queue));
             $this->realtime->entryChanged($queue, $current);
@@ -58,7 +59,7 @@ final class EntryActions
     }
 
     /**
-     * Withdraws an entry that is REGISTERED or WAITING: by its owner, or by staff or the doctor (who need patient_informed_in_person for a
+     * Withdraws an entry that is REGISTERED, WAITING or SKIPPED (D15): by its owner, or by staff or the doctor (who need patient_informed_in_person for a
      * guest, who has no notification channel). Frees the place. Only the reason code is stored; a patient's entry cancelled by staff gets a generic in-app notice.
      */
     public function cancel(User $user, WalkInQueueEntry $entry, CancelReason $reason, bool $patientInformedInPerson): WalkInQueueEntry
@@ -78,7 +79,7 @@ final class EntryActions
         return $this->locks->run(function () use ($user, $entry, $queue, $reason, $byStaff, $patientInformedInPerson): WalkInQueueEntry {
             $this->lockQueueThenEntry($queue, $entry);
             $current = WalkInQueueEntry::query()->whereKey($entry->id)->firstOrFail();
-            if (! in_array($current->status, [EntryStatus::Registered, EntryStatus::Waiting], true)) {
+            if (! EntryTransitions::allows($current->status, EntryStatus::Cancelled)) {
                 throw InvalidEntryTransition::entry($current->status, 'cancelled');
             }
             $from = $current->status;

@@ -43,6 +43,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $estimated_call_at_min
  * @property CarbonImmutable|null $estimated_call_at_max
  * @property CarbonImmutable|null $arrived_at
+ * @property CarbonImmutable|null $queue_sort_at
  * @property CarbonImmutable|null $called_at
  * @property CarbonImmutable|null $consultation_started_at
  * @property CarbonImmutable|null $completed_at
@@ -82,6 +83,7 @@ class WalkInQueueEntry extends Model
             'estimated_call_at_min' => 'immutable_datetime',
             'estimated_call_at_max' => 'immutable_datetime',
             'arrived_at' => 'immutable_datetime',
+            'queue_sort_at' => 'immutable_datetime',
             'called_at' => 'immutable_datetime',
             'consultation_started_at' => 'immutable_datetime',
             'completed_at' => 'immutable_datetime',

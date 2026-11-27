@@ -25,6 +25,17 @@ enum EntryStatus: string
         return [self::Registered, self::Waiting, self::Called, self::InConsultation];
     }
 
+    /**
+     * Entries that keep a patient's one place in a queue: the live ones plus SKIPPED (decision 94). Exactly the predicate of the
+     * uq_one_held_entry_per_patient index (a test keeps them equal).
+     *
+     * @return list<self>
+     */
+    public static function held(): array
+    {
+        return [...self::live(), self::Skipped];
+    }
+
     public function isLive(): bool
     {
         return in_array($this, self::live(), true);

@@ -113,3 +113,13 @@ it('answers 404 for an assignment that is not in this clinic, and 409 for an end
     DB::table('doctor_clinic_assignments')->where('id', $this->w['assignment'])->update(['status' => 'ENDED', 'effective_until' => now(), 'end_reason' => 'Left the clinic']);
     wi_patch($this->url, $this->w['manager'], ['allow_patient_app_registration' => true])->assertStatus(409)->assertJsonPath('code', 'INVALID_STATE_TRANSITION');
 });
+
+it('validates recall_limit (1 to 10) and stores a valid one as an integer', function () {
+    foreach ([0, 11, 'x'] as $bad) {
+        wi_patch($this->url, $this->w['manager'], ['recall_limit' => $bad])->assertStatus(422);
+    }
+    wi_patch($this->url, $this->w['manager'], ['recall_limit' => 3])->assertOk()->assertJsonPath('data.recall_limit', 3);
+
+    $stored = json_decode((string) DB::table('doctor_clinic_assignments')->where('id', $this->w['assignment'])->value('walkin_policy'), true);
+    expect($stored['recall_limit'])->toBeInt()->toBe(3);
+});

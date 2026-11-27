@@ -36,6 +36,8 @@ final class UpdateWalkInPolicyRequest extends ClinicScopedRequest
             'number_prefix' => ['sometimes', 'nullable', 'string', 'regex:/^[A-Z]{1,4}$/'],
             /** DERIVED takes the capacity from the schedule; UNLIMITED admits until the cutoff. */
             'capacity_mode' => ['sometimes', Rule::enum(CapacityMode::class)],
+            /** How many times a called patient may be recalled before staff may mark them a no-show. 1 to 10 (WalkInPolicy::MAX_RECALL_LIMIT), default 2. */
+            'recall_limit' => ['sometimes', 'integer', 'min:1', 'max:'.WalkInPolicy::MAX_RECALL_LIMIT],
         ];
     }
 
@@ -64,6 +66,10 @@ final class UpdateWalkInPolicyRequest extends ClinicScopedRequest
         }
         if (array_key_exists('capacity_mode', $validated)) {
             $changes['capacity_mode'] = $validated['capacity_mode'];
+        }
+
+        if (array_key_exists('recall_limit', $validated)) {
+            $changes['recall_limit'] = $this->integer('recall_limit');
         }
 
         return $changes;

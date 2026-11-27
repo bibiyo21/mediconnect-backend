@@ -92,7 +92,7 @@ it('refuses to add the NOT NULL doctor service over existing entries', function 
         registration_migration()->down();
         // The 5.1 shape: an entry with no doctor service.
         DB::table('walkin_queue_entries')->insert(['id' => (string) Str::uuid7(), 'walkin_queue_id' => $queue, 'queue_number' => 1, 'guest_name_encrypted' => 'x',
-            'registered_by_user_id' => $doctor->user_id, 'registration_channel' => 'STAFF_CONSOLE', 'status' => 'WAITING', 'payer_type' => 'SELF_PAY']);
+            'registered_by_user_id' => $doctor->user_id, 'registration_channel' => 'STAFF_CONSOLE', 'status' => 'WAITING', 'payer_type' => 'SELF_PAY', 'queue_sort_at' => now()]);
 
         expect(fn () => registration_migration()->up())->toThrow(RuntimeException::class, 'has rows');
     });
