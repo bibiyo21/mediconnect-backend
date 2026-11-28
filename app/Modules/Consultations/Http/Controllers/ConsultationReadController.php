@@ -35,14 +35,14 @@ final class ConsultationReadController
         abort_unless($user->can('consultations.view'), 403, 'You do not have access to consultations.');
 
         $scope = $this->scope->for($user);
-        $page = $this->reader->list($scope, $request->filters());
-        // Fail closed: a row with no level for this caller is dropped, not shown restricted.
-        $rows = $page->getCollection()
-            ->map(fn (Consultation $c): array => ['consultation' => $c, 'level' => $this->scope->levelFor($scope, $c)])
-            ->filter(fn (array $row): bool => $row['level'] !== null)
-            ->map(fn (array $row): array => (new ConsultationResource($row['consultation'], $row['level']))->resolve($request));
+        // The reader drops rows with no level for this caller (fail closed) and returns each kept row with its level.
+        $result = $this->reader->list($scope, $request->filters());
+        $page = $result['page'];
+        $rows = collect($result['rows'])
+            ->map(fn (array $row): array => (new ConsultationResource($row['consultation'], $row['level']))->resolve($request))
+            ->values()->all();
 
-        return ApiResponse::success($rows->values()->all(), meta: [
+        return ApiResponse::success($rows, meta: [
             'per_page' => $page->perPage(), 'next_cursor' => $page->nextCursor()?->encode(), 'previous_cursor' => $page->previousCursor()?->encode(),
         ]);
     }

@@ -36,9 +36,6 @@ use Illuminate\Support\Facades\DB;
  */
 final class QueueEstimates
 {
-    /** @var array<string, ExpectedDuration> */
-    private array $durations = [];
-
     public function __construct(
         private readonly WaitTimeEstimator $estimator,
         private readonly RollingDurationStats $stats,
@@ -49,11 +46,14 @@ final class QueueEstimates
     public function inputs(string $doctorId, string $localDate, WalkInDayFacts $facts, AdmissionPresence $presence, iterable $entries): EstimateInputs
     {
         $inputs = [];
+        // Durations are memoised for this one call only: a stale durations memo across calls would hide a changed rolling average.
+        $durations = [];
         foreach ($entries as $entry) {
             if (! in_array($entry->status, [EntryStatus::Registered, EntryStatus::Waiting, EntryStatus::Called], true)) {
                 continue;
             }
-            $duration = $this->duration($doctorId, $entry->doctor_service_id);
+            $key = $entry->doctor_service_id ?? '-';
+            $duration = $durations[$key] ??= $this->duration($doctorId, $entry->doctor_service_id);
             $arrived = $entry->status === EntryStatus::Registered ? null : ($entry->queue_sort_at ?? $entry->arrived_at ?? $entry->called_at ?? $this->clock->now());
             $inputs[] = new QueueEntryInput($entry->id, $entry->queue_number, $entry->triage_priority->value, $entry->status, $duration->seconds, $duration->source, $arrived);
         }
@@ -63,9 +63,7 @@ final class QueueEstimates
 
     public function duration(string $doctorId, ?string $doctorServiceId): ExpectedDuration
     {
-        $key = $doctorId.':'.($doctorServiceId ?? '-');
-
-        return $this->durations[$key] ??= $this->stats->expectedFor($doctorId, $doctorServiceId);
+        return $this->stats->expectedFor($doctorId, $doctorServiceId);
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Modules\Consultations\Models\Consultation;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\CursorPaginator;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Reads consultations for the list and the detail (brief §4 5.7-2). Lists are cursor-paginated, newest first. Every read by a global
@@ -26,9 +27,9 @@ final class ConsultationReader
 
     /**
      * @param  array{status: string|null, clinic_location_id: string|null, from: CarbonImmutable|null, to: CarbonImmutable|null}  $filters
-     * @return CursorPaginator<int, Consultation>
+     * @return array{page: CursorPaginator<int, Consultation>, rows: list<array{consultation: Consultation, level: ConsultationView}>}
      */
-    public function list(ReadScope $scope, array $filters): CursorPaginator
+    public function list(ReadScope $scope, array $filters): array
     {
         /** @var Builder<Consultation> $query */
         $query = $this->scope->applyTo(Consultation::query(), $scope)->with('participants')
@@ -41,19 +42,34 @@ final class ConsultationReader
         /** @var CursorPaginator<int, Consultation> $page */
         $page = $query->cursorPaginate(self::PAGE_SIZE);
 
-        // Fail closed: a row this reader has no standing at is dropped from the page, never shown restricted.
-        $visible = $page->getCollection()->filter(fn (Consultation $c): bool => $this->scope->levelFor($scope, $c) !== null)->values();
-        $page->setCollection($visible);
+        // Fail closed, once: a row this reader has no standing at is dropped from the page, never shown restricted. The level is
+        // computed once per row here and handed back, so callers never recompute it.
+        $rows = [];
+        $dropped = [];
+        foreach ($page->getCollection() as $consultation) {
+            $level = $this->scope->levelFor($scope, $consultation);
+            if ($level === null) {
+                $dropped[] = (string) $consultation->id;
+
+                continue;
+            }
+            $rows[] = ['consultation' => $consultation, 'level' => $level];
+        }
+        if ($dropped !== []) {
+            // Ids and a count only, no PHI: makes drift between applyTo and levelFor visible.
+            Log::warning('consultations.list_rows_dropped', ['count' => count($dropped), 'consultation_ids' => $dropped]);
+        }
+        $page->setCollection(collect(array_map(fn (array $row): Consultation => $row['consultation'], $rows)));
 
         if ($scope->global) {
-            $restricted = $visible->filter(fn (Consultation $c): bool => $this->scope->levelFor($scope, $c) === ConsultationView::Restricted)->count();
+            $restricted = count(array_filter($rows, fn (array $row): bool => $row['level'] === ConsultationView::Restricted));
             $applied = array_keys(array_filter($filters, fn (mixed $v): bool => $v !== null));
             // L-4: the ids of the rows this page returned (ids only, no PHI). A page holds at most PAGE_SIZE rows, so the list stays bounded.
-            $ids = $visible->map(fn (Consultation $c): string => (string) $c->id)->values()->all();
-            $this->audit->record('consultations.listed', null, null, ['count' => $visible->count(), 'restricted' => $restricted, 'filters' => $applied, 'consultation_ids' => $ids], accessEvent: true);
+            $ids = array_map(fn (array $row): string => (string) $row['consultation']->id, $rows);
+            $this->audit->record('consultations.listed', null, null, ['count' => count($rows), 'restricted' => $restricted, 'filters' => $applied, 'consultation_ids' => $ids], accessEvent: true);
         }
 
-        return $page;
+        return ['page' => $page, 'rows' => $rows];
     }
 
     /** The level of one consultation for this reader, with a global reader's restricted read audited. Null when the reader has no standing. */

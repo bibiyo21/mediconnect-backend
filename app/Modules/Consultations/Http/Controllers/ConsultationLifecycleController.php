@@ -94,8 +94,9 @@ final class ConsultationLifecycleController
     /**
      * Resume an interrupted walk-in consultation (INTERRUPTED to IN_PROGRESS). Only the consultation's own doctor, with consultations.start.
      * The doctor must be stored IN at this location, and no other consultation of the doctor may be IN_PROGRESS. A repeat answers 200.
-     * Errors: 409 DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable or not_checked_in), ACTIVE_CONSULTATION,
-     * INVALID_STATE_TRANSITION (errors.status), CONCURRENT_MODIFICATION (retry with a NEW key).
+     * Errors: 409 DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable, not_checked_in, no_assignment, doctor_not_active or
+     * location_not_active), QUEUE_CLOSED
+     * (reason_code: not_today), ACTIVE_CONSULTATION, INVALID_STATE_TRANSITION (errors.status), CONCURRENT_MODIFICATION (retry with a NEW key).
      */
     public function resume(ConsultationActionRequest $request, string $id): JsonResponse
     {
