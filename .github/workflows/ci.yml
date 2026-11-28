@@ -17,7 +17,8 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # The full suite took 19m45s at 13927c1 and outgrew 20 minutes in 5.8.
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:18.1-alpine
