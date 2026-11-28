@@ -5172,7 +5172,7 @@
         "/consultations/{id}/resume": {
             "post": {
                 "operationId": "consultationLifecycle.resume",
-                "summary": "Resume an interrupted walk-in consultation (INTERRUPTED to IN_PROGRESS). Only the consultation's own doctor, with consultations.start.\nThe doctor must be stored IN at this location, and no other consultation of the doctor may be IN_PROGRESS. A repeat answers 200.\nErrors: 409 DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable or not_checked_in), ACTIVE_CONSULTATION,\nINVALID_STATE_TRANSITION (errors.status), CONCURRENT_MODIFICATION (retry with a NEW key)",
+                "summary": "Resume an interrupted walk-in consultation (INTERRUPTED to IN_PROGRESS). Only the consultation's own doctor, with consultations.start.\nThe doctor must be stored IN at this location, and no other consultation of the doctor may be IN_PROGRESS. A repeat answers 200.\nErrors: 409 DOCTOR_NOT_AVAILABLE (reason_code: checked_out, on_break, unavailable, not_checked_in, no_assignment, doctor_not_active or\nlocation_not_active), QUEUE_CLOSED\n(reason_code: not_today), ACTIVE_CONSULTATION, INVALID_STATE_TRANSITION (errors.status), CONCURRENT_MODIFICATION (retry with a NEW key)",
                 "tags": [
                     "ConsultationLifecycle"
                 ],
@@ -8771,6 +8771,109 @@
                 ]
             }
         },
+        "/presence/check-out/preview": {
+            "get": {
+                "operationId": "presence.checkOutPreview",
+                "summary": "Check-out preview (increment 5.8, D-I): what a check-out would find. Advisory, no lock, nothing changed. The caller needs\npresence.check_out (for yourself) or presence.manage at the location (for someone else)",
+                "tags": [
+                    "Presence"
+                ],
+                "parameters": [
+                    {
+                        "name": "doctor_id",
+                        "in": "query",
+                        "description": "Clinic staff only: the doctor to act for. Omit to change your own presence.",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "clinic_location_id",
+                        "in": "query",
+                        "description": "Required when acting for another doctor: the location where you hold presence rights.",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/CheckOutPreviewResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/presence/check-in": {
             "post": {
                 "operationId": "presence.checkIn",
@@ -9272,6 +9375,103 @@
                     },
                     "409": {
                         "description": "INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/presence/check-out": {
+            "post": {
+                "operationId": "presence.checkOut",
+                "summary": "Check out of a clinic location (increment 5.8, D-J). Refused with 409 ACTIVE_CONSULTATION while a consultation is in progress or interrupted,\nor a walk-in is called (`reason_code` says which). Never cancels an appointment; a walk-in entry is held or cancelled as the\n`walkin_disposition` says. No Idempotency-Key: the open-session index and the state guard make a repeat a 409 `not_checked_in`",
+                "tags": [
+                    "Presence"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CheckOutRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/CheckOutResultResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "ACTIVE_CONSULTATION (reason_code `in_progress`, `interrupted` or `called`): a consultation is in progress or interrupted, or a walk-in patient is called; end it, or start, skip or mark that patient no-show first (no ids). INVALID_STATE_TRANSITION, reason_code `not_checked_in`: no open session at this location (a retry after a success lands here: refetch GET /presence/me), or `change_in_progress` (CONCURRENT_MODIFICATION): retry.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14899,12 +15099,13 @@
             },
             "CancelReason": {
                 "type": "string",
-                "description": "Why an entry was cancelled (decision 52). Only the code is ever stored on the event, audit row or notice.\n",
+                "description": "Why an entry was cancelled (decision 52). Only the code is ever stored on the event, audit row or notice.\n| |\n|---|\n| `PATIENT_REQUEST` <br/>  |\n| `PATIENT_LEFT` <br/>  |\n| `DUPLICATE_ENTRY` <br/>  |\n| `OTHER` <br/>  |\n| `DOCTOR_CHECKED_OUT` <br/> The doctor checked out and staff chose NOTIFY_AND_CANCEL (increment 5.8, D-D). |",
                 "enum": [
                     "PATIENT_REQUEST",
                     "PATIENT_LEFT",
                     "DUPLICATE_ENTRY",
-                    "OTHER"
+                    "OTHER",
+                    "DOCTOR_CHECKED_OUT"
                 ],
                 "title": "CancelReason"
             },
@@ -14913,7 +15114,7 @@
                 "description": "POST /walk-ins/{id}/cancel",
                 "properties": {
                     "reason_code": {
-                        "description": "PATIENT_REQUEST, PATIENT_LEFT, DUPLICATE_ENTRY or OTHER. A fixed code: no free text.",
+                        "description": "PATIENT_REQUEST, PATIENT_LEFT, DUPLICATE_ENTRY or OTHER. A fixed code: no free text.\n\n| |\n|---|\n| `PATIENT_REQUEST` <br/>  |\n| `PATIENT_LEFT` <br/>  |\n| `DUPLICATE_ENTRY` <br/>  |\n| `OTHER` <br/>  |\n| `DOCTOR_CHECKED_OUT` <br/> The doctor checked out and staff chose NOTIFY_AND_CANCEL (increment 5.8, D-D). |",
                         "$ref": "#/components/schemas/CancelReason"
                     },
                     "patient_informed_in_person": {
@@ -15005,6 +15206,323 @@
                     "clinic_location_id"
                 ],
                 "title": "CheckInRequest"
+            },
+            "CheckOutDisposition": {
+                "type": "string",
+                "description": "What happens to a doctor's live walk-in entries when the doctor checks out (increment 5.8, D-D). Required: the system never picks one for a person. HOLD keeps every place; NOTIFY_AND_CANCEL cancels them with the notice.\n",
+                "enum": [
+                    "HOLD_FOR_REASSIGNMENT",
+                    "NOTIFY_AND_CANCEL"
+                ],
+                "title": "CheckOutDisposition"
+            },
+            "CheckOutPreviewResource": {
+                "type": "object",
+                "properties": {
+                    "session": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "The open session at the location, or null when there is none.",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "status",
+                            "version"
+                        ]
+                    },
+                    "blocking": {
+                        "type": "array",
+                        "description": "What would refuse the check-out. Empty when nothing blocks it.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "code": {
+                                    "type": "string"
+                                },
+                                "reason_code": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "code",
+                                "reason_code"
+                            ]
+                        }
+                    },
+                    "active_consultation": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "The doctor's unfinished consultation. The id is null unless the reader may see that consultation.",
+                        "properties": {
+                            "id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "status"
+                        ]
+                    },
+                    "queues": {
+                        "type": "array",
+                        "description": "The doctor's own queues for the day.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "queue_id": {
+                                    "type": "string"
+                                },
+                                "status": {
+                                    "type": "string"
+                                },
+                                "counts": {
+                                    "type": "object",
+                                    "properties": {
+                                        "registered": {
+                                            "type": "integer"
+                                        },
+                                        "waiting": {
+                                            "type": "integer"
+                                        },
+                                        "called": {
+                                            "type": "integer"
+                                        },
+                                        "skipped": {
+                                            "type": "integer"
+                                        },
+                                        "in_consultation": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "registered",
+                                        "waiting",
+                                        "called",
+                                        "skipped",
+                                        "in_consultation"
+                                    ]
+                                },
+                                "guest_count": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "queue_id",
+                                "status",
+                                "counts",
+                                "guest_count"
+                            ]
+                        }
+                    },
+                    "called_entry_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "description": "CALLED or IN_CONSULTATION entry ids. Null unless the reader may see walk-in entries at the location.",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "live_entry_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "description": "Entry ids a disposition would decide. Null unless the reader may see walk-in entries at the location.",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "appointments": {
+                        "type": "object",
+                        "description": "The day's live appointments: ids and start times only.",
+                        "properties": {
+                            "count": {
+                                "type": "integer"
+                            },
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "starts_at": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "starts_at"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "count",
+                            "items"
+                        ]
+                    }
+                },
+                "required": [
+                    "session",
+                    "blocking",
+                    "active_consultation",
+                    "queues",
+                    "called_entry_ids",
+                    "live_entry_ids",
+                    "appointments"
+                ],
+                "title": "CheckOutPreviewResource"
+            },
+            "CheckOutReason": {
+                "type": "string",
+                "description": "Why a doctor checked out (increment 5.8). A fixed code, never free text. Matches the database CHECK on doctor_presence_sessions.checkout_reason (a unit test keeps them equal).\n",
+                "enum": [
+                    "END_OF_SHIFT",
+                    "EMERGENCY",
+                    "PERSONAL",
+                    "CLINIC_CLOSED",
+                    "OTHER"
+                ],
+                "title": "CheckOutReason"
+            },
+            "CheckOutRequest": {
+                "type": "object",
+                "description": "POST /presence/check-out. The coarse gate is presence.check_out (the doctor) or presence.manage (staff); PresenceAccess decides the rest.\nThe walk-in disposition is required: the system never picks one for a person (D-D). The ids (doctor_id, clinic_location_id) are the\npresence module's shared ones (PresenceActionRequest, api-specification \u00a72.7).",
+                "properties": {
+                    "doctor_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Clinic staff only: the doctor to act for. Omit to change your own presence."
+                    },
+                    "clinic_location_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "description": "Required when acting for another doctor: the location where you hold presence rights."
+                    },
+                    "reason": {
+                        "description": "Why, as a fixed code (END_OF_SHIFT, EMERGENCY, PERSONAL, CLINIC_CLOSED, OTHER). No free text.",
+                        "$ref": "#/components/schemas/CheckOutReason"
+                    },
+                    "walkin_disposition": {
+                        "description": "What happens to the walk-in entries still waiting: HOLD_FOR_REASSIGNMENT keeps them, NOTIFY_AND_CANCEL cancels them with notice.",
+                        "$ref": "#/components/schemas/CheckOutDisposition"
+                    },
+                    "guests_informed_in_person": {
+                        "type": "boolean",
+                        "description": "Required (true) when NOTIFY_AND_CANCEL cancels a guest entry: the guest was told in person, since a guest has no notification."
+                    }
+                },
+                "required": [
+                    "reason",
+                    "walkin_disposition"
+                ],
+                "title": "CheckOutRequest"
+            },
+            "CheckOutResultResource": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "Always OUT: the session is closed by the check-out.",
+                        "const": "OUT"
+                    },
+                    "effective_status": {
+                        "type": "string",
+                        "description": "The same as status: a closed session has no derived BUSY.",
+                        "const": "OUT"
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "The session that was closed."
+                    },
+                    "clinic_location_id": {
+                        "type": "string"
+                    },
+                    "checked_in_at": {
+                        "type": "string",
+                        "description": "UTC."
+                    },
+                    "break_expected_end_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "UTC. Always null after a check-out (a break ends with the session)."
+                    },
+                    "version": {
+                        "type": "integer",
+                        "description": "Increases with every change."
+                    },
+                    "result": {
+                        "type": "object",
+                        "description": "Counts of what the check-out did.",
+                        "properties": {
+                            "queues_paused": {
+                                "type": "integer"
+                            },
+                            "entries_held": {
+                                "type": "integer"
+                            },
+                            "entries_cancelled": {
+                                "type": "integer"
+                            },
+                            "appointments_flagged": {
+                                "type": "integer"
+                            },
+                            "tasks_created": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "queues_paused",
+                            "entries_held",
+                            "entries_cancelled",
+                            "appointments_flagged",
+                            "tasks_created"
+                        ]
+                    }
+                },
+                "required": [
+                    "status",
+                    "effective_status",
+                    "session_id",
+                    "clinic_location_id",
+                    "checked_in_at",
+                    "break_expected_end_at",
+                    "version",
+                    "result"
+                ],
+                "title": "CheckOutResultResource"
             },
             "ClinicManagementResource": {
                 "type": "object",
@@ -16878,6 +17396,9 @@
                             "not_checked_in",
                             "invalid_transition",
                             "change_in_progress",
+                            "in_progress",
+                            "interrupted",
+                            "called",
                             "doctor_not_active",
                             "location_not_active",
                             "remote_registration_off",

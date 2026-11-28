@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Administration\Providers\AdministrationServiceProvider;
+use App\Modules\Appointments\Providers\AppointmentsServiceProvider;
 use App\Modules\Audit\Providers\AuditServiceProvider;
 use App\Modules\Authentication\Providers\AuthenticationServiceProvider;
 use App\Modules\Clinics\Providers\ClinicsServiceProvider;
@@ -36,4 +37,5 @@ return [
     PresenceServiceProvider::class,
     ConsultationsServiceProvider::class,
     WalkInsServiceProvider::class,
+    AppointmentsServiceProvider::class,
 ];

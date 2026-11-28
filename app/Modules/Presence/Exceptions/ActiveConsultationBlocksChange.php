@@ -6,14 +6,30 @@ use App\Shared\Enums\ErrorCode;
 use App\Shared\Exceptions\DomainException;
 
 /**
- * A break or mark-unavailable while the doctor has a consultation in progress (plan 5.7 D-I): 409 ACTIVE_CONSULTATION, no reason code.
- * Stored presence and the running consultation must not disagree, so the change waits until the consultation ends.
+ * A change that a running or unfinished consultation (or a called walk-in) blocks: 409 ACTIVE_CONSULTATION. Break and unavailable carry no reason
+ * code (plan 5.7 D-I). Check-out (increment 5.8, D-C) sends `in_progress`, `interrupted` or `called`. Stored presence and the running consultation
+ * must not disagree, so the change waits until the consultation ends.
  */
 final class ActiveConsultationBlocksChange extends DomainException
 {
-    public function __construct()
+    public function __construct(?string $message = null, private readonly ?string $reason = null)
     {
-        parent::__construct('A consultation is in progress. End it before you take a break or mark yourself unavailable.');
+        parent::__construct($message ?? 'A consultation is in progress. End it before you take a break or mark yourself unavailable.');
+    }
+
+    public static function inProgress(): self
+    {
+        return new self('A consultation is in progress. End it before you check out.', 'in_progress');
+    }
+
+    public static function interrupted(): self
+    {
+        return new self('A consultation was interrupted. End it before you check out.', 'interrupted');
+    }
+
+    public static function called(): self
+    {
+        return new self('A patient is called to you. Start, skip or mark them no-show before you check out.', 'called');
     }
 
     /** A normal refusal (a stale screen): not an error worth a Sentry event. */
@@ -25,5 +41,10 @@ final class ActiveConsultationBlocksChange extends DomainException
     public function errorCode(): ErrorCode
     {
         return ErrorCode::ActiveConsultation;
+    }
+
+    public function reasonCode(): ?string
+    {
+        return $this->reason;
     }
 }

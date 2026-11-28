@@ -2,9 +2,11 @@
 
 namespace App\Modules\WalkIns\Providers;
 
+use App\Modules\WalkIns\Contracts\CheckOutQueues;
 use App\Modules\WalkIns\Contracts\WalkInConsultationEntries;
 use App\Modules\WalkIns\Estimation\EstimationConfig;
 use App\Modules\WalkIns\Estimation\EstimatorSettings;
+use App\Modules\WalkIns\Services\CheckOutQueues as CheckOutQueuesService;
 use App\Modules\WalkIns\Services\ConsultationEntries;
 use App\Shared\Services\Fingerprint;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -21,6 +23,7 @@ final class WalkInsServiceProvider extends ServiceProvider
         // Not a singleton: the settings are read from config each time an estimator is resolved.
         $this->app->bind(EstimatorSettings::class, fn () => EstimatorSettings::fromConfig());
         $this->app->bind(WalkInConsultationEntries::class, ConsultationEntries::class);
+        $this->app->bind(CheckOutQueues::class, CheckOutQueuesService::class);
     }
 
     public function boot(): void

@@ -32,6 +32,8 @@ final class DocumentsErrorEnvelope
     private const REASON_CODES = [
         'doctor_not_active', 'location_not_active', 'no_assignment', 'no_service_mode', 'clinic_closed', 'closed_holiday', 'outside_hours',
         'open_session', 'not_checked_in', 'invalid_transition', 'change_in_progress',
+        // Doctor check-out (Phase 5, 5.8-1): the blocks that refuse it.
+        'in_progress', 'interrupted', 'called',
         // Walk-in registration (Phase 5, 5.5a).
         'doctor_not_active', 'location_not_active', 'remote_registration_off', 'mobile_not_verified', 'doctor_unavailable', 'doctor_checked_out', 'no_walkin_hours_today',
         'paused', 'closed', 'cutoff_passed', 'clinic_closed_today', 'live_entries_per_patient', 'patients_per_account_per_day',
@@ -109,9 +111,14 @@ final class DocumentsErrorEnvelope
                     continue;
                 }
 
+                $isCheckOut = str_ends_with($path->path, 'presence/check-out');
                 $activeNote = str_ends_with($path->path, 'presence/break/start') || str_ends_with($path->path, 'presence/unavailable') ? ' ACTIVE_CONSULTATION: a consultation is in progress; end it first (errors carry no ids).' : '';
+                if ($isCheckOut) {
+                    $activeNote = ' ACTIVE_CONSULTATION (reason_code `in_progress`, `interrupted` or `called`): a consultation is in progress or interrupted, or a walk-in patient is called; end it, or start, skip or mark that patient no-show first (no ids).';
+                }
                 $baseNote = $isCheckIn ? 'INVALID_STATE_TRANSITION, reason_code `open_session`: the doctor already has an open session in another state or at another location (errors.clinic_location_id only for the doctor and staff of that location), or `change_in_progress` (CONCURRENT_MODIFICATION): retry.'
-                    : 'INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.';
+                    : ($isCheckOut ? 'INVALID_STATE_TRANSITION, reason_code `not_checked_in`: no open session at this location (a retry after a success lands here: refetch GET /presence/me), or `change_in_progress` (CONCURRENT_MODIFICATION): retry.'
+                    : 'INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.');
                 $operation->addResponse(Response::make(409)->setContent('application/json', $ref)->setDescription(trim($activeNote.' '.$baseNote)));
 
                 if ($isCheckIn) {

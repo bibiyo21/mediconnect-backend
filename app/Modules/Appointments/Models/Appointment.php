@@ -2,6 +2,7 @@
 
 namespace App\Modules\Appointments\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
  * An appointment (database-schema.md §9). Structure only until Phase 6 booking; the overlap constraint protects it from day one. Status changes go through one state machine (Phase 6).
  *
  * @property string $id
+ * @property CarbonImmutable $starts_at
+ * @property CarbonImmutable $ends_at
  * @property string $reference_code
  * @property string $patient_profile_id
  * @property string $doctor_profile_id

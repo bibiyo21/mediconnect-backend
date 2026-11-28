@@ -57,6 +57,18 @@
         "version": "integer"
       }
     },
+    "DoctorCheckedOut": {
+      "channels": [
+        "presence-clinic.{locationId}"
+      ],
+      "payload": {
+        "doctor_profile_id": "string",
+        "clinic_location_id": "string",
+        "session_id": "string",
+        "status": "string",
+        "version": "integer"
+      }
+    },
     "DoctorPresenceUpdated": {
       "channels": [
         "presence-clinic.{locationId}"

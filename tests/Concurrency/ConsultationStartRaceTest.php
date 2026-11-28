@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Consultations\Contracts\ActiveConsultations;
+use App\Modules\Consultations\DTOs\UnfinishedConsultation;
 use App\Modules\Consultations\Exceptions\ConsultationRefused;
 use App\Modules\Consultations\Models\Consultation;
 use App\Modules\Consultations\Services\ConsultationLifecycle;
@@ -420,6 +421,11 @@ it('23505 backstop: with the presence check stubbed to "nothing running", a star
     app()->instance(ActiveConsultations::class, new class implements ActiveConsultations
     {
         public function inProgressFor(string $doctorProfileId): ?string
+        {
+            return null;
+        }
+
+        public function unfinishedFor(string $doctorProfileId): ?UnfinishedConsultation
         {
             return null;
         }

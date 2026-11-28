@@ -2,15 +2,21 @@
 
 namespace App\Modules\Presence\Http\Controllers;
 
+use App\Modules\Presence\Enums\PresenceChangeMethod;
 use App\Modules\Presence\Http\Requests\CheckInRequest;
+use App\Modules\Presence\Http\Requests\CheckOutPreviewRequest;
+use App\Modules\Presence\Http\Requests\CheckOutRequest;
 use App\Modules\Presence\Http\Requests\MarkUnavailableRequest;
 use App\Modules\Presence\Http\Requests\PresenceActionRequest;
 use App\Modules\Presence\Http\Requests\StartBreakRequest;
+use App\Modules\Presence\Http\Resources\CheckOutPreviewResource;
+use App\Modules\Presence\Http\Resources\CheckOutResultResource;
 use App\Modules\Presence\Http\Resources\PresenceStateResource;
 use App\Modules\Presence\Http\SourceDevice;
 use App\Modules\Presence\Models\DoctorPresenceSession;
 use App\Modules\Presence\Services\PresenceAccess;
 use App\Modules\Presence\Services\PresenceActor;
+use App\Modules\Presence\Services\PresenceCheckOut;
 use App\Modules\Presence\Services\PresenceReader;
 use App\Modules\Presence\Services\PresenceSessions;
 use App\Modules\Users\Models\User;
@@ -31,6 +37,7 @@ final class PresenceController
         private readonly PresenceSessions $sessions,
         private readonly PresenceAccess $access,
         private readonly PresenceReader $reader,
+        private readonly PresenceCheckOut $checkOut,
     ) {}
 
     /** Your own presence: the open session, or NOT_CHECKED_IN. */
@@ -98,6 +105,33 @@ final class PresenceController
         return ApiResponse::success($this->state($this->sessions->markAvailable($actor, $doctor, $request->locationId())));
     }
 
+    /**
+     * Check-out preview (increment 5.8, D-I): what a check-out would find. Advisory, no lock, nothing changed. The caller needs
+     * presence.check_out (for yourself) or presence.manage at the location (for someone else).
+     */
+    public function checkOutPreview(CheckOutPreviewRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        ['doctor' => $doctor, 'method' => $method] = $this->access->resolve($user, $request->doctorId(), $request->locationId(), 'presence.check_out');
+
+        return ApiResponse::success(new CheckOutPreviewResource($this->checkOut->preview($user, $doctor, $request->locationId(), $method === PresenceChangeMethod::DoctorApp)));
+    }
+
+    /**
+     * Check out of a clinic location (increment 5.8, D-J). Refused with 409 ACTIVE_CONSULTATION while a consultation is in progress or interrupted,
+     * or a walk-in is called (`reason_code` says which). Never cancels an appointment; a walk-in entry is held or cancelled as the
+     * `walkin_disposition` says. No Idempotency-Key: the open-session index and the state guard make a repeat a 409 `not_checked_in`.
+     */
+    public function checkOut(CheckOutRequest $request): JsonResponse
+    {
+        ['doctor' => $doctor, 'actor' => $actor] = $this->actor($request, $request->doctorId(), $request->locationId(), 'presence.check_out');
+
+        $outcome = $this->checkOut->checkOut($actor, $doctor, $request->locationId(), $request->reason(), $request->disposition(), $request->guestsInformed());
+
+        return ApiResponse::success(new CheckOutResultResource($outcome['session'], $outcome['result']));
+    }
+
     /** The doctor's own state with its effective status (derived BUSY). */
     private function state(?DoctorPresenceSession $session): PresenceStateResource
     {
@@ -105,11 +139,11 @@ final class PresenceController
     }
 
     /** @return array{doctor: string, actor: PresenceActor} */
-    private function actor(Request $request, ?string $doctorId, ?string $locationId): array
+    private function actor(Request $request, ?string $doctorId, ?string $locationId, string $ownPermission = 'presence.check_in'): array
     {
         /** @var User $user */
         $user = $request->user();
-        ['doctor' => $doctor, 'method' => $method] = $this->access->resolve($user, $doctorId, $locationId);
+        ['doctor' => $doctor, 'method' => $method] = $this->access->resolve($user, $doctorId, $locationId, $ownPermission);
 
         return ['doctor' => $doctor, 'actor' => new PresenceActor($user, $method, SourceDevice::of($request))];
     }

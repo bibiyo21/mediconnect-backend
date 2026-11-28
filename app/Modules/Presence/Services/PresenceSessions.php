@@ -74,7 +74,7 @@ final class PresenceSessions
                 $session = new DoctorPresenceSession;
                 $session->forceFill([
                     'id' => (string) Str::uuid7(), 'doctor_profile_id' => $doctorId, 'clinic_location_id' => $locationId, 'session_kind' => 'IN_PERSON',
-                    'current_status' => PresenceStatus::In, 'checked_in_at' => $this->clock->now(), 'checked_in_by' => $actor->user->id,
+                    'current_status' => PresenceStatus::In, 'checked_in_at' => $this->clock->now(), 'checked_in_by' => $actor->requireUser()->id,
                 ])->save();
 
                 $this->record($session, PresenceStatus::NotCheckedIn, $actor, $reason, null, 'presence.checked_in');
@@ -118,7 +118,7 @@ final class PresenceSessions
         }
 
         // Elsewhere: only the doctor, or someone with presence rights at that other location, learns where.
-        $entitled = ! $actor->isOnBehalf() || $this->clinics->allowsAtLocation($actor->user, 'presence.manage', $openAt);
+        $entitled = ! $actor->isOnBehalf() || ($actor->user !== null && $this->clinics->allowsAtLocation($actor->user, 'presence.manage', $openAt));
 
         throw InvalidPresenceTransition::checkedInElsewhere($entitled ? $openAt : null);
     }
@@ -221,11 +221,13 @@ final class PresenceSessions
     }
 
     /**
-     * The §8.5 event row, and the audit record, in the caller's transaction.
+     * The §8.5 event row, and the audit record, in the caller's transaction. $reason is a fixed code (PresenceReason, or CheckOutReason for a
+     * check-out); $auditExtra adds ids, counts and codes to the audit row only.
      *
      * @param  array<string, mixed>|null  $metadata
+     * @param  array<string, mixed>  $auditExtra
      */
-    private function record(DoctorPresenceSession $session, PresenceStatus $from, PresenceActor $actor, ?PresenceReason $reason, ?array $metadata, string $auditAction): void
+    public function record(DoctorPresenceSession $session, PresenceStatus $from, PresenceActor $actor, ?\BackedEnum $reason, ?array $metadata, string $auditAction, array $auditExtra = []): void
     {
         DB::table('doctor_presence_events')->insert([
             'doctor_presence_session_id' => $session->id,
@@ -233,7 +235,7 @@ final class PresenceSessions
             'clinic_location_id' => $session->clinic_location_id,
             'previous_status' => $from->value,
             'new_status' => $session->current_status->value,
-            'changed_by' => $actor->user->id,
+            'changed_by' => $actor->user?->id,
             'change_method' => $actor->method->value,
             'reason' => $reason?->value,
             'source_device_id' => $actor->deviceId,
@@ -244,11 +246,12 @@ final class PresenceSessions
         $this->audit->record($auditAction, 'doctor_presence_session', $session->id, [
             'from' => $from->value, 'to' => $session->current_status->value, 'method' => $actor->method->value,
             'clinic_location_id' => $session->clinic_location_id, 'on_behalf' => $actor->isOnBehalf(),
+            ...$auditExtra,
         ], clinicId: is_string($clinicId) ? $clinicId : null);
     }
 
-    /** Redis hint after commit, and a notice to the doctor when someone else changed their status. */
-    private function afterChange(DoctorPresenceSession $session, PresenceActor $actor): void
+    /** Redis hint after commit, and a notice to the doctor when someone else changed their status (never for the SYSTEM actor). */
+    public function afterChange(DoctorPresenceSession $session, PresenceActor $actor): void
     {
         $doctorId = $session->doctor_profile_id;
         $locationId = (string) $session->clinic_location_id;
@@ -261,11 +264,37 @@ final class PresenceSessions
         });
 
         // At most one "changed by staff" notice per doctor and location every 5 minutes: staff running a doctor's breaks must not flood them.
-        if ($actor->isOnBehalf() && Cache::add("presence:staff-notice:{$doctorId}:{$locationId}", true, 300)) {
+        if ($actor->isOnBehalf() && $actor->user !== null && Cache::add("presence:staff-notice:{$doctorId}:{$locationId}", true, 300)) {
             $doctorUser = DB::table('doctor_profiles')->where('id', $doctorId)->value('user_id');
             if (is_string($doctorUser)) {
                 $this->notifications->notify($doctorUser, 'presence.changed_by_staff', 'Your clinic status was updated', 'A member of the clinic team updated your status. Open the app to review it.', ['clinic_location_id' => $locationId]);
             }
+        }
+    }
+
+    /**
+     * Runs one presence write in its own transaction, with the lock-wait limit and the 55P03 mapping every change uses. For a write that is not a
+     * simple state move (check-out, increment 5.8): the caller takes the session row FOR UPDATE first, inside $work.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $work
+     * @return T
+     */
+    public function guarded(Closure $work): mixed
+    {
+        $outerLockWait = $this->currentLockWait();
+
+        try {
+            return DB::transaction(function () use ($work) {
+                $this->limitLockWait();
+
+                return $work();
+            });
+        } catch (QueryException $e) {
+            throw $this->lockTimeout($e);
+        } finally {
+            $this->restoreLockWait($outerLockWait);
         }
     }
 

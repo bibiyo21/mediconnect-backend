@@ -32,15 +32,17 @@ final class PresenceAccess
     }
 
     /**
+     * @param  string  $ownPermission  what the doctor needs for their own change: presence.check_in, or presence.check_out (increment 5.8).
+     *                                 Acting for another doctor always needs presence.manage at the location.
      * @return array{doctor: string, method: PresenceChangeMethod}
      */
-    public function resolve(User $user, ?string $doctorId, ?string $locationId): array
+    public function resolve(User $user, ?string $doctorId, ?string $locationId, string $ownPermission = 'presence.check_in'): array
     {
         $own = DoctorProfile::where('user_id', $user->id)->value('id');
         $own = is_string($own) ? $own : null;
 
         if ($doctorId === null || $doctorId === $own) {
-            abort_unless($own !== null && $user->can('presence.check_in'), 403, 'You do not have permission to change your own presence.');
+            abort_unless($own !== null && $user->can($ownPermission), 403, 'You do not have permission to change your own presence.');
 
             return ['doctor' => $own, 'method' => PresenceChangeMethod::DoctorApp];
         }
