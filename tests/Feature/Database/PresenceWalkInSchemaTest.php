@@ -371,7 +371,7 @@ it('pairs walk-in events with their entry and queue, and limits statuses to entr
         ->and(schema_rejects(fn () => ($this->queueEvent)($queue, null, 'QUEUE_OPENED')))->toBeNull()
         ->and(schema_rejects(fn () => ($this->queueEvent)($queue, $entry, 'QUEUE_CLOSED')))->toBe('23514') // queue-level event naming an entry
         ->and(schema_rejects(fn () => ($this->queueEvent)($queue, null, 'CALLED')))->toBe('23514') // entry event without an entry
-        ->and(schema_rejects(fn () => ($this->queueEvent)($other, $entry, 'REGISTERED')))->toBe('23503') // another queue's entry
+        ->and(schema_rejects(fn () => ($this->queueEvent)($other, $entry, 'REGISTERED')))->toBe('23514') // another queue's entry: walkin_queue_events_match_entry trigger (check_violation), not an FK
         ->and(schema_rejects(fn () => ($this->queueEvent)($queue, $entry, 'TELEPORTED')))->toBe('23514')
         ->and(schema_rejects(fn () => ($this->queueEvent)($queue, $entry, 'CALLED', ['from_status' => 'WAITING', 'to_status' => 'OPEN'])))->toBe('23514') // a queue status is not an entry status
         ->and(schema_rejects(fn () => ($this->queueEvent)($queue, $entry, 'CALLED', ['from_status' => 'WAITING', 'to_status' => 'CALLED'])))->toBeNull();

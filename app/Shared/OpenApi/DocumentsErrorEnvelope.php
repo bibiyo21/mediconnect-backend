@@ -39,6 +39,8 @@ final class DocumentsErrorEnvelope
         'paused', 'closed', 'cutoff_passed', 'clinic_closed_today', 'live_entries_per_patient', 'patients_per_account_per_day',
         // Walk-in queue operations (Phase 5, 5.6-2).
         'on_break', 'unavailable', 'checked_out', 'not_today', 'appointment', 'hold', 'no_doctor', 'other_queue', 'previous_day',
+        // Queue close and transfer (Phase 5, 5.8-2): the doctor is checked in at the location; the cutoff of a target queue is `cutoff_passed` (listed above).
+        'doctor_checked_in',
     ];
 
     /** Business refusals of the walk-in routes, by operation (path suffix and method). */
@@ -47,6 +49,8 @@ final class DocumentsErrorEnvelope
         'POST walk-ins/{id}/arrive' => 'INVALID_STATE_TRANSITION: the entry is not REGISTERED (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).',
         'POST walk-ins/{id}/cancel' => 'INVALID_STATE_TRANSITION: only a REGISTERED, WAITING or SKIPPED entry can be cancelled (errors.status is its current status), or CONCURRENT_MODIFICATION (retry).',
         'POST walk-ins/queues/{id}/pause' => 'INVALID_STATE_TRANSITION: only an OPEN queue can be paused (errors.status), or CONCURRENT_MODIFICATION (retry).',
+        'POST walk-ins/queues/{id}/close' => 'INVALID_STATE_TRANSITION (reason_code doctor_checked_in while the doctor is checked in at the location; errors.status when the queue is already CLOSED), ACTIVE_CONSULTATION (reason_code called or in_progress, errors.entry_id: a CALLED or IN_CONSULTATION entry), or CONCURRENT_MODIFICATION (retry with a NEW key). 422 (errors.dispositions) when a live entry has no disposition, or a guest is given CANCEL_WITH_NOTICE.',
+        'POST walk-ins/{id}/transfer' => 'INVALID_STATE_TRANSITION (the entry is not REGISTERED or WAITING; errors.status), DOCTOR_NOT_AVAILABLE (reason_code checked_out, no_assignment or no_doctor: the target doctor), REGISTRATION_NOT_ALLOWED (reason_code: doctor_not_active, location_not_active, no_walkin_hours_today, doctor_unavailable or doctor_checked_out: the target is not taking walk-ins), QUEUE_CLOSED (reason_code paused, closed, cutoff_passed, clinic_closed_today or not_today: the target is not open today), ENTRY_ALREADY_LIVE (errors.entry_id: the patient already holds a place in the target), CAPACITY_OVERRIDE_REQUIRED (send over_capacity_ack), or CONCURRENT_MODIFICATION (retry with a NEW key). A target the caller cannot see is 404.',
         'POST walk-ins/queues/{id}/open' => 'INVALID_STATE_TRANSITION: only a PAUSED queue can be reopened; a closed queue stays closed (errors.status), or CONCURRENT_MODIFICATION (retry).',
         'POST walk-ins/queues/{id}/call-next' => 'DOCTOR_NOT_AVAILABLE (reason_code: on_break, unavailable, not_checked_in, checked_out, doctor_not_active, location_not_active, no_assignment, no_doctor: the queue has no doctor), QUEUE_CLOSED (reason_code: closed, not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING (reason_code: other_queue, previous_day; no ids), QUEUE_EMPTY, APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until), or CONCURRENT_MODIFICATION (retry with a NEW key). Call-next never overrides a protected window. Any 4xx answer is replayed for 48 hours for the same key, so send a NEW Idempotency-Key for each attempt.',
         'POST walk-ins/{id}/call' => 'INVALID_STATE_TRANSITION (the entry is not WAITING; errors.status), NOT_NEXT_IN_ORDER, DOCTOR_NOT_AVAILABLE (reason_code: on_break, unavailable, not_checked_in, checked_out, doctor_not_active, location_not_active, no_assignment, no_doctor), QUEUE_CLOSED (reason_code: closed, not_today), ENTRY_ALREADY_CALLED (errors.entry_id), DOCTOR_ALREADY_CALLING (reason_code: other_queue, previous_day; no ids), APPOINTMENT_WINDOW_PROTECTED (reason_code: appointment or hold; errors.blocked_until; a triaged patient can pass it with override_reason_code), or CONCURRENT_MODIFICATION (retry with a NEW key).',
@@ -59,13 +63,14 @@ final class DocumentsErrorEnvelope
     ];
 
     /** Walk-in operations that answer 404 for a missing record or one the caller has no standing at. */
-    private const WALK_IN_404 = ['GET walk-ins/{id}', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel', 'POST walk-ins/queues/{id}/pause', 'POST walk-ins/queues/{id}/open',
+    public const WALK_IN_404 = ['GET walk-ins/{id}', 'POST walk-ins/{id}/arrive', 'POST walk-ins/queues/{id}/close', 'POST walk-ins/{id}/transfer', 'POST walk-ins/{id}/cancel', 'POST walk-ins/queues/{id}/pause', 'POST walk-ins/queues/{id}/open',
         'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority',
         'GET clinics/{clinicId}/doctor-assignments/{assignmentId}/walkin-policy', 'PATCH clinics/{clinicId}/doctor-assignments/{assignmentId}/walkin-policy'];
 
     /** Operations that need an Idempotency-Key header (the `idempotent` middleware): 400 when it is missing. */
-    private const WALK_IN_IDEMPOTENT = ['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel',
-        'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority'];
+    public const WALK_IN_IDEMPOTENT = ['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel',
+        'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority',
+        'POST walk-ins/queues/{id}/close', 'POST walk-ins/{id}/transfer'];
 
     /** The consultation writes that take a 404 or 403 and an Idempotency-Key (5.7). */
     private const CONSULTATION_WRITES = ['POST consultations/{id}/start', 'POST consultations/{id}/end', 'POST consultations/{id}/interrupt',

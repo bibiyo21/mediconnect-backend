@@ -146,6 +146,10 @@ final class PresenceCheckOut
             }
             $location = (string) $session->clinic_location_id;
             $from = $session->current_status;
+            // The move itself is checked against the table, as every other presence change is (the table is the one source of legal moves).
+            if (! PresenceTransitions::allows($from, PresenceStatus::Out)) {
+                throw InvalidPresenceTransition::between($from, PresenceStatus::Out);
+            }
 
             $unfinished = $this->consultations->unfinishedFor($doctorId);
             if ($unfinished !== null) {

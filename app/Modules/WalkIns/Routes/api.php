@@ -34,4 +34,9 @@ Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->prefix('wa
     // Pause and reopen a queue: guarded by state (a repeat is 409 INVALID_STATE_TRANSITION).
     Route::post('queues/{id}/pause', [QueueControlController::class, 'pause'])->whereUuid('id')->middleware('throttle:walkin-write');
     Route::post('queues/{id}/open', [QueueControlController::class, 'open'])->whereUuid('id')->middleware('throttle:walkin-write');
+
+    // Close a queue for the day, with a disposition per live entry (5.8-2, D-F): Idempotency-Key required. A closed queue is never reopened.
+    Route::post('queues/{id}/close', [QueueControlController::class, 'close'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
+    // Move one live entry to another queue of the same location and day (5.8-2, D-G): staff only, Idempotency-Key required.
+    Route::post('{id}/transfer', [QueueControlController::class, 'transfer'])->whereUuid('id')->middleware(['throttle:walkin-write', 'idempotent']);
 });

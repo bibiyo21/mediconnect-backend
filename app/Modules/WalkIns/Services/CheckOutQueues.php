@@ -3,7 +3,6 @@
 namespace App\Modules\WalkIns\Services;
 
 use App\Modules\Audit\Contracts\RecordsAudit;
-use App\Modules\Consultations\Contracts\ConsultationIntake;
 use App\Modules\Notifications\Contracts\SendsNotifications;
 use App\Modules\WalkIns\Contracts\CheckOutQueues as CheckOutQueuesContract;
 use App\Modules\WalkIns\DTOs\CheckOutQueueFacts;
@@ -31,7 +30,7 @@ final class CheckOutQueues implements CheckOutQueuesContract
 {
     public function __construct(
         private readonly QueueRealtime $realtime,
-        private readonly ConsultationIntake $intake,
+        private readonly EntryActions $entries,
         private readonly RecordsAudit $audit,
         private readonly SendsNotifications $notifications,
         private readonly PatientAccess $patients,
@@ -79,7 +78,11 @@ final class CheckOutQueues implements CheckOutQueuesContract
             }
         } else {
             foreach ($facts->dispositionable() as $row) {
-                $this->cancelEntry($row, $by, $actorUserId, $guestsInformed);
+                $entry = WalkInQueueEntry::query()->whereKey($row['id'])->firstOrFail();
+                $queue = WalkInQueue::query()->whereKey($entry->walkin_queue_id)->firstOrFail();
+                // A guest has no notification channel: the staff confirmation is recorded on the event instead.
+                $metadata = $entry->patient_profile_id === null ? ['patient_informed_in_person' => $guestsInformed] : [];
+                $this->entries->cancelUnderLock($queue, $entry, CancelReason::DoctorCheckedOut, $by, $actorUserId, $metadata, notify: true);
                 $cancelled++;
             }
         }
@@ -188,34 +191,6 @@ final class CheckOutQueues implements CheckOutQueuesContract
         }
 
         return $paused;
-    }
-
-    /** @param  EntryRow  $row */
-    private function cancelEntry(array $row, string $by, ?string $actorUserId, bool $guestsInformed): void
-    {
-        $entry = WalkInQueueEntry::query()->whereKey($row['id'])->firstOrFail();
-        $queue = WalkInQueue::query()->whereKey($entry->walkin_queue_id)->firstOrFail();
-        $from = $entry->status;
-
-        $entry->forceFill(['status' => EntryStatus::Cancelled, 'assigned_doctor_profile_id' => null])->save();
-        // Ends any care relationship and cancels the SCHEDULED consultation of a skipped patient (idempotent; a consultation in progress blocks earlier).
-        $this->intake->cancelForWalkIn($entry->id);
-
-        $metadata = ['by' => $by];
-        if ($entry->patient_profile_id === null) {
-            $metadata['patient_informed_in_person'] = $guestsInformed;
-        }
-        DB::table('walkin_queue_events')->insert([
-            'walkin_queue_id' => $queue->id, 'walkin_queue_entry_id' => $entry->id, 'event_type' => 'CANCELLED',
-            'from_status' => $from->value, 'to_status' => EntryStatus::Cancelled->value, 'actor_id' => $actorUserId,
-            'reason' => CancelReason::DoctorCheckedOut->value, 'metadata' => json_encode($metadata),
-        ]);
-        $this->audit->record('walkins.cancelled', 'walkin_queue_entry', $entry->id, ['queue_id' => $queue->id, 'reason_code' => CancelReason::DoctorCheckedOut->value, 'by' => $by], clinicId: $this->clinicIdOf($queue));
-
-        if ($entry->patient_profile_id !== null) {
-            $this->notifyPatient($entry->patient_profile_id, 'walkins.cancelled', 'Your walk-in queue entry was cancelled', 'Open the app for details.', ['entry_id' => $entry->id]);
-        }
-        $this->realtime->entryChanged($queue, $entry);
     }
 
     /** @param  Collection<int, WalkInQueueEntry>  $entries */

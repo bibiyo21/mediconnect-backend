@@ -6,12 +6,14 @@ use App\Modules\Audit\Contracts\RecordsAudit;
 use App\Modules\Clinics\Contracts\ClinicAccess;
 use App\Modules\Consultations\Contracts\ActiveConsultations;
 use App\Modules\Notifications\Contracts\SendsNotifications;
+use App\Modules\Presence\Enums\CheckOutReason;
 use App\Modules\Presence\Enums\PresenceReason;
 use App\Modules\Presence\Enums\PresenceStatus;
 use App\Modules\Presence\Events\DoctorBreakEnded;
 use App\Modules\Presence\Events\DoctorBreakStarted;
 use App\Modules\Presence\Events\DoctorCheckedIn;
 use App\Modules\Presence\Events\DoctorPresenceUpdated;
+use App\Modules\Presence\Events\PresenceChanged;
 use App\Modules\Presence\Exceptions\ActiveConsultationBlocksChange;
 use App\Modules\Presence\Exceptions\InvalidPresenceTransition;
 use App\Modules\Presence\Exceptions\PresenceChangeInProgress;
@@ -227,7 +229,7 @@ final class PresenceSessions
      * @param  array<string, mixed>|null  $metadata
      * @param  array<string, mixed>  $auditExtra
      */
-    public function record(DoctorPresenceSession $session, PresenceStatus $from, PresenceActor $actor, ?\BackedEnum $reason, ?array $metadata, string $auditAction, array $auditExtra = []): void
+    public function record(DoctorPresenceSession $session, PresenceStatus $from, PresenceActor $actor, PresenceReason|CheckOutReason|null $reason, ?array $metadata, string $auditAction, array $auditExtra = []): void
     {
         DB::table('doctor_presence_events')->insert([
             'doctor_presence_session_id' => $session->id,
@@ -261,6 +263,8 @@ final class PresenceSessions
         DB::afterCommit(function () use ($doctorId, $locationId, $sessionId, $status, $version) {
             $this->cache->put($doctorId, $locationId, $sessionId, $status, $version);
             $this->cache->forgetPublic($doctorId);
+            // D-M: after commit only, so a listener never reads a change that rolled back.
+            PresenceChanged::dispatch($doctorId, $locationId);
         });
 
         // At most one "changed by staff" notice per doctor and location every 5 minutes: staff running a doctor's breaks must not flood them.

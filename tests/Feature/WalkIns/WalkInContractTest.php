@@ -2,6 +2,7 @@
 
 use App\Modules\Rbac\Enums\Role;
 use App\Shared\Enums\ErrorCode;
+use App\Shared\OpenApi\DocumentsErrorEnvelope;
 use Database\Seeders\SpecialtySeeder;
 use Illuminate\Support\Facades\Route;
 
@@ -93,14 +94,15 @@ it('puts a named limiter on every walk-in route and Idempotency-Key on the write
     $limiter = fn ($r) => collect($r->gatherMiddleware())->first(fn ($m) => is_string($m) && str_starts_with($m, 'throttle:walkin-'));
     $key = fn ($r) => in_array('idempotent', $r->gatherMiddleware(), true);
 
-    expect($routes)->toHaveCount(19);
+    // 21 routes: the 5.8-2 close and transfer (both writes, with the Idempotency-Key) are the two added since 19.
+    expect($routes)->toHaveCount(21);
     foreach ($routes as $route) {
         expect($limiter($route))->not->toBeNull($route->uri())->and($route->gatherMiddleware())->toContain('auth:sanctum');
     }
     $byAction = $routes->mapWithKeys(fn ($r) => [implode('|', $r->methods()).' '.str_replace('api/v1/', '', $r->uri()) => $r]);
     expect($limiter($byAction['POST walk-ins']))->toBe('throttle:walkin-register')->and($limiter($byAction['POST walk-ins/search']))->toBe('throttle:walkin-search')
         ->and($limiter($byAction['GET|HEAD walk-ins/queue']))->toBe('throttle:walkin-read');
-    foreach (['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel', 'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority'] as $needsKey) {
+    foreach (['POST walk-ins', 'POST walk-ins/{id}/arrive', 'POST walk-ins/{id}/cancel', 'POST walk-ins/queues/{id}/call-next', 'POST walk-ins/{id}/call', 'POST walk-ins/{id}/recall', 'POST walk-ins/{id}/skip', 'POST walk-ins/{id}/no-show', 'POST walk-ins/{id}/return', 'POST walk-ins/{id}/priority', 'POST walk-ins/queues/{id}/close', 'POST walk-ins/{id}/transfer'] as $needsKey) {
         expect($key($byAction[$needsKey]))->toBeTrue($needsKey);
     }
     foreach (['POST walk-ins/queues/{id}/pause', 'POST walk-ins/queues/{id}/open', 'GET|HEAD walk-ins/{id}', 'POST walk-ins/search'] as $noKey) {
@@ -112,4 +114,19 @@ it('reads the limiter values from config', function () {
     expect(config('walkins.limits'))->toMatchArray(['register_patient_per_minute' => 10, 'register_staff_per_minute' => 60, 'search_per_minute' => 30, 'read_per_minute' => 120])
         ->and(config('walkins.guest_pii_retention_days'))->toBe(30)->and(config('walkins.estimation.appointment_grace_minutes'))->toBe(15)
         ->and(config('walkins.remote'))->toBe(['max_live_entries_per_patient' => 2, 'max_patients_per_account_per_day' => 5]);
+});
+
+it('reads the real lists: every idempotent walk-in operation documents the Idempotency-Key header and 400, every 404 operation documents 404', function () {
+    $paths = $this->doc['paths'];
+    foreach (DocumentsErrorEnvelope::WALK_IN_IDEMPOTENT as $operation) {
+        [$method, $path] = explode(' ', $operation, 2);
+        $documented = $paths['/'.$path][strtolower($method)];
+        expect(array_column($documented['parameters'] ?? [], 'name'))->toContain('Idempotency-Key')
+            ->and($documented['responses'])->toHaveKey('400');
+    }
+    foreach (DocumentsErrorEnvelope::WALK_IN_404 as $operation) {
+        [$method, $path] = explode(' ', $operation, 2);
+        expect($paths['/'.$path][strtolower($method)]['responses'])->toHaveKey('404');
+    }
+    expect(DocumentsErrorEnvelope::WALK_IN_IDEMPOTENT)->toContain('POST walk-ins/queues/{id}/close')->toContain('POST walk-ins/{id}/transfer');
 });

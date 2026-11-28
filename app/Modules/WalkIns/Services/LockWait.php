@@ -3,6 +3,8 @@
 namespace App\Modules\WalkIns\Services;
 
 use App\Modules\WalkIns\Exceptions\ConcurrentRegistration;
+use App\Modules\WalkIns\Models\WalkInQueue;
+use App\Modules\WalkIns\Models\WalkInQueueEntry;
 use App\Shared\Database\LockTimeoutTransaction;
 use Closure;
 use Illuminate\Database\QueryException;
@@ -40,6 +42,17 @@ final class LockWait
             return LockTimeoutTransaction::run((int) config('walkins.lock_timeout_ms'), $work);
         } catch (QueryException $e) {
             throw $e->getCode() === '55P03' ? new ConcurrentRegistration : $e;
+        }
+    }
+
+    /**
+     * Call after the queue and entry locks: an entry that a transfer moved to another queue meanwhile is not in the queue this change locked.
+     * The change must not write (the event trigger would refuse it), so the caller gets 409 CONCURRENT_MODIFICATION and retries under the new queue.
+     */
+    public static function assertEntryInQueue(WalkInQueueEntry $entry, WalkInQueue $locked): void
+    {
+        if ((string) $entry->walkin_queue_id !== (string) $locked->id) {
+            throw new ConcurrentRegistration;
         }
     }
 

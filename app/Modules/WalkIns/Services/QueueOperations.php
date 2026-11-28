@@ -122,6 +122,7 @@ final class QueueOperations
 
         if ($targetId !== null) {
             $target = WalkInQueueEntry::query()->whereKey($targetId)->lockForUpdate()->firstOrFail();
+            LockWait::assertEntryInQueue($target, $locked);
             if (! EntryTransitions::allows($target->status, EntryStatus::Called)) {
                 throw InvalidEntryTransition::entry($target->status, 'called');
             }
@@ -312,10 +313,11 @@ final class QueueOperations
      */
     private function lockBoth(WalkInQueue $queue, WalkInQueueEntry $entry): array
     {
-        return [
-            WalkInQueue::query()->whereKey($queue->id)->lockForUpdate()->firstOrFail(),
-            WalkInQueueEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail(),
-        ];
+        $locked = WalkInQueue::query()->whereKey($queue->id)->lockForUpdate()->firstOrFail();
+        $lockedEntry = WalkInQueueEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail();
+        LockWait::assertEntryInQueue($lockedEntry, $locked);
+
+        return [$locked, $lockedEntry];
     }
 
     /** The local date of another queue's CALLED entry for this doctor, or null. Never returns an id: that row may belong to a location the caller cannot see. */

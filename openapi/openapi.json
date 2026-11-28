@@ -10240,6 +10240,282 @@
                 ]
             }
         },
+        "/walk-ins/queues/{id}/close": {
+            "post": {
+                "operationId": "queueControl.close",
+                "description": "Needs `walkins.manage_queue` at the location (staff, or the queue's own doctor). Body `dispositions`: one item per live entry (REGISTERED,\nWAITING or SKIPPED), each `{entry_id, action}` with action CANCEL_WITH_NOTICE (a patient is told in the app) or TOLD_IN_PERSON (staff told\nthem; a guest must use this). A CALLED or IN_CONSULTATION entry blocks the close. The queue is CLOSED for good: no walk-ins that day.\n`409` codes: INVALID_STATE_TRANSITION (reason_code doctor_checked_in: the doctor is checked in here; or errors.status: the queue is already CLOSED),\nACTIVE_CONSULTATION (reason_code called or in_progress, errors.entry_id), CONCURRENT_MODIFICATION (retry with a NEW key). `422` lists the\nentry ids that lack a disposition, or are not live, under errors.dispositions.",
+                "summary": "Close a queue for the day",
+                "tags": [
+                    "QueueControl"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CloseQueueRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/QueueResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION (reason_code doctor_checked_in while the doctor is checked in at the location; errors.status when the queue is already CLOSED), ACTIVE_CONSULTATION (reason_code called or in_progress, errors.entry_id: a CALLED or IN_CONSULTATION entry), or CONCURRENT_MODIFICATION (retry with a NEW key). 422 (errors.dispositions) when a live entry has no disposition, or a guest is given CANCEL_WITH_NOTICE.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
+        "/walk-ins/{id}/transfer": {
+            "post": {
+                "operationId": "queueControl.transfer",
+                "description": "Staff only (`walkins.manage_queue` at the location; a doctor may not move a patient between queues). The entry keeps its id, status and\narrival order and takes the next number of the target queue. The target must be OPEN, its doctor must be checked in or not yet in (not out),\nand the patient must not already hold a place there. `409` codes: INVALID_STATE_TRANSITION (the entry is not REGISTERED or WAITING; errors.status),\nDOCTOR_NOT_AVAILABLE (reason_code checked_out), QUEUE_CLOSED (reason_code paused, closed or cutoff_passed), ENTRY_ALREADY_LIVE (errors.entry_id),\nCAPACITY_OVERRIDE_REQUIRED (send over_capacity_ack), CONCURRENT_MODIFICATION (retry with a NEW key). `404` for a target the caller cannot see.",
+                "summary": "Transfer one live entry to another queue at the same location and day",
+                "tags": [
+                    "QueueControl"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "A new UUID or ULID for each distinct request; the same one when retrying it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TransferEntryRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/WalkInEntryResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "409": {
+                        "description": "INVALID_STATE_TRANSITION (the entry is not REGISTERED or WAITING; errors.status), DOCTOR_NOT_AVAILABLE (reason_code checked_out, no_assignment or no_doctor: the target doctor), REGISTRATION_NOT_ALLOWED (reason_code: doctor_not_active, location_not_active, no_walkin_hours_today, doctor_unavailable or doctor_checked_out: the target is not taking walk-ins), QUEUE_CLOSED (reason_code paused, closed, cutoff_passed, clinic_closed_today or not_today: the target is not open today), ENTRY_ALREADY_LIVE (errors.entry_id: the patient already holds a place in the target), CAPACITY_OVERRIDE_REQUIRED (send over_capacity_ack), or CONCURRENT_MODIFICATION (retry with a NEW key). A target the caller cannot see is 404.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND: no such record, or the caller has no standing at it (its existence is not revealed).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST: the Idempotency-Key header (a UUID or ULID) is missing. Reuse a key only to retry the same request; any 4xx answer is replayed for 48 hours.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/walk-ins/queues/{id}/call-next": {
             "post": {
                 "operationId": "queueOperations.callNext",
@@ -15969,6 +16245,46 @@
                 ],
                 "title": "ClinicSummaryResource"
             },
+            "CloseAction": {
+                "type": "string",
+                "description": "What staff record for each live entry when a queue is closed (increment 5.8, D-F). CANCEL_WITH_NOTICE cancels the entry and sends the generic notice (patients only: a guest has no channel). TOLD_IN_PERSON cancels it after staff have told the patient in person; no notice is sent.\n",
+                "enum": [
+                    "CANCEL_WITH_NOTICE",
+                    "TOLD_IN_PERSON"
+                ],
+                "title": "CloseAction"
+            },
+            "CloseQueueRequest": {
+                "type": "object",
+                "description": "POST /walk-ins/queues/{id}/close: one disposition per live entry of the queue.",
+                "properties": {
+                    "dispositions": {
+                        "type": "array",
+                        "description": "One entry per item; every live entry (REGISTERED, WAITING, SKIPPED) must appear exactly once. Checked against the locked queue.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "entry_id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "action": {
+                                    "$ref": "#/components/schemas/CloseAction"
+                                }
+                            },
+                            "required": [
+                                "entry_id",
+                                "action"
+                            ]
+                        },
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "dispositions"
+                ],
+                "title": "CloseQueueRequest"
+            },
             "ConfirmContactChangeRequest": {
                 "type": "object",
                 "description": "PUT /auth/contact: the new email or mobile and the token from POST /auth/otp/verify.",
@@ -17420,7 +17736,8 @@
                             "hold",
                             "no_doctor",
                             "other_queue",
-                            "previous_day"
+                            "previous_day",
+                            "doctor_checked_in"
                         ]
                     },
                     "request_id": {
@@ -20036,6 +20353,24 @@
                     "reason"
                 ],
                 "title": "SuspendUserRequest"
+            },
+            "TransferEntryRequest": {
+                "type": "object",
+                "description": "POST /walk-ins/{id}/transfer: the target queue, and the staff acknowledgement of a capacity override (B9).",
+                "properties": {
+                    "walkin_queue_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "over_capacity_ack": {
+                        "type": "boolean",
+                        "description": "Needed only when the target is at its capacity; without it the transfer is refused with CAPACITY_OVERRIDE_REQUIRED."
+                    }
+                },
+                "required": [
+                    "walkin_queue_id"
+                ],
+                "title": "TransferEntryRequest"
             },
             "UpdateClinicRequest": {
                 "type": "object",

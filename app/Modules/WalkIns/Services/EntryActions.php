@@ -83,22 +83,41 @@ final class EntryActions
             if (! EntryTransitions::allows($current->status, EntryStatus::Cancelled)) {
                 throw InvalidEntryTransition::entry($current->status, 'cancelled');
             }
-            $from = $current->status;
-            $current->forceFill(['status' => EntryStatus::Cancelled, 'assigned_doctor_profile_id' => null])->save();
-            // A skipped patient's consultation (SCHEDULED, then cancelled by the skip) stays cancelled; any care relationship for the entry ends here (idempotent).
-            $this->intake->cancelForWalkIn($current->id);
-            $this->event($queue, $current, 'CANCELLED', $from, EntryStatus::Cancelled, $user, $reason->value, array_filter(['by' => $byStaff ? 'STAFF' : 'PATIENT', 'patient_informed_in_person' => $byStaff && $current->isGuest() ? $patientInformedInPerson : null], fn ($v) => $v !== null));
-            $this->audit->record('walkins.cancelled', 'walkin_queue_entry', $current->id, ['queue_id' => $queue->id, 'reason_code' => $reason->value, 'by' => $byStaff ? 'STAFF' : 'PATIENT'], clinicId: $this->clinicId($queue));
-            if ($byStaff && $current->patient_profile_id !== null) {
-                // To the accounts that may see this entry now (the profile's own and its authorized guardians), never to a guardian since revoked.
-                foreach ($this->patients->userIds($current->patient_profile_id) as $userId) {
-                    $this->notifications->notify($userId, 'walkins.cancelled', 'Your walk-in queue entry was cancelled', 'Open the app for details.', ['entry_id' => $current->id]);
-                }
-            }
-            $this->realtime->entryChanged($queue, $current);
+            // The one cancel body (shared with check-out and queue close): status, care, event, audit, notice, realtime.
+            $metadata = $byStaff && $current->isGuest() ? ['patient_informed_in_person' => $patientInformedInPerson] : [];
+            $this->cancelUnderLock($queue, $current, $reason, $byStaff ? 'STAFF' : 'PATIENT', $user->id, $metadata, notify: $byStaff);
 
             return $current;
         });
+    }
+
+    /**
+     * Cancels one held entry for a doctor's check-out or a queue close (5.8, D-D and D-F). The caller holds the queue and entry locks (queue
+     * first). Writes the status, ends the walk-in's consultation and care relationship, the CANCELLED event (ids and codes only), the audit row
+     * and, when $notify is set and the entry is a patient's, the generic staff-cancel notice. $actorUserId is null only for the SYSTEM actor.
+     *
+     * @param  array<string, bool|string>  $metadata  event metadata beyond `by` (for example patient_informed_in_person for a guest)
+     */
+    public function cancelUnderLock(WalkInQueue $queue, WalkInQueueEntry $entry, CancelReason $reason, string $by, ?string $actorUserId, array $metadata, bool $notify): void
+    {
+        $from = $entry->status;
+        $entry->forceFill(['status' => EntryStatus::Cancelled, 'assigned_doctor_profile_id' => null])->save();
+        // Ends any care relationship and cancels the SCHEDULED consultation of a skipped patient (idempotent; a consultation in progress blocks earlier).
+        $this->intake->cancelForWalkIn($entry->id);
+
+        DB::table('walkin_queue_events')->insert([
+            'walkin_queue_id' => $queue->id, 'walkin_queue_entry_id' => $entry->id, 'event_type' => 'CANCELLED',
+            'from_status' => $from->value, 'to_status' => EntryStatus::Cancelled->value, 'actor_id' => $actorUserId,
+            'reason' => $reason->value, 'metadata' => json_encode(['by' => $by] + $metadata),
+        ]);
+        $this->audit->record('walkins.cancelled', 'walkin_queue_entry', $entry->id, ['queue_id' => $queue->id, 'reason_code' => $reason->value, 'by' => $by], clinicId: $this->clinicId($queue));
+        if ($notify && $entry->patient_profile_id !== null) {
+            // Generic text, ids only: the same notice as a staff cancel (decision 260).
+            foreach ($this->patients->userIds($entry->patient_profile_id) as $userId) {
+                $this->notifications->notify($userId, 'walkins.cancelled', 'Your walk-in queue entry was cancelled', 'Open the app for details.', ['entry_id' => $entry->id]);
+            }
+        }
+        $this->realtime->entryChanged($queue, $entry);
     }
 
     /** OPEN to PAUSED: no new registrations (QUEUE_CLOSED, reason `paused`); entries already in the queue are untouched. */
@@ -147,8 +166,9 @@ final class EntryActions
     /** The Phase 5 lock order: the queue row, then the entry. */
     private function lockQueueThenEntry(WalkInQueue $queue, WalkInQueueEntry $entry): void
     {
-        WalkInQueue::query()->whereKey($queue->id)->lockForUpdate()->firstOrFail();
-        WalkInQueueEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail();
+        $locked = WalkInQueue::query()->whereKey($queue->id)->lockForUpdate()->firstOrFail();
+        $lockedEntry = WalkInQueueEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail();
+        LockWait::assertEntryInQueue($lockedEntry, $locked);
     }
 
     /** @param  array<string, mixed>|null  $metadata */

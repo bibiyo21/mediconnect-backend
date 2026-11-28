@@ -17,8 +17,10 @@ use App\Modules\WalkIns\Realtime\QueueRealtime;
 use App\Modules\WalkIns\Services\EntryActions;
 use App\Modules\WalkIns\Services\EntryPresenter;
 use App\Modules\WalkIns\Services\JoinPreview;
+use App\Modules\WalkIns\Services\QueueClose;
 use App\Modules\WalkIns\Services\QueueEstimates;
 use App\Modules\WalkIns\Services\QueueOperations;
+use App\Modules\WalkIns\Services\QueueTransfer;
 use App\Modules\WalkIns\Services\WalkInReader;
 use App\Modules\WalkIns\Services\WalkInRegistration;
 use App\Shared\Contracts\Clock;
@@ -41,6 +43,7 @@ function pin_walkin_clock(?CarbonImmutable $at = null): PinnedClock
         WalkInRegistration::class, WalkInDayService::class, QueueEstimates::class, EntryPresenter::class, PresenceAdmissionService::class,
         WaitTimeEstimator::class, RollingDurationStats::class, EntryActions::class, WalkInReader::class, JoinPreview::class, PurgeGuestWalkInPii::class,
         WalkInPolicyController::class, QueueRealtime::class, CareRelationshipService::class, QueueOperations::class,
+        QueueTransfer::class, QueueClose::class,
     ] as $consumer) {
         app()->when($consumer)->needs(Clock::class)->give(fn () => $clock);
     }
