@@ -73,7 +73,11 @@ function cs_attempt(Closure $work): array
     try {
         return ['done' => $work()];
     } catch (Throwable $e) {
-        return ['refused' => $e::class, 'reason' => method_exists($e, 'reasonCode') ? $e->reasonCode() : null];
+        return [
+            'refused' => $e::class,
+            'code' => method_exists($e, 'errorCode') ? $e->errorCode()->value : null,
+            'reason' => method_exists($e, 'reasonCode') ? $e->reasonCode() : null,
+        ];
     }
 }
 
@@ -87,6 +91,12 @@ function cs_refusal(array $result): ?string
 function cs_reason(array $result): ?string
 {
     return $result['ok']['reason'] ?? null;
+}
+
+/** The error code of a refusal (its ErrorCode value), or null. */
+function cs_code(array $result): ?string
+{
+    return $result['ok']['code'] ?? null;
 }
 
 /**
@@ -205,7 +215,7 @@ it('start vs simulated check-out, check-out first: the start is refused checked_
 
     $results = wi_race([cs_after($checkedOut, cs_start($consultation)), cs_checkout()]);
 
-    expect(cs_refusal($results[0]))->toBe(ConsultationRefused::class)->and(cs_reason($results[0]))->toBe('checked_out')
+    expect(cs_refusal($results[0]))->toBe(ConsultationRefused::class)->and(cs_code($results[0]))->toBe('DOCTOR_NOT_AVAILABLE')->and(cs_reason($results[0]))->toBe('checked_out')
         ->and(cs_refusal($results[1]))->toBeNull()
         ->and(cs_status($consultation))->toBe('SCHEDULED')
         ->and(DB::table('consultations')->where('doctor_profile_id', $this->w['doctor']->id)->where('status', 'IN_PROGRESS')->count())->toBe(0)
@@ -237,7 +247,8 @@ it('start vs simulated check-out, simultaneous: either the start commits, or it 
         ->and(cs_grants($entry))->toBe($started ? 1 : 0)
         ->and(cs_doctor_status())->toBeNull();
     if (! $started) {
-        expect(cs_reason($results[0]))->toBe('checked_out');
+        expect(cs_refusal($results[0]))->toBe(ConsultationRefused::class)->and(cs_code($results[0]))->toBe('DOCTOR_NOT_AVAILABLE')
+            ->and(cs_reason($results[0]))->toBe('checked_out');
     }
 });
 
@@ -248,7 +259,7 @@ it('start vs break, break first: the start is refused on_break with no grant', f
     $results = wi_race([cs_break(), cs_after($onBreak, cs_start($consultation))]);
 
     expect(cs_refusal($results[0]))->toBeNull()->and($results[0]['ok']['done'])->toBe('ON_BREAK')
-        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_reason($results[1]))->toBe('on_break')
+        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_code($results[1]))->toBe('DOCTOR_NOT_AVAILABLE')->and(cs_reason($results[1]))->toBe('on_break')
         ->and(cs_status($consultation))->toBe('SCHEDULED')
         ->and(cs_grants($entry))->toBe(0);
 });
@@ -261,6 +272,7 @@ it('start vs break, start first: the break is refused ACTIVE_CONSULTATION and th
 
     expect(cs_refusal($results[0]))->toBeNull()->and($results[0]['ok']['done'])->toBe('IN_PROGRESS')
         ->and(cs_refusal($results[1]))->toBe(ActiveConsultationBlocksChange::class)
+        ->and(cs_code($results[1]))->toBe('ACTIVE_CONSULTATION')->and(cs_reason($results[1]))->toBeNull()
         ->and(cs_doctor_status())->toBe('IN')
         ->and(cs_grants($entry))->toBe(1);
 });
@@ -272,7 +284,7 @@ it('start vs skip, skip first: the skip commits, the start is refused and the co
     $results = wi_race([cs_skip($entry), cs_after($skipped, cs_start($consultation))]);
 
     expect(cs_refusal($results[0]))->toBeNull()
-        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_reason($results[1]))->toBe('invalid_transition')
+        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_code($results[1]))->toBe('INVALID_STATE_TRANSITION')->and(cs_reason($results[1]))->toBe('invalid_transition')
         ->and(cs_status($consultation))->toBe('CANCELLED')
         ->and(cs_grants($entry))->toBe(0)
         ->and(DB::table('walkin_queue_events')->where('walkin_queue_entry_id', $entry)->where('event_type', 'STARTED')->count())->toBe(0);
@@ -285,7 +297,7 @@ it('start vs skip, start first: the skip is refused invalid_transition and the c
     $results = wi_race([cs_start($consultation), cs_after($running, cs_skip($entry))]);
 
     expect(cs_refusal($results[0]))->toBeNull()
-        ->and(cs_refusal($results[1]))->toBe(InvalidEntryTransition::class)
+        ->and(cs_refusal($results[1]))->toBe(InvalidEntryTransition::class)->and(cs_code($results[1]))->toBe('INVALID_STATE_TRANSITION')->and(cs_reason($results[1]))->toBe('invalid_transition')
         ->and(cs_status($consultation))->toBe('IN_PROGRESS')
         ->and(wi_status($entry))->toBe('IN_CONSULTATION')
         ->and(cs_grants($entry))->toBe(1);
@@ -299,7 +311,7 @@ it('start vs no-show at the recall limit, no-show first: the start is refused an
     $results = wi_race([cs_no_show($entry), cs_after($noShow, cs_start($consultation))]);
 
     expect(cs_refusal($results[0]))->toBeNull()
-        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_reason($results[1]))->toBe('invalid_transition')
+        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_code($results[1]))->toBe('INVALID_STATE_TRANSITION')->and(cs_reason($results[1]))->toBe('invalid_transition')
         ->and(cs_status($consultation))->toBe('CANCELLED')
         ->and(cs_grants($entry))->toBe(0);
 });
@@ -312,7 +324,7 @@ it('start vs no-show at the recall limit, start first: the no-show is refused an
     $results = wi_race([cs_start($consultation), cs_after($running, cs_no_show($entry))]);
 
     expect(cs_refusal($results[0]))->toBeNull()
-        ->and(cs_refusal($results[1]))->toBe(InvalidEntryTransition::class)
+        ->and(cs_refusal($results[1]))->toBe(InvalidEntryTransition::class)->and(cs_code($results[1]))->toBe('INVALID_STATE_TRANSITION')->and(cs_reason($results[1]))->toBe('invalid_transition')
         ->and(cs_status($consultation))->toBe('IN_PROGRESS')
         ->and(cs_grants($entry))->toBe(1);
 });
@@ -346,7 +358,7 @@ it('end vs start of the next called patient, simultaneous: at most one IN_PROGRE
         ->and(cs_status($consultationA))->toBe('COMPLETED')
         ->and(DB::table('consultations')->where('doctor_profile_id', $this->w['doctor']->id)->where('status', 'IN_PROGRESS')->count())->toBe($startedB ? 1 : 0);
     if (! $startedB) {
-        expect(cs_refusal($results[1]))->toBe(ConsultationRefused::class);
+        expect(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_code($results[1]))->toBe('ACTIVE_CONSULTATION')->and(cs_reason($results[1]))->toBeNull();
     }
 });
 
@@ -381,6 +393,7 @@ it('resume A vs start B, simultaneous: exactly one of them wins the doctor\'s IN
     $started = cs_refusal($results[1]) === null;
     expect((int) $resumed + (int) $started)->toBe(1)
         ->and(cs_refusal($resumed ? $results[1] : $results[0]))->toBe(ConsultationRefused::class)
+        ->and(cs_code($resumed ? $results[1] : $results[0]))->toBe('ACTIVE_CONSULTATION')->and(cs_reason($resumed ? $results[1] : $results[0]))->toBeNull()
         ->and(cs_in_progress_count())->toBe(1)
         ->and(cs_status($consultationA))->toBe($resumed ? 'IN_PROGRESS' : 'INTERRUPTED')
         ->and(cs_status($consultationB))->toBe($started ? 'IN_PROGRESS' : 'SCHEDULED')
@@ -395,7 +408,7 @@ it('resume A first, then start B: the start is refused ACTIVE_CONSULTATION, B st
     $results = wi_race([cs_resume($consultationA), cs_after($resumedA, cs_start($consultationB))]);
 
     expect(cs_refusal($results[0]))->toBeNull()->and($results[0]['ok']['done'])->toBe('IN_PROGRESS')
-        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)
+        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_code($results[1]))->toBe('ACTIVE_CONSULTATION')->and(cs_reason($results[1]))->toBeNull()
         ->and(cs_status($consultationB))->toBe('SCHEDULED')
         ->and(cs_in_progress_count())->toBe(1)
         ->and(cs_grants($entryB))->toBe(0);
@@ -408,7 +421,7 @@ it('start B first, then resume A: the resume is refused ACTIVE_CONSULTATION, A s
     $results = wi_race([cs_start($consultationB), cs_after($startedB, cs_resume($consultationA))]);
 
     expect(cs_refusal($results[0]))->toBeNull()->and($results[0]['ok']['done'])->toBe('IN_PROGRESS')
-        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)
+        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_code($results[1]))->toBe('ACTIVE_CONSULTATION')->and(cs_reason($results[1]))->toBeNull()
         ->and(cs_status($consultationA))->toBe('INTERRUPTED')
         ->and(cs_in_progress_count())->toBe(1)
         ->and(cs_grants($entryB))->toBe(1);
@@ -456,6 +469,26 @@ it('start B vs call-next on the doctor\'s other queue, simultaneous: the start a
         ->and(wi_status($otherEntry))->toBe($called ? 'CALLED' : 'WAITING')
         ->and(cs_in_progress_count())->toBe(1);
     if (! $called) {
-        expect(cs_refusal($results[1]))->toBe(DoctorAlreadyCalling::class);
+        expect(cs_refusal($results[1]))->toBe(DoctorAlreadyCalling::class)->and(cs_code($results[1]))->toBe('DOCTOR_ALREADY_CALLING')->and(cs_reason($results[1]))->toBe('other_queue');
+    }
+});
+
+it('HAG-30 m6: start vs skip, truly simultaneous (one barrier, no order): exactly one wins; the loser carries its error and reason code; the grant matches the winner', function () {
+    [$entry, $consultation] = cs_called($this->headersA, $this->profileA);
+
+    $results = wi_race([cs_start($consultation), cs_skip($entry)]);
+
+    $startWon = cs_refusal($results[0]) === null;
+    $skipWon = cs_refusal($results[1]) === null;
+    expect((int) $startWon + (int) $skipWon)->toBe(1)
+        ->and(cs_grants($entry))->toBe($startWon ? 1 : 0)
+        ->and(cs_status($consultation))->toBe($startWon ? 'IN_PROGRESS' : 'CANCELLED')
+        ->and(wi_status($entry))->toBe($startWon ? 'IN_CONSULTATION' : 'SKIPPED');
+    if ($startWon) {
+        expect(cs_refusal($results[1]))->toBe(InvalidEntryTransition::class)->and(cs_code($results[1]))->toBe('INVALID_STATE_TRANSITION')
+            ->and(cs_reason($results[1]))->toBe('invalid_transition');
+    } else {
+        expect(cs_refusal($results[0]))->toBe(ConsultationRefused::class)->and(cs_code($results[0]))->toBe('INVALID_STATE_TRANSITION')
+            ->and(cs_reason($results[0]))->toBe('invalid_transition');
     }
 });
