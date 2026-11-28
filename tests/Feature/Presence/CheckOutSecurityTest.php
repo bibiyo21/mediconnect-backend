@@ -11,9 +11,12 @@ use App\Modules\WalkIns\Enums\CheckOutDisposition;
 use App\Shared\Contracts\Clock;
 use Carbon\CarbonImmutable;
 use Database\Seeders\SpecialtySeeder;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
+use Throwable;
 
 /*
  * Increment 5.8-T: check-out security (brief §4 5.8-T). Authorisation failures (another clinic, another location, another doctor, the
@@ -194,23 +197,10 @@ it('a failure after the appointment flag rolls back the whole check-out: session
     $entry = cos_patient($this->w, $this->patient, $this->profile);
     $start = $this->clock->now()->addHour();
     wi_appointment($this->w, $start, $start->addMinutes(30));
+    // Precondition: the appointment the forced failure must roll back is really there, so the flag rollback below is not vacuous.
+    expect(DB::table('appointments')->where('doctor_profile_id', $this->doctorId)->where('needs_rescheduling', false)->count())->toBe(1);
 
-    app()->extend(CheckOutAppointments::class, fn (CheckOutAppointments $real) => new class($real) implements CheckOutAppointments
-    {
-        public function __construct(private readonly CheckOutAppointments $inner) {}
-
-        public function remaining(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
-        {
-            return $this->inner->remaining($doctorProfileId, $locationId, $fromUtc, $toUtc);
-        }
-
-        public function flagForCheckOut(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
-        {
-            $this->inner->flagForCheckOut($doctorProfileId, $locationId, $fromUtc, $toUtc);
-
-            throw new RuntimeException('forced failure after the appointment flag');
-        }
-    });
+    cos_force_failure_after_flag();
 
     $user = User::query()->findOrFail($this->doctorUserId);
     expect(fn () => app(PresenceCheckOut::class)->checkOut(presence_actor($user), $this->doctorId, $this->w['location'], CheckOutReason::EndOfShift, CheckOutDisposition::HoldForReassignment, false))
@@ -226,4 +216,79 @@ it('a failure after the appointment flag rolls back the whole check-out: session
         ->and(DB::table('rescheduling_tasks')->count())->toBe(0)
         ->and((bool) DB::table('appointments')->where('doctor_profile_id', $this->doctorId)->value('needs_rescheduling'))->toBeFalse()
         ->and(DB::table('notifications')->where('type', 'walkins.doctor_checked_out')->count())->toBe(0);
+});
+
+/** Replaces the appointment check-out port so that it flags the appointments and then throws (a forced failure after the flag). */
+function cos_force_failure_after_flag(): void
+{
+    app()->extend(CheckOutAppointments::class, fn (CheckOutAppointments $real) => new class($real) implements CheckOutAppointments
+    {
+        public function __construct(private readonly CheckOutAppointments $inner) {}
+
+        public function remaining(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
+        {
+            return $this->inner->remaining($doctorProfileId, $locationId, $fromUtc, $toUtc);
+        }
+
+        public function lastEndsAt(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): ?CarbonImmutable
+        {
+            return $this->inner->lastEndsAt($doctorProfileId, $locationId, $fromUtc, $toUtc);
+        }
+
+        public function flagForCheckOut(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
+        {
+            $this->inner->flagForCheckOut($doctorProfileId, $locationId, $fromUtc, $toUtc);
+
+            throw new RuntimeException('forced failure after the appointment flag');
+        }
+    });
+}
+
+/**
+ * Every value a log record holds, as text. A Throwable is written as its class, message and trace (json_encode would show it as {} and hide a
+ * leak), and arrays are walked, so nothing in the context is skipped.
+ */
+function cos_log_text(mixed $value): string
+{
+    if ($value instanceof Throwable) {
+        return $value::class.' '.$value->getMessage().' '.$value->getTraceAsString();
+    }
+    if (is_array($value)) {
+        return implode(' ', array_map(fn ($item) => cos_log_text($item), $value));
+    }
+    if (is_object($value)) {
+        return method_exists($value, '__toString') ? (string) $value : $value::class;
+    }
+
+    return (string) $value;
+}
+
+it('check-out failures log no guest name and no phone number: the captured log holds an error (forced 500) and a warning (refused on-behalf), and neither leaks', function () {
+    cos_guest($this->w, $this->staff);
+    cos_patient($this->w, $this->patient, $this->profile);
+    $start = $this->clock->now()->addHour();
+    wi_appointment($this->w, $start, $start->addMinutes(30));
+    $other = walkin_world(['clinic' => 'Reyes Clinic', 'licence' => '1111111']);
+
+    // Registered after the world is set up, so only the check-out's own records are captured.
+    $records = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$records) {
+        $records[] = [$event->level, $event->message, $event->context];
+    });
+
+    cos_force_failure_after_flag();
+    app('auth')->forgetGuards();
+    $this->postJson('/api/v1/presence/check-out', $this->body, $this->w['doctorHeaders'])->assertStatus(500);
+
+    app('auth')->forgetGuards();
+    $this->postJson('/api/v1/presence/check-out', $this->body, $other['manager'])->assertForbidden();
+
+    $levels = array_column($records, 0);
+    expect($records)->not->toBeEmpty()
+        ->and($levels)->toContain('error')
+        ->and($levels)->toContain('warning');
+
+    $text = implode("\n", array_map(fn (array $record) => $record[0].' '.$record[1].' '.cos_log_text($record[2]), $records));
+    expect($text)->not->toContain(COS_GUEST_NAME)->and($text)->not->toContain('Alpha Guest')
+        ->and($text)->not->toContain('9171234567')->and($text)->not->toContain('Ana')->and($text)->not->toContain('Santos');
 });

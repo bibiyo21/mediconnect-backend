@@ -72,8 +72,9 @@ it('answers a repeated start with the current consultation and writes nothing', 
 
 it('refuses a start while the doctor is on break, with no grant and no state change', function () {
     [$entry, $consultation] = called_patient();
-    fresh_session();
-    presence_post('break/start', $this->w['doctorHeaders'], ['clinic_location_id' => $this->w['location'], 'expected_minutes' => 5])->assertOk();
+    // HAG-43: a break cannot start while a patient is called, so the doctor's stored status is set to ON_BREAK directly, as the
+    // 'lets the doctor end while the stored presence is not IN' case does. The start check reads that stored status.
+    DB::table('doctor_presence_sessions')->update(['current_status' => 'ON_BREAK']);
 
     consultation_post("{$consultation}/start", $this->w['doctorHeaders'])->assertStatus(409)
         ->assertJsonPath('errors', [])->assertJsonPath('reason_code', 'on_break');

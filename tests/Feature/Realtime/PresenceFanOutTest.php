@@ -53,7 +53,7 @@ it('hints the live patient when the doctor checks out, and the check-out itself 
     app('auth')->forgetGuards();
     $this->postJson('/api/v1/presence/check-out', ['reason' => 'END_OF_SHIFT', 'walkin_disposition' => 'HOLD_FOR_REASSIGNMENT'], $this->w['doctorHeaders'])->assertOk();
 
-    expect(pf_hints($this->entry))->toBeGreaterThanOrEqual(1);
+    expect(pf_hints($this->entry))->toBe(1);
     expect(DB::table('walkin_queue_entries')->where('id', $this->entry)->value('status'))->toBe('REGISTERED');
 });
 

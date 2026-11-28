@@ -6,24 +6,34 @@ use App\Modules\Doctors\Models\DoctorService;
 use App\Modules\Presence\Enums\CheckOutReason;
 use App\Modules\Presence\Exceptions\ActiveConsultationBlocksChange;
 use App\Modules\Presence\Exceptions\InvalidPresenceTransition;
+use App\Modules\Presence\Jobs\AutoCheckOut;
 use App\Modules\Presence\Services\PresenceCheckOut;
+use App\Modules\Presence\Services\PresenceSessions;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Users\Models\User;
+use App\Modules\WalkIns\DTOs\CloseDisposition;
 use App\Modules\WalkIns\DTOs\RegistrationCommand;
 use App\Modules\WalkIns\Enums\CheckOutDisposition;
+use App\Modules\WalkIns\Enums\CloseAction;
 use App\Modules\WalkIns\Enums\PayerType;
 use App\Modules\WalkIns\Enums\PriorityLevel;
 use App\Modules\WalkIns\Enums\RegistrationChannel;
 use App\Modules\WalkIns\Exceptions\DoctorNotAvailable;
 use App\Modules\WalkIns\Exceptions\RegistrationRefused;
 use App\Modules\WalkIns\Models\WalkInQueue;
+use App\Modules\WalkIns\Models\WalkInQueueEntry;
+use App\Modules\WalkIns\Services\QueueClose;
 use App\Modules\WalkIns\Services\QueueOperations;
+use App\Modules\WalkIns\Services\QueueTransfer;
 use App\Modules\WalkIns\Services\WalkInRegistration;
 use App\Shared\Contracts\Clock;
 use App\Shared\Exceptions\DomainException;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SpecialtySeeder;
+use Illuminate\Database\QueryException;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
 /*
@@ -113,6 +123,9 @@ function cor_attempt(Closure $work): array
             'refused' => $e::class,
             'code' => $e instanceof DomainException ? $e->errorCode()->value : null,
             'reason' => method_exists($e, 'reasonCode') ? $e->reasonCode() : null,
+            // Kept for the failure output: a non-domain throwable (QueryException, LogicException, ...) must show its class and message.
+            'message' => $e->getMessage(),
+            'sqlstate' => $e instanceof QueryException ? $e->getCode() : null,
         ];
     }
 }
@@ -438,9 +451,10 @@ it('S3h check-out before the end: the check-out is refused ACTIVE_CONSULTATION (
 // S3a lock row (HAG-30 M2): the check-out's session lock (PresenceCheckOut, lockForUpdate on the session row) is what makes this deterministic.
 // The start is held open on pgsql_second: the entry is IN_CONSULTATION and the consultation IN_PROGRESS, but not yet committed. The child
 // check-out is forked while the lock is held. With the lock, it waits on the session row, then reads IN_PROGRESS after the commit and is
-// refused in_progress. Without the lock, its unlocked read sees the pre-commit state, its queue read waits on the entry row, then sees
-// IN_CONSULTATION with no CALLED entry and writes OUT next to an IN_PROGRESS consultation. This row therefore fails if the lock is dropped,
-// on every run, without relying on timing. The elapsed > 0.4 s check proves the child really waited on the held lock.
+// refused in_progress. Without the lock, the check-out reads the pre-commit state (the entry is still CALLED), so it is refused `called`
+// instead. The `in_progress` reason assertion below therefore fails if the lock is dropped, on every run, without relying on timing. The
+// `in_progress` pin is the only guard that proves the wait; no other assertion here distinguishes the two orders. The elapsed > 0.4 s check
+// proves the child really waited on the held lock.
 it('S3a lock order: a check-out that waits on a held session row is refused in_progress after the start commits, and is never OUT', function () {
     [$entry, $consultation] = cor_called_patient($this->headersA, $this->profileA);
     $second = DB::connection('pgsql_second');
@@ -553,6 +567,163 @@ it('S3h one barrier: end vs check-out, simultaneous: the end always commits; the
             ->and($results[1]['ok']['code'] ?? null)->toBe('ACTIVE_CONSULTATION')->and($results[1]['ok']['reason'] ?? null)->toBe('in_progress')
             ->and(cor_session_status())->toBe('IN')->and(cor_out_events())->toBe(0);
     }
+});
+
+/*
+ * Increment 5.8-T2: transfer, close and call-next races against the check-out (brief §3 rows T1 to T3 and C1). Each row is a one-barrier
+ * invariant: the two racers start together, so the order is not fixed, and each assertion holds under either interleaving.
+ */
+
+/** A second doctor at the same location, with her queue for today (a guest registered for her). Returns the doctor, service and queue. */
+function cor_second(): array
+{
+    $second = wi_second_doctor(test()->w);
+    app('auth')->forgetGuards();
+    register_walkin(test()->staffHeaders, guest_body($second['service'], 'Target Guest'))->assertCreated();
+    $queue = (string) DB::table('walkin_queues')->where('doctor_profile_id', $second['doctor']->id)->value('id');
+
+    return [...$second, 'queue' => $queue];
+}
+
+/** A transfer of one entry to a queue, by staff. The result is the queue the entry now sits in. */
+function cor_transfer(string $entry, string $target): Closure
+{
+    return fn () => cor_attempt(fn () => app(QueueTransfer::class)->transfer(test()->staffUser, WalkInQueueEntry::query()->findOrFail($entry), $target, false)->walkin_queue_id);
+}
+
+/** A close of the staff's queue, with TOLD_IN_PERSON for the one entry (no notice is sent, so only the queue effect is asserted). */
+function cor_close(string $entry): Closure
+{
+    return fn () => cor_attempt(fn () => app(QueueClose::class)->close(test()->staffUser, WalkInQueue::query()->findOrFail(wi_queue_id()), [new CloseDisposition($entry, CloseAction::ToldInPerson)])->status);
+}
+
+/** The doctor checks in again at the location. */
+function cor_check_in(): Closure
+{
+    return fn () => cor_attempt(function () {
+        app(PresenceSessions::class)->checkIn(presence_actor(test()->doctorUser, 'DOCTOR_APP'), (string) test()->w['doctor']->id, test()->w['location'], null);
+
+        return 'IN';
+    });
+}
+
+/** Whether a racer's refusal is one of the 409 codes a lost race may return. */
+function cor_is_lost_race(array $result): bool
+{
+    return in_array($result['ok']['code'] ?? null, ['CONCURRENT_MODIFICATION', 'INVALID_STATE_TRANSITION'], true);
+}
+
+// T1: transfer A to B vs check-out of A. HOLD cancels nothing, so the transfer always succeeds, from either order.
+
+it('T1 transfer A to B vs check-out of A (one barrier): the entry ends in B, is never cancelled, and the check-out is OUT', function () {
+    $entry = cor_patient_entry($this->headersA, $this->profileA);
+    $target = cor_second()['queue'];
+
+    $results = wi_race([cor_transfer($entry, $target), cor_checkout('doctor')]);
+
+    expect($results[1]['ok']['done'] ?? null)->toBe('OUT')
+        ->and($results[0]['ok']['done'] ?? null)->toBe($target)
+        ->and(DB::table('walkin_queue_entries')->where('id', $entry)->value('walkin_queue_id'))->toBe($target)
+        ->and(cor_entry_status($entry))->toBe('WAITING')
+        ->and(DB::table('walkin_queue_events')->where('walkin_queue_entry_id', $entry)->where('event_type', 'CANCELLED')->count())->toBe(0)
+        ->and(cor_out_sessions())->toBe(1);
+});
+
+// T2: transfer vs call-next on the source queue. Both take the queue row, so one wins and the other sees its result.
+
+it('T2 transfer of the first entry vs call-next on the source queue (one barrier): exactly one wins, and no entry is both called and moved', function () {
+    $first = cor_patient_entry($this->headersA, $this->profileA);
+    $second = cor_patient_entry($this->headersB, $this->profileB);
+    $source = wi_queue_id();
+    $target = cor_second()['queue'];
+
+    $results = wi_race([cor_transfer($first, $target), cor_call($source)]);
+
+    if (($results[0]['ok']['done'] ?? null) === $target) {
+        // The transfer won: the call then takes the next waiting entry, the second patient.
+        expect(DB::table('walkin_queue_entries')->where('id', $first)->value('walkin_queue_id'))->toBe($target)
+            ->and(cor_entry_status($first))->toBe('WAITING')
+            ->and($results[1]['ok']['done'] ?? null)->toBe($second);
+    } else {
+        // The call won: the first entry is CALLED, so the transfer is refused (INVALID_STATE_TRANSITION) and it stays in the source queue.
+        expect($results[1]['ok']['done'] ?? null)->toBe($first)
+            ->and($results[0]['ok']['code'] ?? null)->toBe('INVALID_STATE_TRANSITION')
+            ->and(DB::table('walkin_queue_entries')->where('id', $first)->value('walkin_queue_id'))->toBe($source)
+            ->and(cor_entry_status($first))->toBe('CALLED');
+    }
+});
+
+// T3: two transfers in opposite directions. The queue rows are taken in ascending id order, so there is no deadlock.
+
+it('T3 two transfers in opposite directions (one barrier): no deadlock, each entry either moves or is refused with a lost-race code', function () {
+    $second = cor_second();
+    $a = cor_patient_entry($this->headersA, $this->profileA);
+    $source = (string) DB::table('walkin_queues')->where('doctor_profile_id', $this->w['doctor']->id)->value('id'); // the first doctor's queue (the first patient registered there)
+    $b = register_walkin(test()->staffHeaders, guest_body($second['service'], 'Opposite Guest'))->assertCreated()->json('data.id');
+
+    $results = wi_race([cor_transfer($a, $second['queue']), cor_transfer($b, $source)]);
+
+    foreach ($results as $result) {
+        expect(isset($result['ok']['done']) || cor_is_lost_race($result))->toBeTrue();
+    }
+    expect(DB::table('walkin_queue_entries')->where('id', $a)->value('walkin_queue_id'))
+        ->toBe(isset($results[0]['ok']['done']) ? $second['queue'] : $source)
+        ->and(DB::table('walkin_queue_entries')->where('id', $b)->value('walkin_queue_id'))
+        ->toBe(isset($results[1]['ok']['done']) ? $source : $second['queue'])
+        ->and(cor_entry_status($a))->toBe('WAITING')->and(cor_entry_status($b))->toBe('WAITING');
+});
+
+// C1: close vs check-in of the same doctor. Close first: the queue is CLOSED and the check-in succeeds. Check-in first: close is refused.
+
+it('C1 close vs check-in of the same doctor (one barrier): a close that commits leaves the queue CLOSED; a close that loses is refused doctor_checked_in', function () {
+    $entry = cor_patient_entry($this->headersA, $this->profileA);
+    (cor_checkout('doctor'))(); // the doctor checks out first (HOLD), so the queue is PAUSED and the close may run
+
+    $results = wi_race([cor_close($entry), cor_check_in()]);
+
+    expect($results[1]['ok']['done'] ?? null)->toBe('IN')->and(cor_session_status())->toBe('IN');
+    if (isset($results[0]['ok']['done'])) {
+        expect(DB::table('walkin_queues')->where('id', wi_queue_id())->value('status'))->toBe('CLOSED');
+    } else {
+        expect($results[0]['ok']['code'] ?? null)->toBe('INVALID_STATE_TRANSITION')->and($results[0]['ok']['reason'] ?? null)->toBe('doctor_checked_in')
+            ->and(DB::table('walkin_queues')->where('id', wi_queue_id())->value('status'))->not->toBe('CLOSED');
+    }
+});
+
+// A1: auto check-out (5.8-3, D-L) vs the start of a called patient. Either order, the block refuses the auto check-out, so it is skipped and
+// logged once (PRESENCE_AUTO_CHECKOUT_SKIPPED), and the start always commits.
+
+/** The scheduler's auto check-out of one open session. The result lists the skip records it logged and their reason codes. */
+function cor_auto_checkout(string $session): Closure
+{
+    return fn () => cor_attempt(function () use ($session) {
+        $reasons = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$reasons) {
+            if ($event->message === 'PRESENCE_AUTO_CHECKOUT_SKIPPED') {
+                $reasons[] = $event->context['reason_code'] ?? null;
+            }
+        });
+        app()->call([new AutoCheckOut($session, (string) test()->w['doctor']->id, test()->w['location']), 'handle'], ['clock' => test()->clock]);
+
+        return ['skips' => count($reasons), 'reasons' => $reasons];
+    });
+}
+
+it('A1 auto check-out vs the start of a called patient (one barrier): the start always commits, the auto check-out is skipped and logged once, and nothing is closed', function () {
+    [$entry, $consultation] = cor_called_patient($this->headersA, $this->profileA);
+    $session = (string) DB::table('doctor_presence_sessions')->where('doctor_profile_id', $this->w['doctor']->id)->whereNull('checked_out_at')->value('id');
+
+    $results = wi_race([cor_start($consultation), cor_auto_checkout($session)]);
+
+    expect($results[0]['ok']['done'] ?? null)->toBe('IN_PROGRESS')
+        ->and($results[1]['ok']['done']['skips'] ?? null)->toBe(1)
+        // The reason depends on which lock is taken first: if the start commits first the check-out sees IN_PROGRESS ('in_progress');
+        // if the auto check-out takes the session lock first it sees the CALLED entry ('called'). Either way there is exactly one skip.
+        ->and($results[1]['ok']['done']['reasons'] ?? null)->toHaveCount(1)
+        ->and($results[1]['ok']['done']['reasons'][0] ?? null)->toBeIn(['in_progress', 'called'])
+        ->and(cor_session_status())->toBe('IN')->and(cor_out_sessions())->toBe(0)->and(cor_out_events())->toBe(0)
+        ->and(cor_consultation_status($consultation))->toBe('IN_PROGRESS')->and(cor_grants($entry))->toBe(1)
+        ->and(DB::table('rescheduling_tasks')->count())->toBe(0);
 });
 
 /** The value of a key anywhere in a row's columns (the audit metadata is JSON), or null. */

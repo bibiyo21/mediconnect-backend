@@ -252,16 +252,20 @@ it('start vs simulated check-out, simultaneous: either the start commits, or it 
     }
 });
 
-it('start vs break, break first: the start is refused on_break with no grant', function () {
+it('start vs break, break first (HAG-43): the break is refused ACTIVE_CONSULTATION (called) and the presence stays IN; the start then succeeds with one grant', function () {
     [$entry, $consultation] = cs_called($this->headersA, $this->profileA);
-    $onBreak = fn () => cs_doctor_status() === 'ON_BREAK';
 
-    $results = wi_race([cs_break(), cs_after($onBreak, cs_start($consultation))]);
+    // A refused break commits nothing, so there is no committed state to gate the start on. The break runs to its answer first, then the
+    // start races nothing: two forks in sequence fix the order.
+    $break = wi_race([cs_break()]);
+    $start = wi_race([cs_start($consultation)]);
 
-    expect(cs_refusal($results[0]))->toBeNull()->and($results[0]['ok']['done'])->toBe('ON_BREAK')
-        ->and(cs_refusal($results[1]))->toBe(ConsultationRefused::class)->and(cs_code($results[1]))->toBe('DOCTOR_NOT_AVAILABLE')->and(cs_reason($results[1]))->toBe('on_break')
-        ->and(cs_status($consultation))->toBe('SCHEDULED')
-        ->and(cs_grants($entry))->toBe(0);
+    expect(cs_refusal($break[0]))->toBe(ActiveConsultationBlocksChange::class)
+        ->and(cs_code($break[0]))->toBe('ACTIVE_CONSULTATION')->and(cs_reason($break[0]))->toBe('called')
+        ->and(cs_doctor_status())->toBe('IN')
+        ->and(cs_refusal($start[0]))->toBeNull()->and($start[0]['ok']['done'])->toBe('IN_PROGRESS')
+        ->and(cs_status($consultation))->toBe('IN_PROGRESS')
+        ->and(cs_grants($entry))->toBe(1);
 });
 
 it('start vs break, start first: the break is refused ACTIVE_CONSULTATION and the presence stays IN', function () {
