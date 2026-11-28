@@ -45,12 +45,8 @@ final class SlotGenerator
                 if ($shift->dayOfWeek !== $dow || $date < $shift->effectiveFrom || ($shift->effectiveUntil !== null && $date > $shift->effectiveUntil)) {
                     continue;
                 }
-                $window = [[self::at($date, $shift->startsAt, $shift->timezone), self::at($date, $shift->endsAt, $shift->timezone)]];
-                if ($shift->locationId !== null) {
-                    $window = Intervals::intersect($window, $this->openWindows($shift->locationId, $date, $dow, $shift->timezone, $openingHours, $holidays));
-                }
+                $window = $this->shiftWindow($shift, $date, $dow, $openingHours, $holidays, $exceptions);
                 $window = Intervals::subtract($window, array_map(fn (array $b) => [self::at($date, $b[0], $shift->timezone), self::at($date, $b[1], $shift->timezone)], $shift->breaks));
-                $window = Intervals::subtract($window, $this->blocks($shift->locationId, $exceptions));
                 $recurringByMode[$shift->modeId] = Intervals::normalize([...($recurringByMode[$shift->modeId] ?? []), ...$window]);
 
                 array_push($slots, ...$this->cut($window, $shift->serviceMode, $shift->durationMinutes, $shift->bufferMinutes, $shift->maxAppointments, $shift->modeId, $shift->id, $shift->locationId, $date));
@@ -80,6 +76,51 @@ final class SlotGenerator
     }
 
     /**
+     * Each shift's working window on each date, before its breaks: its hours cut to the location's open hours and to the exceptions. The
+     * doctor's day reads these spans (increment 5.9-B, M2), so a shift with an empty window (a leave, a closure) is absent.
+     *
+     * @param  list<ShiftInput>  $shifts
+     * @param  array<string, list<array{day: int, opens: string, closes: string, from?: string|null, until?: string|null}>>  $openingHours
+     * @param  list<HolidayInput>  $holidays
+     * @param  list<ExceptionInput>  $exceptions
+     * @return array<string, list<array{int, int}>> shift id => UTC [start, end] spans
+     */
+    public function shiftWindows(string $from, string $to, array $shifts, array $openingHours, array $holidays, array $exceptions): array
+    {
+        $out = [];
+        foreach ($this->dates($from, $to) as $date) {
+            $dow = CarbonImmutable::parse($date)->dayOfWeekIso;
+            foreach ($shifts as $shift) {
+                if ($shift->dayOfWeek !== $dow || $date < $shift->effectiveFrom || ($shift->effectiveUntil !== null && $date > $shift->effectiveUntil)) {
+                    continue;
+                }
+                $window = $this->shiftWindow($shift, $date, $dow, $openingHours, $holidays, $exceptions);
+                if ($window !== []) {
+                    $out[$shift->id] = [...($out[$shift->id] ?? []), ...$window];
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, list<array{day: int, opens: string, closes: string, from?: string|null, until?: string|null}>>  $openingHours
+     * @param  list<HolidayInput>  $holidays
+     * @param  list<ExceptionInput>  $exceptions
+     * @return list<array{int, int}>
+     */
+    private function shiftWindow(ShiftInput $shift, string $date, int $dow, array $openingHours, array $holidays, array $exceptions): array
+    {
+        $window = [[self::at($date, $shift->startsAt, $shift->timezone), self::at($date, $shift->endsAt, $shift->timezone)]];
+        if ($shift->locationId !== null) {
+            $window = Intervals::intersect($window, $this->openWindows($shift->locationId, $date, $dow, $shift->timezone, $openingHours, $holidays));
+        }
+
+        return Intervals::subtract($window, $this->blocks($shift->locationId, $exceptions));
+    }
+
+    /**
      * @param  list<array{int, int}>  $window
      * @return list<GeneratedSlot>
      */
@@ -87,6 +128,7 @@ final class SlotGenerator
     {
         $out = [];
         $length = $duration * 60;
+        /** @var list<array{int, int}> $taken */
         $taken = [];
         if ($serviceMode !== 'WALK_IN') {
             $count = 0;

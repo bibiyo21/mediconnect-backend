@@ -6,14 +6,17 @@ use App\Modules\Presence\Enums\PresenceChangeMethod;
 use App\Modules\Presence\Http\Requests\CheckInRequest;
 use App\Modules\Presence\Http\Requests\CheckOutPreviewRequest;
 use App\Modules\Presence\Http\Requests\CheckOutRequest;
+use App\Modules\Presence\Http\Requests\DoctorDayRequest;
 use App\Modules\Presence\Http\Requests\MarkUnavailableRequest;
 use App\Modules\Presence\Http\Requests\PresenceActionRequest;
 use App\Modules\Presence\Http\Requests\StartBreakRequest;
 use App\Modules\Presence\Http\Resources\CheckOutPreviewResource;
 use App\Modules\Presence\Http\Resources\CheckOutResultResource;
+use App\Modules\Presence\Http\Resources\DoctorDayResource;
 use App\Modules\Presence\Http\Resources\PresenceStateResource;
 use App\Modules\Presence\Http\SourceDevice;
 use App\Modules\Presence\Models\DoctorPresenceSession;
+use App\Modules\Presence\Services\DoctorDayReader;
 use App\Modules\Presence\Services\PresenceAccess;
 use App\Modules\Presence\Services\PresenceActor;
 use App\Modules\Presence\Services\PresenceCheckOut;
@@ -38,6 +41,7 @@ final class PresenceController
         private readonly PresenceAccess $access,
         private readonly PresenceReader $reader,
         private readonly PresenceCheckOut $checkOut,
+        private readonly DoctorDayReader $day,
     ) {}
 
     /** Your own presence: the open session, or NOT_CHECKED_IN. */
@@ -48,6 +52,19 @@ final class PresenceController
         ['doctor' => $doctor] = $this->access->resolve($user, null, null);
 
         return ApiResponse::success($this->state($this->reader->openSession($doctor)));
+    }
+
+    /**
+     * Your day (increment 5.9-B, D-B): today's shifts and scheduled breaks at each active assignment, and whether a check-in would be allowed
+     * now (advisory). Own doctor only; `date` may be sent but only today is served. Needs presence.check_in. `presence-read`.
+     */
+    public function day(DoctorDayRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        ['doctor' => $doctor] = $this->access->resolve($user, null, null);
+
+        return ApiResponse::success(new DoctorDayResource($this->day->forDoctor($doctor, $request->localDate())));
     }
 
     /**

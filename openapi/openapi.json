@@ -8944,6 +8944,97 @@
                 ]
             }
         },
+        "/presence/me/day": {
+            "get": {
+                "operationId": "presence.day",
+                "summary": "Your day (increment 5.9-B, D-B): today's shifts and scheduled breaks at each active assignment, and whether a check-in would be allowed\nnow (advisory). Own doctor only; `date` may be sent but only today is served. Needs presence.check_in. `presence-read`",
+                "tags": [
+                    "Presence"
+                ],
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "description": "Optional. Only today (the market zone's date) is served in this version.",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DoctorDayResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/presence/check-out/preview": {
             "get": {
                 "operationId": "presence.checkOutPreview",
@@ -17527,6 +17618,130 @@
                     "requested_at"
                 ],
                 "title": "DoctorAssignmentResource"
+            },
+            "DoctorDayResource": {
+                "type": "object",
+                "properties": {
+                    "local_date": {
+                        "type": "string",
+                        "description": "The market date the request was for, Y-m-d (today in the market zone)."
+                    },
+                    "timezone": {
+                        "type": "string",
+                        "description": "The market zone."
+                    },
+                    "locations": {
+                        "type": "array",
+                        "description": "One entry per ACTIVE assignment.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "clinic_location_id": {
+                                    "type": "string"
+                                },
+                                "location_name": {
+                                    "type": "string"
+                                },
+                                "local_date": {
+                                    "type": "string"
+                                },
+                                "timezone": {
+                                    "type": "string"
+                                },
+                                "shifts": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "starts_at": {
+                                                "type": "string"
+                                            },
+                                            "ends_at": {
+                                                "type": "string"
+                                            },
+                                            "service_mode": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "APPOINTMENT",
+                                                    "WALK_IN",
+                                                    "BOTH"
+                                                ]
+                                            }
+                                        },
+                                        "required": [
+                                            "starts_at",
+                                            "ends_at",
+                                            "service_mode"
+                                        ]
+                                    }
+                                },
+                                "scheduled_breaks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string"
+                                            },
+                                            "starts_at": {
+                                                "type": "string"
+                                            },
+                                            "ends_at": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "starts_at",
+                                            "ends_at"
+                                        ]
+                                    }
+                                },
+                                "check_in": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allowed": {
+                                            "type": "boolean"
+                                        },
+                                        "reason_code": {
+                                            "type": "string",
+                                            "enum": [
+                                                "doctor_not_active",
+                                                "location_not_active",
+                                                "no_assignment",
+                                                "no_service_mode",
+                                                "clinic_closed",
+                                                "closed_holiday",
+                                                "outside_hours"
+                                            ]
+                                        },
+                                        "opens_at": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "allowed"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "clinic_location_id",
+                                "location_name",
+                                "local_date",
+                                "timezone",
+                                "shifts",
+                                "scheduled_breaks",
+                                "check_in"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "local_date",
+                    "timezone",
+                    "locations"
+                ],
+                "title": "DoctorDayResource"
             },
             "DoctorDecisionRequest": {
                 "type": "object",

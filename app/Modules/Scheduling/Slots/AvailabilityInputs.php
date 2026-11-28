@@ -40,11 +40,13 @@ final class AvailabilityInputs
         foreach ($rows as $r) {
             /** @var list<array{string, string}> $shiftBreaks */
             $shiftBreaks = array_values(($breaks[$r->id] ?? collect())->map(fn ($b) => [(string) $b->starts_at_local, (string) $b->ends_at_local])->all());
+            $shiftBreakIds = array_values(($breaks[$r->id] ?? collect())->map(fn ($b) => (string) $b->id)->all());
             $shifts[] = new ShiftInput(
                 (string) $r->id, (int) $r->day_of_week, $r->clinic_location_id, (string) $r->doctor_service_mode_id, (string) $r->service_mode,
                 (string) $r->starts_at_local, (string) $r->ends_at_local, (string) $r->timezone, (int) $r->slot_duration_minutes, (int) $r->buffer_minutes,
                 $r->max_appointments === null ? null : (int) $r->max_appointments, (string) $r->schedule_from, $r->schedule_until === null ? null : (string) $r->schedule_until,
                 $shiftBreaks,
+                $shiftBreakIds,
             );
         }
 

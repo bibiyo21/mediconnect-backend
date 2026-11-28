@@ -2,6 +2,7 @@
 
 namespace App\Modules\Presence\Services;
 
+use App\Modules\Presence\DTOs\CheckInRefusal;
 use App\Modules\Presence\Exceptions\CheckInRefused;
 use App\Shared\Contracts\Clock;
 use Carbon\CarbonImmutable;
@@ -30,6 +31,9 @@ use InvalidArgumentException;
  * exception covering now refuses with `clinic_closed`; a doctor's own leave does not block presence. Presence is independent of the
  * schedule: no shift is needed while the clinic is open. A refusal raises 422 with a `reason_code` and
  * counts DOCTOR_CHECKIN_FAILURES (§29).
+ *
+ * The rules are written once, as checks that return a CheckInRefusal or null. The assert methods throw and count; probe()
+ * returns the same answer as data, counts nothing and never throws (the advisory dashboard, increment 5.9-B).
  */
 final class CheckInEligibility
 {
@@ -40,15 +44,50 @@ final class CheckInEligibility
      */
     public function assertAssigned(string $doctorId, string $locationId): object
     {
+        $result = $this->checkAssigned($doctorId, $locationId);
+        if ($result instanceof CheckInRefusal) {
+            $this->throwRefusal($result);
+        }
+
+        return $result;
+    }
+
+    /** @param  object{timezone: string, clinic_id: string}  $location */
+    public function assertCanCheckInNow(string $doctorId, string $locationId, object $location): void
+    {
+        $refusal = $this->checkNow($doctorId, $locationId, $location);
+        if ($refusal !== null) {
+            $this->throwRefusal($refusal);
+        }
+    }
+
+    /**
+     * Advisory: the same rules as the check-in, in the same order, answered without throwing and without counting a failure.
+     * Null means a check-in would be allowed now. The check-in itself still re-checks everything under its lock.
+     */
+    public function probe(string $doctorId, string $locationId): ?CheckInRefusal
+    {
+        $result = $this->checkAssigned($doctorId, $locationId);
+
+        return $result instanceof CheckInRefusal ? $result : $this->checkNow($doctorId, $locationId, $result);
+    }
+
+    /**
+     * The assignment rules: the location (timezone and clinic) when they hold, else the refusal.
+     *
+     * @return CheckInRefusal|object{timezone: string, clinic_id: string}
+     */
+    private function checkAssigned(string $doctorId, string $locationId): object
+    {
         $doctor = DB::table('doctor_profiles')->where('id', $doctorId)->first(['onboarding_status']);
         if ($doctor === null || $doctor->onboarding_status !== 'ACTIVE') {
-            $this->refuse('doctor_not_active', 'doctor_id', 'Only verified, active doctors can check in.');
+            return new CheckInRefusal('doctor_not_active', 'doctor_id', 'Only verified, active doctors can check in.');
         }
 
         $location = DB::table('clinic_locations as l')->join('clinics as c', 'c.id', '=', 'l.clinic_id')
             ->where('l.id', $locationId)->first(['l.timezone', 'l.clinic_id', 'l.status as location_status', 'c.status as clinic_status']);
         if ($location === null || $location->location_status !== 'ACTIVE' || $location->clinic_status !== 'ACTIVE') {
-            $this->refuse('location_not_active', 'clinic_location_id', 'This location is not available for check-in.');
+            return new CheckInRefusal('location_not_active', 'clinic_location_id', 'This location is not available for check-in.');
         }
 
         $now = $this->clock->now();
@@ -56,14 +95,14 @@ final class CheckInEligibility
             ->where(fn ($q) => $q->whereNull('effective_from')->orWhere('effective_from', '<=', $now))
             ->where(fn ($q) => $q->whereNull('effective_until')->orWhere('effective_until', '>', $now))->exists();
         if (! $assigned) {
-            $this->refuse('no_assignment', 'clinic_location_id', 'You have no active assignment at this location.');
+            return new CheckInRefusal('no_assignment', 'clinic_location_id', 'You have no active assignment at this location.');
         }
 
         return (object) ['timezone' => (string) $location->timezone, 'clinic_id' => (string) $location->clinic_id];
     }
 
     /** @param  object{timezone: string, clinic_id: string}  $location */
-    public function assertCanCheckInNow(string $doctorId, string $locationId, object $location): void
+    private function checkNow(string $doctorId, string $locationId, object $location): ?CheckInRefusal
     {
         $nowLocal = $this->clock->now()->setTimezone($location->timezone);
         $date = $nowLocal->toDateString();
@@ -72,25 +111,23 @@ final class CheckInEligibility
             ->where('m.doctor_profile_id', $doctorId)->where('m.clinic_location_id', $locationId)->where('m.status', 'ACTIVE')->where('s.status', 'ACTIVE')
             ->where('m.effective_from', '<=', $date)->where(fn ($q) => $q->whereNull('m.effective_until')->orWhere('m.effective_until', '>=', $date))->exists();
         if (! $served) {
-            $this->refuse('no_service_mode', 'clinic_location_id', 'You have no active service at this location. Set up an appointment or walk-in service first.');
+            return new CheckInRefusal('no_service_mode', 'clinic_location_id', 'You have no active service at this location. Set up an appointment or walk-in service first.');
         }
 
-        $this->assertNotClosedByException($doctorId, $locationId);
-        $this->assertWithinWindow($doctorId, $locationId, $location->clinic_id, $nowLocal);
+        return $this->closedByException($doctorId, $locationId) ?? $this->windowRefusal($doctorId, $locationId, $location->clinic_id, $nowLocal);
     }
 
     /** A clinic closure recorded in this doctor's exceptions, for this location or every place, that covers now. */
-    private function assertNotClosedByException(string $doctorId, string $locationId): void
+    private function closedByException(string $doctorId, string $locationId): ?CheckInRefusal
     {
         $now = $this->clock->now();
         $closed = DB::table('doctor_schedule_exceptions')->where('doctor_profile_id', $doctorId)->where('exception_type', 'CLINIC_CLOSURE')->where('effect', 'BLOCK')->where('status', 'ACTIVE')
             ->where(fn ($q) => $q->whereNull('clinic_location_id')->orWhere('clinic_location_id', $locationId))->where('starts_at', '<=', $now)->where('ends_at', '>', $now)->exists();
-        if ($closed) {
-            $this->refuse('clinic_closed', 'clinic_location_id', 'The clinic is closed at this time.');
-        }
+
+        return $closed ? new CheckInRefusal('clinic_closed', 'clinic_location_id', 'The clinic is closed at this time.') : null;
     }
 
-    private function assertWithinWindow(string $doctorId, string $locationId, string $clinicId, CarbonImmutable $nowLocal): void
+    private function windowRefusal(string $doctorId, string $locationId, string $clinicId, CarbonImmutable $nowLocal): ?CheckInRefusal
     {
         $today = $nowLocal->startOfDay();
         $days = [$today, $today->addDay()];
@@ -104,14 +141,16 @@ final class CheckInEligibility
             $holidays[(string) $row->date] = $row;
         }
         if (($holidays[$today->toDateString()]->is_closed ?? false) === true) {
-            $this->refuse('closed_holiday', 'clinic_location_id', 'The clinic is closed today.');
+            return new CheckInRefusal('closed_holiday', 'clinic_location_id', 'The clinic is closed today.');
         }
 
         $hours = DB::table('clinic_operating_hours')->where('clinic_location_id', $locationId)->get(['day_of_week', 'opens_at', 'closes_at', 'effective_from', 'effective_until']);
         $shifts = DB::table('doctor_schedule_shifts as sh')->join('doctor_schedules as s', 's.id', '=', 'sh.doctor_schedule_id')->join('doctor_service_modes as m', 'm.id', '=', 'sh.doctor_service_mode_id')
             ->where('s.doctor_profile_id', $doctorId)->where('s.status', 'ACTIVE')->where('m.status', 'ACTIVE')->where('sh.clinic_location_id', $locationId)
-            ->get(['sh.day_of_week', 'sh.starts_at_local', 'sh.ends_at_local', 's.effective_from', 's.effective_until']);
+            ->get(['sh.id', 'sh.day_of_week', 'sh.starts_at_local', 'sh.ends_at_local', 's.effective_from', 's.effective_until']);
 
+        /** @var list<array{0: CarbonImmutable, 1: string|null}> $starts every non-empty window start, with the shift it belongs to (null: clinic hours) */
+        $starts = [];
         foreach ($days as $day) {
             $date = $day->toDateString();
             $holiday = $holidays[$date] ?? null;
@@ -126,8 +165,13 @@ final class CheckInEligibility
                 ? [[(string) $holiday->special_opens_at, (string) $holiday->special_closes_at]]
                 : $hours->filter(fn ($h) => (int) $h->day_of_week === $dow && $inEffect($h, 'effective_from', 'effective_until'))->map(fn ($h) => [(string) $h->opens_at, (string) $h->closes_at])->all();
             foreach ($open as [$opens, $closes]) {
-                if ($this->at($day, $opens) <= $nowLocal && $nowLocal < $this->at($day, $closes)) {
-                    return;
+                $from = $this->at($day, $opens);
+                $until = $this->at($day, $closes);
+                if ($from <= $nowLocal && $nowLocal < $until) {
+                    return null;
+                }
+                if ($from < $until) {
+                    $starts[] = [$from, null];
                 }
             }
 
@@ -140,13 +184,23 @@ final class CheckInEligibility
                     $until = min($until, $this->at($day, (string) $holiday->special_closes_at));
                 }
                 if ($from <= $nowLocal && $nowLocal < $until) {
-                    return;
+                    return null;
+                }
+                // A window that special hours clip away is empty: it opens nothing, so it is not a start (m2).
+                if ($from < $until) {
+                    $starts[] = [$from, (string) $shift->id];
                 }
             }
         }
 
         $minutes = intdiv($early, 60);
-        $this->refuse('outside_hours', 'clinic_location_id', "The clinic is not open now. You can check in up to {$minutes} minutes before your shift, or during it.");
+        // The earliest later start says when a check-in would next be allowed; it names its shift, or null for clinic hours.
+        $later = array_values(array_filter($starts, fn (array $start) => $start[0] > $nowLocal));
+        usort($later, fn (array $a, array $b) => $a[0] <=> $b[0]);
+        $opensAt = $later === [] ? null : $later[0][0]->utc();
+        $opensShiftId = $later === [] ? null : $later[0][1];
+
+        return new CheckInRefusal('outside_hours', 'clinic_location_id', "The clinic is not open now. You can check in up to {$minutes} minutes before your shift, or during it.", $opensAt, $opensShiftId);
     }
 
     /**
@@ -169,12 +223,12 @@ final class CheckInEligibility
         return $at;
     }
 
-    private function refuse(string $reason, string $field, string $message): never
+    /** Counts the refusal (DOCTOR_CHECKIN_FAILURES, §29) and throws it; the log line carries no personal data. */
+    private function throwRefusal(CheckInRefusal $refusal): never
     {
-        // DOCTOR_CHECKIN_FAILURES (§29): counted from logs; no personal data.
-        self::countFailure($reason);
+        self::countFailure($refusal->reason);
 
-        throw new CheckInRefused($reason, $field, $message);
+        throw new CheckInRefused($refusal->reason, $refusal->field, $refusal->message);
     }
 
     public static function countFailure(string $reason): void

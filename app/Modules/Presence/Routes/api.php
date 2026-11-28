@@ -11,6 +11,7 @@ Route::get('presence/doctors/{doctorId}', [PublicPresenceController::class, 'sho
 
 Route::middleware(['auth:sanctum', 'signin.valid', 'mfa.satisfied'])->group(function () {
     Route::get('presence/me', [PresenceController::class, 'me'])->middleware('throttle:presence-read');
+    Route::get('presence/me/day', [PresenceController::class, 'day'])->middleware('throttle:presence-read');
     Route::get('presence/check-out/preview', [PresenceController::class, 'checkOutPreview'])->middleware('throttle:presence-read');
 
     // Writes: 30 a minute per user. Guarded by the open-session index and the transition table, not by an Idempotency-Key.
