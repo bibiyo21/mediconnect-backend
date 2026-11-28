@@ -3,13 +3,20 @@
 namespace App\Modules\WalkIns\Providers;
 
 use App\Modules\Presence\Events\PresenceChanged;
+use App\Modules\WalkIns\Console\ClosePastDaysCommand;
+use App\Modules\WalkIns\Contracts\BreakOverrunNotices;
+use App\Modules\WalkIns\Contracts\CalledEntries;
 use App\Modules\WalkIns\Contracts\CheckOutQueues;
+use App\Modules\WalkIns\Contracts\QueueActivity;
 use App\Modules\WalkIns\Contracts\WalkInConsultationEntries;
 use App\Modules\WalkIns\Estimation\EstimationConfig;
 use App\Modules\WalkIns\Estimation\EstimatorSettings;
 use App\Modules\WalkIns\Listeners\FanOutOnPresenceChange;
+use App\Modules\WalkIns\Services\BreakOverrunNotice;
+use App\Modules\WalkIns\Services\CalledEntryCheck;
 use App\Modules\WalkIns\Services\CheckOutQueues as CheckOutQueuesService;
 use App\Modules\WalkIns\Services\ConsultationEntries;
+use App\Modules\WalkIns\Services\QueueActivityLog;
 use App\Shared\Services\Fingerprint;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -27,6 +34,13 @@ final class WalkInsServiceProvider extends ServiceProvider
         $this->app->bind(EstimatorSettings::class, fn () => EstimatorSettings::fromConfig());
         $this->app->bind(WalkInConsultationEntries::class, ConsultationEntries::class);
         $this->app->bind(CheckOutQueues::class, CheckOutQueuesService::class);
+        $this->app->bind(QueueActivity::class, QueueActivityLog::class);
+        $this->app->bind(CalledEntries::class, CalledEntryCheck::class);
+        $this->app->bind(BreakOverrunNotices::class, BreakOverrunNotice::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([ClosePastDaysCommand::class]);
+        }
     }
 
     public function boot(): void

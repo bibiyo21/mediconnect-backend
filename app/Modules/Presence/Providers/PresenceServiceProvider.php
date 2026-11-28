@@ -2,6 +2,7 @@
 
 namespace App\Modules\Presence\Providers;
 
+use App\Modules\Presence\Console\AutoCheckOutCommand;
 use App\Modules\Presence\Contracts\PresenceAdmission;
 use App\Modules\Presence\Contracts\PresenceVisibility;
 use App\Modules\Presence\Services\PresenceAdmissionService;
@@ -20,6 +21,10 @@ final class PresenceServiceProvider extends ServiceProvider
     {
         $this->app->bind(PresenceAdmission::class, PresenceAdmissionService::class);
         $this->app->bind(PresenceVisibility::class, PresenceCache::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([AutoCheckOutCommand::class]);
+        }
     }
 
     public function boot(): void

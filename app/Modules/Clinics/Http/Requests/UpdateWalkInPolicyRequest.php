@@ -38,6 +38,8 @@ final class UpdateWalkInPolicyRequest extends ClinicScopedRequest
             'capacity_mode' => ['sometimes', Rule::enum(CapacityMode::class)],
             /** How many times a called patient may be recalled before staff may mark them a no-show. 1 to 10 (WalkInPolicy::MAX_RECALL_LIMIT), default 2. */
             'recall_limit' => ['sometimes', 'integer', 'min:1', 'max:'.WalkInPolicy::MAX_RECALL_LIMIT],
+            /** Minutes after the latest of the clinic's closing, the doctor's last shift end and the doctor's last booked end that day before an open session is checked out automatically. 0 to 720, default 60. */
+            'auto_checkout_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:'.WalkInPolicy::MAX_AUTO_CHECKOUT_GRACE_MINUTES],
         ];
     }
 
@@ -70,6 +72,9 @@ final class UpdateWalkInPolicyRequest extends ClinicScopedRequest
 
         if (array_key_exists('recall_limit', $validated)) {
             $changes['recall_limit'] = $this->integer('recall_limit');
+        }
+        if (array_key_exists('auto_checkout_grace_minutes', $validated)) {
+            $changes['auto_checkout_grace_minutes'] = $this->integer('auto_checkout_grace_minutes');
         }
 
         return $changes;

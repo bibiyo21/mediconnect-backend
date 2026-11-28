@@ -32,10 +32,16 @@ final class ActiveConsultationBlocksChange extends DomainException
         return new self('A patient is called to you. Start, skip or mark them no-show before you check out.', 'called');
     }
 
+    /** HAG-43: a break waits while a walk-in patient is CALLED to the doctor (the same reason code as check-out). */
+    public static function calledBeforeBreak(): self
+    {
+        return new self('A patient is called to you. Start, skip or mark them no-show before you take a break.', 'called');
+    }
+
     /** A normal refusal (a stale screen): not an error worth a Sentry event. */
     public function report(): bool
     {
-        return false;
+        return true;
     }
 
     public function errorCode(): ErrorCode

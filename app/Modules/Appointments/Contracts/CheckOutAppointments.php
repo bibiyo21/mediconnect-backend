@@ -20,6 +20,12 @@ interface CheckOutAppointments
     public function remaining(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array;
 
     /**
+     * The latest end among the doctor's live appointments at the location that overlap $fromUtc..$toUtc, or null when there are none. Advisory
+     * (no lock): the auto check-out uses it to find when the doctor's last booked in-person work ends today (5.8 V-M1).
+     */
+    public function lastEndsAt(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): ?CarbonImmutable;
+
+    /**
      * Sets needs_rescheduling on those same appointments (FOR UPDATE, ascending id) and opens one DOCTOR_CHECKOUT rescheduling task each. The
      * task insert is idempotent through the open-task partial unique index, so a second check-out the same day creates none. Must run inside
      * the caller's transaction, after the doctor's session lock. Never cancels.

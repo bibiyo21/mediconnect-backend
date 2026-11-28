@@ -117,7 +117,10 @@ final class DocumentsErrorEnvelope
                 }
 
                 $isCheckOut = str_ends_with($path->path, 'presence/check-out');
-                $activeNote = str_ends_with($path->path, 'presence/break/start') || str_ends_with($path->path, 'presence/unavailable') ? ' ACTIVE_CONSULTATION: a consultation is in progress; end it first (errors carry no ids).' : '';
+                $activeNote = str_ends_with($path->path, 'presence/unavailable') ? ' ACTIVE_CONSULTATION: a consultation is in progress; end it first (errors carry no ids).' : '';
+                if (str_ends_with($path->path, 'presence/break/start')) {
+                    $activeNote = ' ACTIVE_CONSULTATION (reason_code `in_progress` or `called`): a consultation is in progress, or a walk-in patient is called to this doctor; end it, or start, skip or mark that patient no-show first (no ids).';
+                }
                 if ($isCheckOut) {
                     $activeNote = ' ACTIVE_CONSULTATION (reason_code `in_progress`, `interrupted` or `called`): a consultation is in progress or interrupted, or a walk-in patient is called; end it, or start, skip or mark that patient no-show first (no ids).';
                 }

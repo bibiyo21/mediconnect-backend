@@ -20,7 +20,7 @@ final class RegistrationRefused extends DomainException
     /** A normal client-side refusal: not an error worth a Sentry event. */
     public function report(): bool
     {
-        return false;
+        return true;
     }
 
     public function errorCode(): ErrorCode

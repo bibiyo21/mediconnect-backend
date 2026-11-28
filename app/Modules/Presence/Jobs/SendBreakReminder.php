@@ -5,6 +5,7 @@ namespace App\Modules\Presence\Jobs;
 use App\Modules\Notifications\Contracts\SendsNotifications;
 use App\Modules\Presence\Enums\PresenceStatus;
 use App\Modules\Presence\Models\DoctorPresenceSession;
+use App\Modules\WalkIns\Contracts\BreakOverrunNotices;
 use App\Shared\Contracts\Clock;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,7 +37,10 @@ final class SendBreakReminder implements ShouldQueue
         return [10, 60];
     }
 
-    public function handle(SendsNotifications $notifications, Clock $clock): void
+    /**
+     * The doctor's reminder, and (increment 5.8, D-P) the once-per-break "running late" notice to walk-in patients still waiting in the doctor's queues.
+     */
+    public function handle(SendsNotifications $notifications, Clock $clock, BreakOverrunNotices $delays): void
     {
         $session = DoctorPresenceSession::whereKey($this->sessionId)->whereNull('checked_out_at')->first();
         $expected = CarbonImmutable::parse($this->expectedEndAt);
@@ -64,11 +68,14 @@ final class SendBreakReminder implements ShouldQueue
             }
 
             $userId = DB::table('doctor_profiles')->where('id', $session->doctor_profile_id)->value('user_id');
-            if (is_string($userId)) {
-                // The notice rows are written together or not at all; the dedupe mark is set only once they exist, so a failed run retries.
-                DB::transaction(fn () => $notifications->notify($userId, 'presence.break_ended', 'Your break time is up', 'Your planned break has ended. Open the app to update your status.', ['clinic_location_id' => (string) $session->clinic_location_id]));
-                Cache::put($key, true, now()->addDay());
-            }
+            // The notice rows are written together or not at all; the dedupe mark is set only once they exist, so a failed run retries.
+            DB::transaction(function () use ($notifications, $delays, $userId, $session, $clock): void {
+                if (is_string($userId)) {
+                    $notifications->notify($userId, 'presence.break_ended', 'Your break time is up', 'Your planned break has ended. Open the app to update your status.', ['clinic_location_id' => (string) $session->clinic_location_id]);
+                }
+                $delays->notifyWaitingPatients((string) $session->doctor_profile_id, (string) $session->clinic_location_id, $clock->now());
+            });
+            Cache::put($key, true, now()->addDay());
         } finally {
             $lock->release();
         }

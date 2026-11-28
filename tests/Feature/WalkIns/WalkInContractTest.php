@@ -130,3 +130,15 @@ it('reads the real lists: every idempotent walk-in operation documents the Idemp
     }
     expect(DocumentsErrorEnvelope::WALK_IN_IDEMPOTENT)->toContain('POST walk-ins/queues/{id}/close')->toContain('POST walk-ins/{id}/transfer');
 });
+
+it('the walk-in routes that carry the idempotent middleware are exactly WALK_IN_IDEMPOTENT, so the contract list cannot drift from the routes', function () {
+    $routed = collect(app('router')->getRoutes()->getRoutes())
+        ->filter(fn ($route) => str_starts_with($route->uri(), 'api/v1/walk-ins') && in_array('idempotent', $route->middleware(), true))
+        ->map(fn ($route) => $route->methods()[0].' '.substr($route->uri(), strlen('api/v1/')))
+        // POST walk-ins/{id}/complete is a consultation write (5.7), documented under the consultation list, not the walk-in list.
+        ->reject(fn (string $route) => $route === 'POST walk-ins/{id}/complete')
+        ->sort()->values()->all();
+
+    expect($routed)->not->toBeEmpty()
+        ->and($routed)->toBe(collect(DocumentsErrorEnvelope::WALK_IN_IDEMPOTENT)->sort()->values()->all());
+});

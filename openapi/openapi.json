@@ -9086,7 +9086,7 @@
                         "$ref": "#/components/responses/AuthorizationException"
                     },
                     "409": {
-                        "description": "ACTIVE_CONSULTATION: a consultation is in progress; end it first (errors carry no ids). INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.",
+                        "description": "ACTIVE_CONSULTATION (reason_code `in_progress` or `called`): a consultation is in progress, or a walk-in patient is called to this doctor; end it, or start, skip or mark that patient no-show first (no ids). INVALID_STATE_TRANSITION: the move is not allowed from the current status (reason_code `not_checked_in` or `invalid_transition`; errors.status is the current status), or `change_in_progress` (CONCURRENT_MODIFICATION): retry. A repeat of the state already reached is a 200, not a 409.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -15373,25 +15373,19 @@
                 },
                 "title": "CallWalkInRequest"
             },
-            "CancelReason": {
-                "type": "string",
-                "description": "Why an entry was cancelled (decision 52). Only the code is ever stored on the event, audit row or notice.\n| |\n|---|\n| `PATIENT_REQUEST` <br/>  |\n| `PATIENT_LEFT` <br/>  |\n| `DUPLICATE_ENTRY` <br/>  |\n| `OTHER` <br/>  |\n| `DOCTOR_CHECKED_OUT` <br/> The doctor checked out and staff chose NOTIFY_AND_CANCEL (increment 5.8, D-D). |",
-                "enum": [
-                    "PATIENT_REQUEST",
-                    "PATIENT_LEFT",
-                    "DUPLICATE_ENTRY",
-                    "OTHER",
-                    "DOCTOR_CHECKED_OUT"
-                ],
-                "title": "CancelReason"
-            },
             "CancelWalkInRequest": {
                 "type": "object",
                 "description": "POST /walk-ins/{id}/cancel",
                 "properties": {
                     "reason_code": {
-                        "description": "PATIENT_REQUEST, PATIENT_LEFT, DUPLICATE_ENTRY or OTHER. A fixed code: no free text.\n\n| |\n|---|\n| `PATIENT_REQUEST` <br/>  |\n| `PATIENT_LEFT` <br/>  |\n| `DUPLICATE_ENTRY` <br/>  |\n| `OTHER` <br/>  |\n| `DOCTOR_CHECKED_OUT` <br/> The doctor checked out and staff chose NOTIFY_AND_CANCEL (increment 5.8, D-D). |",
-                        "$ref": "#/components/schemas/CancelReason"
+                        "type": "string",
+                        "description": "PATIENT_REQUEST, PATIENT_LEFT, DUPLICATE_ENTRY or OTHER. A fixed code: no free text. The system-only codes are never accepted here.",
+                        "enum": [
+                            "PATIENT_REQUEST",
+                            "PATIENT_LEFT",
+                            "DUPLICATE_ENTRY",
+                            "OTHER"
+                        ]
                     },
                     "patient_informed_in_person": {
                         "type": "boolean",
@@ -21015,6 +21009,12 @@
                         "description": "How many times a called patient may be recalled before staff may mark them a no-show. 1 to 10 (WalkInPolicy::MAX_RECALL_LIMIT), default 2.",
                         "minimum": 1,
                         "maximum": 10
+                    },
+                    "auto_checkout_grace_minutes": {
+                        "type": "integer",
+                        "description": "Minutes after the latest of the clinic's closing, the doctor's last shift end and the doctor's last booked end that day before an open session is checked out automatically. 0 to 720, default 60.",
+                        "minimum": 0,
+                        "maximum": 720
                     }
                 },
                 "title": "UpdateWalkInPolicyRequest"
@@ -21722,6 +21722,10 @@
                         "type": "integer",
                         "description": "How many times a called patient may be recalled before staff may mark a no-show."
                     },
+                    "auto_checkout_grace_minutes": {
+                        "type": "integer",
+                        "description": "Minutes after closing before an open session of this doctor here is checked out automatically (0 to 720)."
+                    },
                     "derived_capacity_today": {
                         "type": "integer",
                         "description": "The capacity today's schedule gives this doctor here (the sum over today's walk-in shifts). With UNLIMITED it is informational: the queue has no cap."
@@ -21743,6 +21747,7 @@
                     "number_prefix",
                     "capacity_mode",
                     "recall_limit",
+                    "auto_checkout_grace_minutes",
                     "derived_capacity_today",
                     "local_date",
                     "timezone"

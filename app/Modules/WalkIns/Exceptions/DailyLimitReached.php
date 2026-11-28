@@ -18,7 +18,7 @@ final class DailyLimitReached extends DomainException
 
     public function report(): bool
     {
-        return false;
+        return true;
     }
 
     public function errorCode(): ErrorCode

@@ -56,7 +56,7 @@ final class CheckOutQueues implements CheckOutQueuesContract
         return $this->facts($doctorProfileId, $locationId, $localDate, $queues, $entries, $doctorQueueIds);
     }
 
-    public function apply(CheckOutQueueFacts $facts, CheckOutDisposition $disposition, ?string $actorUserId, bool $guestsInformed): CheckOutQueueResult
+    public function apply(CheckOutQueueFacts $facts, CheckOutDisposition $disposition, ?string $actorUserId, bool $guestsInformed, bool $notifyHeld = true): CheckOutQueueResult
     {
         if ($disposition === CheckOutDisposition::NotifyAndCancel && $facts->guestDispositionableCount() > 0 && ! $guestsInformed) {
             throw ValidationException::withMessages(['guests_informed_in_person' => ['Tell each guest in person, then confirm it here: a guest has no notification.']]);
@@ -72,7 +72,7 @@ final class CheckOutQueues implements CheckOutQueuesContract
         if ($disposition === CheckOutDisposition::HoldForReassignment) {
             foreach ($facts->dispositionable() as $entry) {
                 $held++;
-                if ($entry['patient_profile_id'] !== null) {
+                if ($notifyHeld && $entry['patient_profile_id'] !== null) {
                     $this->notifyPatient($entry['patient_profile_id'], 'walkins.doctor_checked_out', 'The doctor has left the clinic', 'Please ask the clinic desk for advice. Your place is kept for now.', ['entry_id' => $entry['id']]);
                 }
             }

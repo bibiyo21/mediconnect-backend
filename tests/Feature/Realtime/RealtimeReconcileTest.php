@@ -45,6 +45,7 @@ beforeEach(function () {
     $this->pusher = fake_pusher();
     Cache::flush();
     [$this->clinic, $this->locA, $manager] = clinic_with_manager('Santos Family Clinic');
+    $this->manager = $manager;
     $this->locB = add_location($this->clinic, $manager, 'Branch B');
 });
 
@@ -78,7 +79,8 @@ function staff_at(?string $locationId = null, string $status = 'ACTIVE'): User
 
 it('keeps an authorized member on every channel', function () {
     $staff = staff_at();
-    $doctor = verified_doctor('0123456', 'ACTIVE')[0];
+    [$doctor, $doctorHeaders] = verified_doctor('0123456', 'ACTIVE');
+    assign($this->clinic, $this->locA, $this->manager, $doctorHeaders); // the doctor channel needs an ACTIVE assignment (5.8 L1)
     $doctorUser = swept(User::findOrFail($doctor->user_id));
     put_on("clinic.{$this->locA}", $staff->id);
     put_on("clinic.{$this->locA}.queue", $staff->id);

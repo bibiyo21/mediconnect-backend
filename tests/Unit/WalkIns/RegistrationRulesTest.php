@@ -58,7 +58,7 @@ it('reads only well-formed stored values and ignores the rest, including the sup
     $bad = WalkInPolicy::fromStored(['allow_patient_app_registration' => 'true', 'cutoff_minutes_before_close' => '30', 'number_prefix' => 'dr', 'capacity_mode' => 'NONE']);
 
     expect($p->allowPatientAppRegistration)->toBeTrue()->and($p->cutoffMinutesBeforeClose)->toBe(0)->and($p->numberPrefix)->toBe('DR')->and($p->capacityMode)->toBe(CapacityMode::Unlimited)
-        ->and($p->toStored())->toBe(['allow_patient_app_registration' => true, 'cutoff_minutes_before_close' => 0, 'number_prefix' => 'DR', 'capacity_mode' => 'UNLIMITED', 'recall_limit' => 2])
+        ->and($p->toStored())->toBe(['allow_patient_app_registration' => true, 'cutoff_minutes_before_close' => 0, 'number_prefix' => 'DR', 'capacity_mode' => 'UNLIMITED', 'recall_limit' => 2, 'auto_checkout_grace_minutes' => 60])
         ->and($bad->allowPatientAppRegistration)->toBeFalse()->and($bad->cutoffMinutesBeforeClose)->toBe(30)->and($bad->numberPrefix)->toBeNull()->and($bad->capacityMode)->toBe(CapacityMode::Derived);
     expect($p->with(['number_prefix' => null])->numberPrefix)->toBeNull()->and($p->with(['cutoff_minutes_before_close' => 15])->allowPatientAppRegistration)->toBeTrue();
 });

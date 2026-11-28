@@ -78,7 +78,9 @@ final class QueueTransfer
             [$lockedSource, $lockedTarget] = $this->lockQueues($source, $target);
 
             $current = WalkInQueueEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail();
-            if ($current->walkin_queue_id !== $source->id || ! in_array($current->status, [EntryStatus::Registered, EntryStatus::Waiting], true)) {
+            // A concurrent transfer that moved the entry first is a retryable conflict (5.8 review), not an illegal transition.
+            LockWait::assertEntryInQueue($current, $lockedSource);
+            if (! in_array($current->status, [EntryStatus::Registered, EntryStatus::Waiting], true)) {
                 throw InvalidEntryTransition::entry($current->status, 'transferred');
             }
 

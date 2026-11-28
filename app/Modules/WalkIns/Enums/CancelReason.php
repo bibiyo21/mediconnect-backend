@@ -11,4 +11,6 @@ enum CancelReason: string
     case Other = 'OTHER';
     /** The doctor checked out and staff chose NOTIFY_AND_CANCEL (increment 5.8, D-D). */
     case DoctorCheckedOut = 'DOCTOR_CHECKED_OUT';
+    /** The daily sweep closed a queue from an earlier day (increment 5.8, D-O): a system cancel, never CALLED or IN_CONSULTATION. */
+    case EndOfDay = 'END_OF_DAY';
 }

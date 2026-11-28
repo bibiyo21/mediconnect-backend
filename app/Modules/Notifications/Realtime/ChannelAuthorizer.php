@@ -5,6 +5,7 @@ namespace App\Modules\Notifications\Realtime;
 use App\Modules\Clinics\Contracts\ClinicAccess;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Users\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -33,11 +34,15 @@ final class ChannelAuthorizer
         return Str::isUuid($userId) && $user->id === $userId;
     }
 
-    /** The doctor channel of the profile you own. Clinic staff are not doctors and cannot subscribe. */
+    /**
+     * The doctor channel of the profile you own, while the profile has an ACTIVE clinic assignment (5.8 L1): an ended assignment ends
+     * the subscription too, so a former clinic's queue events stop. Clinic staff are not doctors and cannot subscribe.
+     */
     public function doctor(User $user, string $doctorProfileId): bool
     {
         return Str::isUuid($doctorProfileId)
-            && DoctorProfile::whereKey($doctorProfileId)->where('user_id', $user->id)->exists();
+            && DoctorProfile::whereKey($doctorProfileId)->where('user_id', $user->id)->exists()
+            && DB::table('doctor_clinic_assignments')->where('doctor_profile_id', $doctorProfileId)->where('status', 'ACTIVE')->exists();
     }
 
     /**

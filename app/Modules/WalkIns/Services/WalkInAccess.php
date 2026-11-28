@@ -3,6 +3,7 @@
 namespace App\Modules\WalkIns\Services;
 
 use App\Modules\Clinics\Contracts\ClinicAccess;
+use App\Modules\Clinics\Models\DoctorClinicAssignment;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Users\Models\User;
 use App\Modules\WalkIns\Enums\RegistrationChannel;
@@ -46,6 +47,12 @@ final class WalkInAccess
         return $bag[$key];
     }
 
+    /** The doctor's own queue is theirs to act on only while they hold an ACTIVE assignment at this location (5.8 L1: an ended assignment ends access). */
+    private function assignedHere(string $doctorProfileId, string $locationId): bool
+    {
+        return DoctorClinicAssignment::query()->where('doctor_profile_id', $doctorProfileId)->where('clinic_location_id', $locationId)->where('status', 'ACTIVE')->exists();
+    }
+
     public function ownDoctorId(User $user): ?string
     {
         return $this->once("doctor:{$user->id}", function () use ($user): ?string {
@@ -80,7 +87,7 @@ final class WalkInAccess
         if ($this->memberMay($user, $permission, $locationId)) {
             return RegistrationChannel::StaffConsole;
         }
-        if ($queueDoctorId !== null && $this->ownDoctorId($user) === $queueDoctorId && $this->doctorRoleHolds($user, $permission)) {
+        if ($queueDoctorId !== null && $this->ownDoctorId($user) === $queueDoctorId && $this->doctorRoleHolds($user, $permission) && $this->assignedHere($queueDoctorId, $locationId)) {
             return RegistrationChannel::DoctorApp;
         }
 
@@ -110,7 +117,7 @@ final class WalkInAccess
         if ($this->memberMay($user, 'walkins.view', $locationId)) {
             return ViewLevel::Staff;
         }
-        if ($queueDoctorId !== null && $this->ownDoctorId($user) === $queueDoctorId && $this->doctorRoleHolds($user, 'walkins.view')) {
+        if ($queueDoctorId !== null && $this->ownDoctorId($user) === $queueDoctorId && $this->doctorRoleHolds($user, 'walkins.view') && $this->assignedHere($queueDoctorId, $locationId)) {
             return ViewLevel::Doctor;
         }
         if ($this->clinics->allowsAtLocation($user, 'walkins.view', $locationId)) {

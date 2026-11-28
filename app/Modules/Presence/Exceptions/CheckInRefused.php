@@ -17,7 +17,7 @@ final class CheckInRefused extends DomainException
     /** A normal client-side refusal (a double tap, a stale screen): not an error worth a Sentry event. */
     public function report(): bool
     {
-        return false;
+        return true;
     }
 
     public function reasonCode(): string

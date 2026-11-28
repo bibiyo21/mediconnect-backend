@@ -279,3 +279,27 @@ it('blocks on a stale CALLED entry at another clinic, but never returns its id i
     $this->postJson('/api/v1/presence/check-out', ['reason' => 'END_OF_SHIFT', 'walkin_disposition' => 'HOLD_FOR_REASSIGNMENT'], $this->w['doctorHeaders'])
         ->assertStatus(409)->assertJsonPath('reason_code', 'called');
 });
+
+it('with no open session here, reports one block (not_checked_in) and no called signal, even when a stale CALLED entry points at the doctor (5.8-3 C1)', function () {
+    // The doctor checks out here first: a called patient at this location would block it (and must not be checked by the preview).
+    app('auth')->forgetGuards();
+    $this->postJson('/api/v1/presence/check-out', ['reason' => 'END_OF_SHIFT', 'walkin_disposition' => 'HOLD_FOR_REASSIGNMENT'], $this->w['doctorHeaders'])->assertOk();
+
+    $other = walkin_world(['clinic' => 'Reyes Clinic', 'licence' => '2222222', 'remote' => true]);
+    doctor_in($other);
+    [, $otherProfile, $otherHeaders] = remote_patient();
+    $otherStaff = staff_of($other);
+    fresh_session();
+    $entry = register_walkin($otherHeaders, patient_body($other['service'], $otherProfile))->assertCreated()->json('data.id');
+    fresh_session();
+    wi_post("{$entry}/arrive", $otherStaff)->assertOk();
+    fresh_session();
+    wi_call_next((string) DB::table('walkin_queues')->where('doctor_profile_id', $other['doctor']->id)->value('id'), $otherStaff)->assertOk();
+    DB::table('walkin_queue_entries')->where('id', $entry)->update(['assigned_doctor_profile_id' => $this->doctorId]);
+
+    $r = cp_preview($this->w['manager'], ['doctor_id' => $this->doctorId, 'clinic_location_id' => $this->w['location']])->assertOk();
+    expect($r->json('data.blocking'))->toBe([['code' => 'INVALID_STATE_TRANSITION', 'reason_code' => 'not_checked_in']])
+        ->and($r->json('data.queues'))->toBe([])
+        ->and($r->json('data.called_entry_ids'))->toBeNull()
+        ->and($r->getContent())->not->toContain($entry);
+});

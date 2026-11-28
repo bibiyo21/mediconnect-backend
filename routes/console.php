@@ -26,6 +26,10 @@ Schedule::job(new ExpireSlotReservations)->everyMinute();
 Schedule::job(new PurgeGuestWalkInPii)->dailyAt('03:30');
 // Failed walk-in realtime hints older than a day (M-1): allowlisted classes only, never a global prune.
 Schedule::job(new PruneFailedHints)->dailyAt('03:45');
+// Automatic check-out (increment 5.8, D-L): a forgotten check-out after the clinic closes, or from an earlier day. HOLD only, never cancels.
+Schedule::command('presence:auto-checkout')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+// Past-day walk-in queues (increment 5.8, D-O). Hourly, so each location's local midnight is covered; idempotent per queue.
+Schedule::command('walkins:close-past-days')->hourlyAt(15)->withoutOverlapping()->onOneServer();
 // Realtime sweep (increment 5.6-0): closes sockets whose authorization or credential ended without a
 // terminate call. A command, not a queued job, so each tick starts with no stale model or permission state.
 Schedule::command('realtime:reconcile')->everyMinute()->withoutOverlapping(5)->onOneServer()->runInBackground();

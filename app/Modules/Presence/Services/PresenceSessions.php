@@ -19,6 +19,7 @@ use App\Modules\Presence\Exceptions\InvalidPresenceTransition;
 use App\Modules\Presence\Exceptions\PresenceChangeInProgress;
 use App\Modules\Presence\Jobs\SendBreakReminder;
 use App\Modules\Presence\Models\DoctorPresenceSession;
+use App\Modules\WalkIns\Contracts\CalledEntries;
 use App\Shared\Contracts\Clock;
 use Closure;
 use Illuminate\Database\QueryException;
@@ -50,6 +51,7 @@ final class PresenceSessions
         private readonly Clock $clock,
         private readonly ClinicAccess $clinics,
         private readonly ActiveConsultations $consultations,
+        private readonly CalledEntries $called,
     ) {}
 
     /**
@@ -206,6 +208,11 @@ final class PresenceSessions
             // D-I: taken under the session lock above, so no consultation can start between this check and the change.
             if (in_array($to, [PresenceStatus::OnBreak, PresenceStatus::TemporarilyUnavailable], true) && $this->consultations->inProgressFor($doctorId) !== null) {
                 throw new ActiveConsultationBlocksChange;
+            }
+            // HAG-43 (owner, 2026-11-28): a break waits while a walk-in patient is CALLED to the doctor, anywhere (as check-out does). An
+            // INTERRUPTED consultation does not block a break. The call paths hold this row FOR SHARE, so the answer cannot change under us.
+            if ($to === PresenceStatus::OnBreak && $this->called->hasCalledFor($doctorId)) {
+                throw ActiveConsultationBlocksChange::calledBeforeBreak();
             }
 
             $metadata = $prepare !== null ? $prepare($session) : null;

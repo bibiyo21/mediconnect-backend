@@ -6,17 +6,22 @@ use App\Modules\Clinics\Models\DoctorClinicAssignment;
 use App\Modules\Consultations\Services\CareRelationshipService;
 use App\Modules\Doctors\Models\DoctorProfile;
 use App\Modules\Patients\Models\PatientProfile;
+use App\Modules\Presence\Console\AutoCheckOutCommand;
+use App\Modules\Presence\Services\AutoCheckOutCandidates;
 use App\Modules\Presence\Services\PresenceAdmissionService;
 use App\Modules\Rbac\Enums\Role;
 use App\Modules\Scheduling\Services\WalkInDayService;
 use App\Modules\Users\Models\User;
+use App\Modules\WalkIns\Console\ClosePastDaysCommand;
 use App\Modules\WalkIns\Estimation\RollingDurationStats;
 use App\Modules\WalkIns\Estimation\WaitTimeEstimator;
 use App\Modules\WalkIns\Jobs\PurgeGuestWalkInPii;
+use App\Modules\WalkIns\Listeners\FanOutOnPresenceChange;
 use App\Modules\WalkIns\Realtime\QueueRealtime;
 use App\Modules\WalkIns\Services\EntryActions;
 use App\Modules\WalkIns\Services\EntryPresenter;
 use App\Modules\WalkIns\Services\JoinPreview;
+use App\Modules\WalkIns\Services\PastDaySweep;
 use App\Modules\WalkIns\Services\QueueClose;
 use App\Modules\WalkIns\Services\QueueEstimates;
 use App\Modules\WalkIns\Services\QueueOperations;
@@ -43,7 +48,8 @@ function pin_walkin_clock(?CarbonImmutable $at = null): PinnedClock
         WalkInRegistration::class, WalkInDayService::class, QueueEstimates::class, EntryPresenter::class, PresenceAdmissionService::class,
         WaitTimeEstimator::class, RollingDurationStats::class, EntryActions::class, WalkInReader::class, JoinPreview::class, PurgeGuestWalkInPii::class,
         WalkInPolicyController::class, QueueRealtime::class, CareRelationshipService::class, QueueOperations::class,
-        QueueTransfer::class, QueueClose::class,
+        QueueTransfer::class, QueueClose::class, FanOutOnPresenceChange::class,
+        AutoCheckOutCandidates::class, AutoCheckOutCommand::class, PastDaySweep::class, ClosePastDaysCommand::class,
     ] as $consumer) {
         app()->when($consumer)->needs(Clock::class)->give(fn () => $clock);
     }
@@ -316,4 +322,15 @@ function wi_second_queue_for_doctor(array $world, string $status = 'WAITING', st
 function wi_status(string $id): string
 {
     return (string) DB::table('walkin_queue_entries')->where('id', $id)->value('status');
+}
+
+/** A patient's walk-in registered and arrived (WAITING) at the world's queue: the entry id. Shared by the 5.8-3 tests. */
+function walkin_arrived(array $w, array $staff, array $patientHeaders, string $profile): string
+{
+    app('auth')->forgetGuards();
+    $entry = register_walkin($patientHeaders, patient_body($w['service'], $profile))->assertCreated()->json('data.id');
+    app('auth')->forgetGuards();
+    wi_post("{$entry}/arrive", $staff)->assertOk();
+
+    return $entry;
 }

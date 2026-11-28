@@ -98,7 +98,7 @@ final class EntryActions
      *
      * @param  array<string, bool|string>  $metadata  event metadata beyond `by` (for example patient_informed_in_person for a guest)
      */
-    public function cancelUnderLock(WalkInQueue $queue, WalkInQueueEntry $entry, CancelReason $reason, string $by, ?string $actorUserId, array $metadata, bool $notify): void
+    public function cancelUnderLock(WalkInQueue $queue, WalkInQueueEntry $entry, CancelReason $reason, string $by, ?string $actorUserId, array $metadata, bool $notify, bool $push = true): void
     {
         $from = $entry->status;
         $entry->forceFill(['status' => EntryStatus::Cancelled, 'assigned_doctor_profile_id' => null])->save();
@@ -114,7 +114,7 @@ final class EntryActions
         if ($notify && $entry->patient_profile_id !== null) {
             // Generic text, ids only: the same notice as a staff cancel (decision 260).
             foreach ($this->patients->userIds($entry->patient_profile_id) as $userId) {
-                $this->notifications->notify($userId, 'walkins.cancelled', 'Your walk-in queue entry was cancelled', 'Open the app for details.', ['entry_id' => $entry->id]);
+                $this->notifications->notify($userId, 'walkins.cancelled', 'Your walk-in queue entry was cancelled', 'Open the app for details.', ['entry_id' => $entry->id], $push);
             }
         }
         $this->realtime->entryChanged($queue, $entry);

@@ -30,6 +30,8 @@ beforeEach(function () {
     [$this->otherClinic, $this->otherLoc, $otherManager] = clinic_with_manager('Diliman Medical Clinic');
 
     [$this->doctor, $doctorHeaders] = verified_doctor('0123456', 'ACTIVE');
+    // The doctor channel needs an ACTIVE assignment (5.8 L1): accept one at the clinic.
+    assign($this->clinic, $this->locA, $manager, $doctorHeaders);
     [$this->otherDoctor, $otherDoctorHeaders] = verified_doctor('7654321', 'ACTIVE');
 
     $patient = patient_account();

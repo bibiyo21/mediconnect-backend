@@ -22,6 +22,13 @@ final class CheckOutAppointmentsService implements CheckOutAppointments
             ->all());
     }
 
+    public function lastEndsAt(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): ?CarbonImmutable
+    {
+        $end = $this->window($doctorProfileId, $locationId, $fromUtc, $toUtc)->max('ends_at');
+
+        return $end === null ? null : CarbonImmutable::parse((string) $end)->utc();
+    }
+
     public function flagForCheckOut(string $doctorProfileId, string $locationId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
     {
         $ids = $this->window($doctorProfileId, $locationId, $fromUtc, $toUtc)

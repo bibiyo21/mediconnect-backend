@@ -8,7 +8,9 @@ use App\Modules\Clinics\Contracts\ClinicAccess;
 use App\Modules\Consultations\Contracts\ActiveConsultations;
 use App\Modules\Consultations\DTOs\UnfinishedConsultation;
 use App\Modules\Consultations\Enums\ConsultationStatus;
+use App\Modules\Notifications\Contracts\SendsNotifications;
 use App\Modules\Presence\Enums\CheckOutReason;
+use App\Modules\Presence\Enums\PresenceChangeMethod;
 use App\Modules\Presence\Enums\PresenceStatus;
 use App\Modules\Presence\Events\DoctorCheckedOut;
 use App\Modules\Presence\Events\DoctorPresenceUpdated;
@@ -32,6 +34,10 @@ use LogicException;
  * Lock order (brief §3): session FOR UPDATE, then the consultation read (no lock), queues (ascending id), entries (ascending id), cancelled
  * consultations and care relationships (inside the queue apply), appointments (FOR UPDATE, then the rescheduling-task insert), the session
  * update and the event and audit rows. Check-out never takes advisory lock 5504.
+ *
+ * The queue day and the appointment window follow the ACTOR (5.8 M1). A doctor or staff check-out is a real departure now, so today's queue
+ * and today's appointments are used. The SYSTEM actor closes a session that began on an earlier day (or was forgotten), so it works on the
+ * session's own local day: today's queues are untouched and no appointment of today is flagged for rescheduling.
  */
 final class PresenceCheckOut
 {
@@ -43,6 +49,7 @@ final class PresenceCheckOut
         private readonly ClinicAccess $clinics,
         private readonly RecordsAudit $audit,
         private readonly Clock $clock,
+        private readonly SendsNotifications $notifications,
     ) {}
 
     /**
@@ -83,7 +90,8 @@ final class PresenceCheckOut
         $queueRows = [];
         $calledIds = null;
         $liveIds = null;
-        if ($location !== null) {
+        // Gated on the open session (5.8 C1): a caller with no session at this location learns nothing about its queues or called entries.
+        if ($session !== null && $location !== null) {
             $facts = $this->queues->peek($doctorId, $location, $this->localDate($location, $now));
             if ($facts->calledCount() > 0) {
                 $blocking[] = ['code' => 'ACTIVE_CONSULTATION', 'reason_code' => 'called'];
@@ -130,18 +138,22 @@ final class PresenceCheckOut
      *
      * @return array{session: DoctorPresenceSession, result: array{queues_paused: int, entries_held: int, entries_cancelled: int, appointments_flagged: int, tasks_created: int}}
      */
-    public function checkOut(PresenceActor $actor, string $doctorId, ?string $locationId, CheckOutReason $reason, CheckOutDisposition $disposition, bool $guestsInformed): array
+    public function checkOut(PresenceActor $actor, string $doctorId, ?string $locationId, CheckOutReason $reason, CheckOutDisposition $disposition, bool $guestsInformed, ?string $expectedSessionId = null): array
     {
         // The system never cancels a patient's place (D-D): a SYSTEM actor may only hold entries (5.8 m4).
         if ($actor->user === null && $disposition === CheckOutDisposition::NotifyAndCancel) {
             throw new LogicException('The SYSTEM actor may not cancel walk-in entries: only HOLD_FOR_REASSIGNMENT.');
         }
 
-        return $this->sessions->guarded(function () use ($actor, $doctorId, $locationId, $reason, $disposition, $guestsInformed): array {
+        return $this->sessions->guarded(function () use ($actor, $doctorId, $locationId, $reason, $disposition, $guestsInformed, $expectedSessionId): array {
             $session = DoctorPresenceSession::query()->where('doctor_profile_id', $doctorId)->whereNull('checked_out_at')
                 ->when($locationId !== null, fn ($q) => $q->where('clinic_location_id', $locationId))
                 ->lockForUpdate()->first();
             if ($session === null) {
+                throw InvalidPresenceTransition::between(PresenceStatus::NotCheckedIn, PresenceStatus::Out);
+            }
+            // An automatic check-out is for one session (5.8 m7): if that session was closed and a new one opened meanwhile, the new one is not ours.
+            if ($expectedSessionId !== null && (string) $session->id !== $expectedSessionId) {
                 throw InvalidPresenceTransition::between(PresenceStatus::NotCheckedIn, PresenceStatus::Out);
             }
             $location = (string) $session->clinic_location_id;
@@ -157,13 +169,18 @@ final class PresenceCheckOut
             }
 
             $now = $this->clock->now();
-            $facts = $this->queues->lockForCheckOut($doctorId, $location, $this->localDate($location, $now));
+            $anchor = $actor->user === null ? CarbonImmutable::instance($session->checked_in_at) : $now;
+            $day = $this->localDate($location, $anchor);
+            $facts = $this->queues->lockForCheckOut($doctorId, $location, $day);
             if ($facts->calledCount() > 0) {
                 throw ActiveConsultationBlocksChange::called();
             }
 
-            $queueResult = $this->queues->apply($facts, $disposition, $actor->user?->id, $guestsInformed);
-            $flags = $this->appointments->flagForCheckOut($doctorId, $location, $now, $this->endOfLocalDay($location, $now));
+            // 5.8-3 S2: a SYSTEM check-out of a session from an earlier local day sends no hold notice. The past-day sweep cancels those
+            // entries later and tells the patient once; a "your place is kept" notice now would contradict it.
+            $earlierDay = $actor->user === null && $this->localDate($location, $now) !== $this->localDate($location, $anchor);
+            $queueResult = $this->queues->apply($facts, $disposition, $actor->user?->id, $guestsInformed, notifyHeld: ! $earlierDay);
+            $flags = $this->appointments->flagForCheckOut($doctorId, $location, $now, $this->endOfLocalDay($location, $anchor));
 
             $counts = [
                 'queues_paused' => $queueResult->queuesPaused,
@@ -186,6 +203,13 @@ final class PresenceCheckOut
             $metadata = ['disposition' => $disposition->value] + $counts;
             $this->sessions->record($session, $from, $actor, $reason, $metadata, 'presence.checked_out', $metadata);
             $this->sessions->afterChange($session, $actor);
+            if ($actor->method === PresenceChangeMethod::System) {
+                // 5.8 D-H: the doctor is told the system closed their session. Generic text, no reason, no names.
+                $doctorUser = DB::table('doctor_profiles')->where('id', $doctorId)->value('user_id');
+                if (is_string($doctorUser)) {
+                    $this->notifications->notify($doctorUser, 'presence.auto_checked_out', 'You were checked out automatically', 'Open the app to review your clinic status.', ['clinic_location_id' => $location]);
+                }
+            }
             DoctorCheckedOut::dispatch($doctorId, $location, (string) $session->id, PresenceStatus::Out, $session->version);
             DoctorPresenceUpdated::dispatch($doctorId, $location, (string) $session->id, PresenceStatus::Out, $session->version);
 

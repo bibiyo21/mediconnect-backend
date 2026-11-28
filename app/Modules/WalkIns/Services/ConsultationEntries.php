@@ -32,6 +32,8 @@ final class ConsultationEntries implements WalkInConsultationEntries
         $queueId = (string) WalkInQueueEntry::query()->whereKey($entryId)->value('walkin_queue_id');
         $queue = WalkInQueue::query()->whereKey($queueId)->lockForUpdate()->firstOrFail();
         $entry = WalkInQueueEntry::query()->whereKey($entryId)->lockForUpdate()->firstOrFail();
+        // The entry may have been moved by a transfer between the read above and the lock (5.8 review): refuse rather than act on the old queue.
+        LockWait::assertEntryInQueue($entry, $queue);
 
         $doctorId = $entry->assigned_doctor_profile_id ?? $queue->doctor_profile_id ?? '';
         $timezone = (string) ClinicLocation::query()->whereKey($queue->clinic_location_id)->value('timezone');

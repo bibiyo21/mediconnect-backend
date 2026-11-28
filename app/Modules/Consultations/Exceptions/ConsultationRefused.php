@@ -50,7 +50,7 @@ final class ConsultationRefused extends DomainException
     /** A normal refusal (a stale screen, a double tap): not an error worth a Sentry event. */
     public function report(): bool
     {
-        return false;
+        return true;
     }
 
     public function errorCode(): ErrorCode

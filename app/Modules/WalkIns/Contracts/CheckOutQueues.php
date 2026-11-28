@@ -24,7 +24,8 @@ interface CheckOutQueues
     /**
      * Pauses the doctor's OPEN queues and applies the disposition to the entries in the locked facts: HOLD leaves them in place with an
      * in-app notice; NOTIFY_AND_CANCEL cancels them (DOCTOR_CHECKED_OUT, with cancelForWalkIn and the staff-cancel notice). A guest entry
-     * needs $guestsInformed. $actorUserId is null only for the SYSTEM actor.
+     * needs $guestsInformed. $actorUserId is null only for the SYSTEM actor. $notifyHeld false sends no HOLD notice (5.8-3 S2): used for a
+     * SYSTEM check-out of an earlier-day session, where the past-day sweep cancels the held entries and tells the patient once.
      */
-    public function apply(CheckOutQueueFacts $facts, CheckOutDisposition $disposition, ?string $actorUserId, bool $guestsInformed): CheckOutQueueResult;
+    public function apply(CheckOutQueueFacts $facts, CheckOutDisposition $disposition, ?string $actorUserId, bool $guestsInformed, bool $notifyHeld = true): CheckOutQueueResult;
 }

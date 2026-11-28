@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 final class WalkInPolicyResource extends JsonResource
 {
-    /** @return array{assignment_id: string, clinic_location_id: string, doctor_profile_id: string, allow_patient_app_registration: bool, cutoff_minutes_before_close: int, number_prefix: string|null, capacity_mode: string, recall_limit: int, derived_capacity_today: int, local_date: string, timezone: string} */
+    /** @return array{assignment_id: string, clinic_location_id: string, doctor_profile_id: string, allow_patient_app_registration: bool, cutoff_minutes_before_close: int, number_prefix: string|null, capacity_mode: string, recall_limit: int, auto_checkout_grace_minutes: int, derived_capacity_today: int, local_date: string, timezone: string} */
     public function toArray(Request $request): array
     {
         /** @var WalkInPolicy $policy */
@@ -29,6 +29,8 @@ final class WalkInPolicyResource extends JsonResource
             'capacity_mode' => $policy->capacityMode->value,
             /** How many times a called patient may be recalled before staff may mark a no-show. */
             'recall_limit' => (int) $policy->recallLimit,
+            /** Minutes after closing before an open session of this doctor here is checked out automatically (0 to 720). */
+            'auto_checkout_grace_minutes' => (int) $policy->autoCheckoutGraceMinutes,
             /** The capacity today's schedule gives this doctor here (the sum over today's walk-in shifts). With UNLIMITED it is informational: the queue has no cap. */
             'derived_capacity_today' => (int) $this->resource['derived_capacity_today'],
             /** The location's local date the capacity is for (Y-m-d). */

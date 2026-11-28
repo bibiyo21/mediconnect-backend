@@ -54,7 +54,7 @@ final class QueueClose
         $by = $channel === RegistrationChannel::DoctorApp ? 'DOCTOR' : 'STAFF';
 
         return $this->locks->run(function () use ($user, $queue, $dispositions, $by): WalkInQueue {
-            // Only today's queue is blocked by the doctor's presence: a past-day queue closes whatever the doctor is doing today.
+            // Only today's queue is blocked by the doctor's presence: a past-day queue (local date before today, n2) closes whatever the doctor is doing today.
             $today = $this->isToday($queue);
             $presence = $queue->doctor_profile_id === null || ! $today ? null : $this->presence->lockShared((string) $queue->doctor_profile_id, $queue->clinic_location_id);
             if ($presence !== null && $this->checkedInHere($presence)) {

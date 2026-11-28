@@ -2,6 +2,7 @@
 
 use App\Modules\Notifications\Contracts\SendsNotifications;
 use App\Modules\Presence\Jobs\SendBreakReminder;
+use App\Modules\WalkIns\Contracts\BreakOverrunNotices;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -20,7 +21,7 @@ beforeEach(function () {
     $this->doc = $this->w['doctor'];
     $this->headers = $this->w['doctorHeaders'];
     $this->run = function (string $sessionId, string $end) {
-        (new SendBreakReminder($sessionId, $end))->handle(app(SendsNotifications::class), $this->clock);
+        (new SendBreakReminder($sessionId, $end))->handle(app(SendsNotifications::class), $this->clock, app(BreakOverrunNotices::class));
     };
     $this->reminders = fn () => DB::table('notifications')->where('notifiable_id', $this->doc->user_id)->where('type', 'presence.break_ended')->get();
 });
@@ -101,7 +102,7 @@ it('sets the dedupe mark only after the notice exists, so a failed run is retrie
             throw new RuntimeException('database hiccup');
         }
     };
-    expect(fn () => (new SendBreakReminder($session->id, $end->toIso8601ZuluString()))->handle($failing, $this->clock))->toThrow(RuntimeException::class);
+    expect(fn () => (new SendBreakReminder($session->id, $end->toIso8601ZuluString()))->handle($failing, $this->clock, app(BreakOverrunNotices::class)))->toThrow(RuntimeException::class);
     expect(Cache::has("presence:break-reminder:{$session->id}:{$end->getTimestamp()}"))->toBeFalse();
 
     // The retry goes through and then marks the break as done.
@@ -126,7 +127,7 @@ it('writes the notice rows together or not at all', function () {
         }
     };
 
-    expect(fn () => (new SendBreakReminder($session->id, $end->toIso8601ZuluString()))->handle($half, $this->clock))->toThrow(RuntimeException::class)
+    expect(fn () => (new SendBreakReminder($session->id, $end->toIso8601ZuluString()))->handle($half, $this->clock, app(BreakOverrunNotices::class)))->toThrow(RuntimeException::class)
         ->and(($this->reminders)())->toHaveCount(0);
 });
 
