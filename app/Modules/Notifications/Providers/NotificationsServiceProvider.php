@@ -52,6 +52,8 @@ final class NotificationsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Channel subscriptions: 60 a minute per user (a client joins a handful of channels at connect).
+        // PUSH switches: 30 reads or writes a minute per user, a settings screen never needs more.
+        RateLimiter::for('notification-preferences', fn (Request $request) => Limit::perMinute(30)->by('notification-preferences:'.($request->user()?->getAuthIdentifier() ?? Fingerprint::ip($request->ip()))));
         RateLimiter::for('broadcast-auth', fn (Request $request) => Limit::perMinute(60)->by('broadcast-auth:'.($request->user()?->getAuthIdentifier() ?? Fingerprint::ip($request->ip()))));
 
         if ($this->app->runningInConsole()) {

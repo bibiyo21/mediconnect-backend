@@ -97,6 +97,9 @@ final class DocumentsErrorEnvelope
 
         foreach ($openApi->paths as $path) {
             foreach ($path->operations as $method => $operation) {
+                if (in_array(strtoupper((string) $method).' '.ltrim($path->path, '/'), self::PUSH_PREFERENCE_403, true)) {
+                    $operation->addResponse(Response::make(403)->setContent('application/json', $ref)->setDescription('FORBIDDEN: the account has a privileged role and has not completed multi-factor sign-in (mfa.satisfied). Set up MFA, then sign in again.'));
+                }
                 $description = self::WALK_IN_409[strtoupper((string) $method).' '.ltrim($path->path, '/')] ?? self::CONSULTATION_409[strtoupper((string) $method).' '.ltrim($path->path, '/')] ?? null;
                 if ($description !== null) {
                     $operation->addResponse(Response::make(409)->setContent('application/json', $ref)->setDescription($description));
@@ -136,6 +139,9 @@ final class DocumentsErrorEnvelope
             }
         }
     }
+
+    /** The PUSH switch routes: mfa.satisfied can refuse a privileged user with 403 (HAG-38). */
+    private const PUSH_PREFERENCE_403 = ['GET notifications/preferences', 'PUT notifications/preferences'];
 
     /** @param  Reference  $ref  the ErrorEnvelope schema */
     private function documentWalkInOperation(Operation $operation, string $key, Reference $ref): void

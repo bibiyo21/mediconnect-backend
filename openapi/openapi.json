@@ -8350,6 +8350,179 @@
                 ]
             }
         },
+        "/notifications/preferences": {
+            "get": {
+                "operationId": "notificationPreferences.index",
+                "summary": "Read the PUSH switches. A group with no stored row is on",
+                "tags": [
+                    "NotificationPreferences"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PushPreferencesResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the account has a privileged role and has not completed multi-factor sign-in (mfa.satisfied). Set up MFA, then sign in again.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "notificationPreferences.update",
+                "summary": "Replace the PUSH switches. Repeating the same body changes nothing. In-app notices are unaffected",
+                "tags": [
+                    "NotificationPreferences"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdatePushPreferencesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PushPreferencesResource"
+                                        },
+                                        "meta": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "data",
+                                        "meta",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: the account has a privileged role and has not completed multi-factor sign-in (mfa.satisfied). Set up MFA, then sign in again.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    },
+                    {
+                        "session": []
+                    }
+                ]
+            }
+        },
         "/auth/otp": {
             "post": {
                 "operationId": "otp.request",
@@ -19192,6 +19365,34 @@
                 ],
                 "title": "PublicPresenceResource"
             },
+            "PushPreferencesResource": {
+                "type": "object",
+                "properties": {
+                    "push": {
+                        "type": "object",
+                        "properties": {
+                            "walk_in_doctor_checked_out": {
+                                "type": "boolean"
+                            },
+                            "walk_in_cancelled": {
+                                "type": "boolean"
+                            },
+                            "walk_in_transferred": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "walk_in_doctor_checked_out",
+                            "walk_in_cancelled",
+                            "walk_in_transferred"
+                        ]
+                    }
+                },
+                "required": [
+                    "push"
+                ],
+                "title": "PushPreferencesResource"
+            },
             "QueueBoardResource": {
                 "type": "object",
                 "properties": {
@@ -20861,6 +21062,35 @@
                     }
                 },
                 "title": "UpdateMyPatientProfileRequest"
+            },
+            "UpdatePushPreferencesRequest": {
+                "type": "object",
+                "description": "PUT /notifications/preferences: every known PUSH group, each on or off. Unknown groups are refused.",
+                "properties": {
+                    "push": {
+                        "type": "object",
+                        "properties": {
+                            "walk_in_doctor_checked_out": {
+                                "type": "boolean"
+                            },
+                            "walk_in_cancelled": {
+                                "type": "boolean"
+                            },
+                            "walk_in_transferred": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "walk_in_doctor_checked_out",
+                            "walk_in_cancelled",
+                            "walk_in_transferred"
+                        ]
+                    }
+                },
+                "required": [
+                    "push"
+                ],
+                "title": "UpdatePushPreferencesRequest"
             },
             "UpdateSettingRequest": {
                 "type": "object",
